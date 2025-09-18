@@ -1,0 +1,552 @@
+# QuickBite — Full System Design (MVP → Scale)
+
+**Goal:** Build a campus-first food pre-order & pickup app (students + small vendors). This document maps the full system: ERD, APIs, user flows, architecture, infra, background jobs, security, and a prioritized feature roadmap for an MVP and what to add next.
+
+> No fluff. Practical, developer-first design you can implement step-by-step.
+
+---
+
+# 1 — High-level overview
+
+Actors:
+
+* **Student (user)** — browses menus, pre-orders, pays (optional), receives pickup notification.
+* **Vendor (merchant)** — manages menu, sees incoming orders, updates order status.
+* **Admin** — manages vendors/users, views transactions, resolves disputes.
+
+Primary flows:
+
+1. Student authenticates → browses campus vendors → places order (immediate or scheduled) → pays or selects cash-on-pickup.
+2. Vendor dashboard receives order in real-time → accepts/rejects → prepares → marks *ready for pickup*.
+3. Student receives notification → picks up → vendor marks picked up → order completed.
+
+MVP scope (minimum):
+
+* Student mobile app (React Native/Expo)
+* Vendor web dashboard (React)
+* Backend API (Node + Express + TypeScript)
+* PostgreSQL (managed)
+* Real-time updates (WebSocket + FCM push)
+* Payments: Paystack integration (optional at launch, but support cash)
+* Image storage (Cloudinary)
+
+---
+
+# 2 — Tech choices (recommended)
+
+* Mobile: **React Native (Expo)** — faster dev, OTA updates via EAS. Use TypeScript. Use Expo Go for testing.
+* Web vendor dashboard: **React + Vite**, TypeScript.
+* Backend: **Node.js + Express + TypeScript**. Use **Prisma** as ORM for Postgres.
+* DB: **Postgres** managed like Neon
+* Cache / queues: **Redis** BullMQ recommended.
+* Storage: **Cloudinary**.
+* Realtime push: **WebSocket (ws / socket.io)** for vendor dashboard; **FCM** for mobile push.
+* CI/CD: **GitHub Actions** → deploy web to Vercel, backend to Render. Use GitHub Actions for testing and deployment.
+* Observability: **Sentry** for errors, **Prometheus/Grafana** for metrics, logs to **Loki/Cloudwatch**.
+
+Rationale: TypeScript everywhere gives consistent types/shared DTOs between frontend and backend (create a `shared` types package in a monorepo).
+
+---
+
+# 3 — Data model (ERD)
+
+Mermaid ERD (paste to a Mermaid viewer if you want the visual):
+
+```mermaid
+erDiagram
+    USERS ||--o{ ORDERS : places
+    USERS ||--o{ VENDORS : owns
+    VENDORS ||--o{ MENUS : offers
+    MENUS ||--o{ MENU_ITEMS : contains
+    ORDERS ||--o{ ORDER_ITEMS : contains
+    MENU_ITEMS ||--o{ ORDER_ITEMS : referenced_by
+    ORDERS ||--o{ PAYMENTS : has
+    VENDORS ||--o{ ORDERS : receives
+    CAMPUSES ||--o{ VENDORS : contains
+    CAMPUSES ||--o{ USERS : contains
+```
+
+## Core tables & fields (concise)
+
+### users
+
+* id (uuid, pk)
+* email (unique)
+* password\_hash
+* name
+* phone
+* role (enum: student, vendor\_owner, admin)
+* campus\_id -> campuses.id
+* fcm\_token (nullable)
+* created\_at, updated\_at
+
+### campuses
+
+* id
+* name (e.g., "KWASU - Malete")
+* lat, lng, campus\_meta
+
+### vendors
+
+* id
+* owner\_id -> users.id
+* name
+* description
+* location (text) // simple
+* campus\_id
+* is\_active
+* pickup\_window (json or intervals) // e.g., open hours
+* created\_at, updated\_at
+
+### menus
+
+* id
+* vendor\_id -> vendors.id
+* name
+* description
+* is\_active
+
+### menu\_items
+
+* id
+* menu\_id -> menus.id
+* name
+* description
+* price\_cents (integer)
+* prep\_time\_minutes (int)
+* available\_quantity (nullable int) // optional inventory
+* is\_active
+* image\_url
+
+### order\_items
+
+* id
+* order\_id -> orders.id
+* menu\_item\_id -> menu\_items.id
+* quantity
+* unit\_price\_cents
+* extras jsonb (for addons)
+
+### orders
+
+* id (uuid)
+* user\_id -> users.id
+* vendor\_id -> vendors.id
+* status (enum: pending, accepted, preparing, ready\_for\_pickup, picked\_up, cancelled, refunded)
+* total\_cents
+* payment\_status (enum: unpaid, paid, refunded)
+* payment\_method (enum: cash, stripe, paystack)
+* scheduled\_time (nullable timestamp)
+* estimated\_ready\_time (timestamp)
+* pickup\_code (short string) // optional security code
+* created\_at, updated\_at
+
+### payments
+
+* id
+* order\_id
+* provider\_payment\_id (string)
+* amount\_cents
+* status (enum: pending, succeeded, failed, refunded)
+* created\_at
+
+### notifications (audit log)
+
+* id
+* user\_id
+* type
+* payload jsonb
+* sent\_at
+
+### analytics\_events (optional)
+
+* id
+* user\_id (nullable)
+* event\_name
+* payload jsonb
+* created\_at
+
+Indexes: add indexes on orders(vendor\_id, status), menu\_items(menu\_id, is\_active), users(campus\_id).
+
+Use JSONB for flexible fields like extras and pickup windows.
+
+---
+
+# 4 — Prisma schema (starter snippet)
+
+```prisma
+generator client { provider = "prisma-client-js" }
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  phone        String?
+  role         UserRole @default(STUDENT)
+  campusId     String?
+  fcmToken     String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  vendors      Vendor[] @relation("OwnerVendors")
+  orders       Order[]
+}
+
+enum UserRole { STUDENT VENDOR_OWNER ADMIN }
+
+model Vendor {
+  id          String   @id @default(uuid())
+  ownerId     String
+  owner       User     @relation(fields: [ownerId], references: [id], name: "OwnerVendors")
+  name        String
+  campusId    String?
+  isActive    Boolean  @default(true)
+  menus       Menu[]
+  orders      Order[]
+  createdAt   DateTime @default(now())
+}
+
+model Menu {
+  id        String     @id @default(uuid())
+  vendorId  String
+  vendor    Vendor     @relation(fields: [vendorId], references: [id])
+  name      String
+  items     MenuItem[]
+}
+
+model MenuItem {
+  id               String   @id @default(uuid())
+  menuId           String
+  menu             Menu     @relation(fields: [menuId], references: [id])
+  name             String
+  description      String?
+  priceCents       Int
+  prepTimeMin      Int?
+  availableQty     Int?
+  isActive         Boolean  @default(true)
+  imageUrl         String?
+}
+
+model Order {
+  id                 String      @id @default(uuid())
+  userId             String
+  user               User        @relation(fields: [userId], references: [id])
+  vendorId           String
+  vendor             Vendor      @relation(fields: [vendorId], references: [id])
+  status             OrderStatus @default(PENDING)
+  paymentStatus      PaymentStatus @default(UNPAID)
+  paymentMethod      PaymentMethod
+  totalCents         Int
+  scheduledTime      DateTime?
+  estimatedReadyTime DateTime?
+  pickupCode         String?
+  items              OrderItem[]
+  createdAt          DateTime @default(now())
+}
+
+enum OrderStatus { PENDING ACCEPTED PREPARING READY_FOR_PICKUP PICKED_UP CANCELLED REFUNDED }
+enum PaymentStatus { UNPAID PAID REFUNDED }
+enum PaymentMethod { CASH STRIPE PAYSTACK }
+
+model OrderItem {
+  id          String @id @default(uuid())
+  orderId     String
+  order       Order  @relation(fields: [orderId], references: [id])
+  menuItemId  String
+  menuItem    MenuItem @relation(fields: [menuItemId], references: [id])
+  quantity    Int
+  unitPrice   Int
+  extras      Json?
+}
+```
+
+---
+
+# 5 — API surface (REST) — essential endpoints
+
+**Auth**
+
+* `POST /api/v1/auth/register` — {name,email,phone,password,role,campus\_id}
+* `POST /api/v1/auth/login` — {email,password} → {access\_token, refresh\_token, user}
+* `POST /api/v1/auth/refresh` — {refresh\_token} → new access\_token
+* `POST /api/v1/auth/logout` — revoke refresh token
+
+**Users**
+
+* `GET /api/v1/users/me` — auth
+* `PATCH /api/v1/users/me` — update profile, fcm token
+
+**Vendors & Menus**
+
+* `GET /api/v1/vendors?campus_id=&q=` — list vendors
+* `GET /api/v1/vendors/:id` — vendor details + active menu
+* `POST /api/v1/vendors` — create vendor (vendor owner)
+* `POST /api/v1/vendors/:id/menus` — create menu
+* `POST /api/v1/menus/:menuId/items` — create menu item (vendor)
+* `PATCH /api/v1/menu-items/:id` — update item
+
+**Orders**
+
+* `POST /api/v1/orders` — create order
+
+  * Body: `{ vendor_id, items: [{menu_item_id, quantity, extras}], scheduled_time?, payment_method }`
+  * Response: `{ order_id, total_cents, estimated_ready_time }`
+* `GET /api/v1/orders/:id` — order details (owner/user)
+* `GET /api/v1/vendors/:id/orders?status=` — vendor order list (real-time updates)
+* `PATCH /api/v1/orders/:id/status` — vendor updates status (accept/cancel/ready/picked\_up)
+
+**Payments**
+
+* `POST /api/v1/payments/create-intent` — create PaymentIntent (stripe) or initialize (paystack)
+* `POST /api/v1/payments/webhook` — webhook endpoint to confirm payment
+
+**Notifications**
+
+* `POST /api/v1/users/me/fcm-token` — register device token
+
+**Admin**
+
+* `GET /api/v1/admin/vendors` — list vendors
+* `PATCH /api/v1/admin/vendors/:id` — suspend/reactivate vendor
+
+---
+
+# API examples (order creation)
+
+Request:
+
+```http
+POST /api/v1/orders
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "vendor_id": "vendor-uuid",
+  "items": [
+    { "menu_item_id": "item-uuid", "quantity": 2, "extras": {"sauce": "extra"} }
+  ],
+  "scheduled_time": null,
+  "payment_method": "CASH"
+}
+```
+
+Response (201):
+
+```json
+{
+  "id": "order-uuid",
+  "total_cents": 1200,
+  "status": "PENDING",
+  "estimated_ready_time": "2025-09-18T11:10:00Z"
+}
+```
+
+---
+
+# 6 — Real-time & notifications
+
+**Vendor dashboard**: use Socket.IO (namespaces per vendor) or a dedicated WS server.
+
+* Rooms: `vendor:{vendorId}` subscribe to vendor events.
+* Events:
+
+  * `order.created` — payload: {order\_id, items, total\_cents, user: {id,name}, scheduled\_time}
+  * `order.updated` — payload: {order\_id, status}
+
+**Student mobile**: use FCM for push notifications for readiness & payment updates.
+
+* Flow: backend triggers push when order status becomes `READY_FOR_PICKUP` or payment succeeded.
+* Also send in-app update via WS when app connected.
+
+**Webhooks**: payment provider posts to `/payments/webhook` → backend verifies signature → updates order and emits WS + push.
+
+---
+
+# 7 — Background jobs & queues
+
+Use Redis + BullMQ.
+
+Jobs:
+
+* `sendPushNotification` — deliver push to FCM; retry with backoff.
+* `processPaymentWebhook` — handle idempotent updates.
+* `autoCancelUnacceptedOrders` — cancel orders not accepted within X minutes.
+* `generateDailyVendorReport` — email or store report.
+* `reconcilePayments` — periodic checks with payment provider if needed.
+
+This keeps HTTP endpoints fast & idempotent.
+
+---
+
+# 8 — Concurrency, transactions, and consistency
+
+Critical: avoid race conditions when multiple users attempt to order low-stock items.
+
+Strategies:
+
+* Use DB transactions and `SELECT FOR UPDATE` on `menu_items` row when you decrement `available_quantity`.
+* Alternatively, use optimistic locking (version number) and retry on conflict.
+* Use idempotency keys for order creation/payment webhooks to prevent duplicate orders (store idempotency key in Redis or DB).
+
+Example (pseudo):
+
+1. Start transaction.
+2. For each menu\_item: `SELECT available_qty FROM menu_items WHERE id = X FOR UPDATE`.
+3. If quantity available, update `available_qty = available_qty - qty`.
+4. Insert order and order\_items, commit.
+
+---
+
+# 9 — Security & data protection
+
+* **Auth:** JWT access tokens (short-lived) + refresh tokens (long-lived) stored securely. Mobile: use secure storage. Web: HttpOnly secure cookie for refresh token.
+* **Passwords:** Argon2 or bcrypt (cost configured). Never log secrets.
+* **API:** rate-limiting per IP & per user, basic abuse protection.
+* **Input validation:** strong request validation (zod or Joi). Reject unexpected extras.
+* **File uploads:** sign upload URLs (S3 pre-signed). Validate content-type & size.
+* **Webhooks:** verify signature from payment provider.
+* **Least privilege:** DB roles for read vs write? Ensure backups encrypted.
+* **PCI:** if you accept payments, use payment provider SDKs / hosted pages to avoid handling card data directly.
+
+Privacy: store minimum PII; allow users to delete accounts per laws.
+
+---
+
+# 10 — Observability & monitoring
+
+* Errors: Sentry.
+* Logs: structured logs (JSON) → Loki / Cloudwatch.
+* Metrics: expose Prometheus metrics (request latency, queue sizes, worker errors).
+* Traces: use OpenTelemetry to trace long flows (webhook → DB → push).
+
+---
+
+# 11 — Deployment & infra (suggested)
+
+* **Monorepo layout** (npm / yarn workspaces): `/apps/mobile`, `/apps/web`, `/apps/api`, `/packages/shared`.
+
+**Hosting**
+
+* Frontend vendor dashboard: Vercel
+* Mobile: Expo (EAS builds) → Play Store / App Store. Use Expo Go for testing.
+* API: Render
+* Postgres: Neon
+* Redis: Managed Redis (Upstash / Redis Cloud)
+* Storage: Cloudinary
+
+**Scaling**
+
+* Stateless API containers behind LB. Use horizontal scaling.
+* Websocket: stateful — use a separate socket server cluster + Redis pub/sub to broadcast between instances.
+* DB: read replicas for heavy reads; careful with write-heavy flows.
+
+**CI/CD**
+
+* GitHub Actions: tests → build → deploy. Run Prisma migrations as part of deploy pipeline with safe migration checks.
+
+---
+
+# 12 — Testing strategy
+
+* Unit tests: Jest for backend business logic.
+* Integration tests: test endpoints with supertest + test DB (docker-compose or ephemeral DB). Use Jest for testing.
+* End-to-end: Playwright for web, Detox or E2E with Expo for mobile. Use Playwright for testing.
+* Contract tests: keep shared DTOs and test API interactions between services.
+
+---
+
+# 13 — Edge cases & business rules
+
+* Vendor ignores order -> auto-cancel after configurable timeout and notify user & refund if paid.
+* Vendor rejects order -> full refund workflow.
+* Student doesn’t pick up -> vendor can mark as `no_show` after X minutes → refund partial/full per policy.
+* Duplicate payments -> dedupe via idempotency key and provider transaction id.
+* Schedule orders: vendor must explicitly enable scheduled pickup windows; compute estimated\_ready\_time = scheduled\_time or created\_at + max prep time.
+
+---
+
+# 14 — Admin & reconciliation
+
+Admin panel should allow:
+
+* Search orders/payments, refund manual payments, suspend vendors/users, run reconciliation tasks.
+* Export CSV reports for vendor payouts.
+
+Payouts: vendors receive payouts on a schedule; either manual or automatic via payment provider.
+
+---
+
+# 15 — Roadmap / priorities (MVP → v2 → scale)
+
+MVP (launch campus):
+
+1. Auth, user profile, vendor onboarding, menu CRUD.
+2. Order creation + vendor dashboard (real-time), basic notifications (FCM).
+3. Cash-on-pickup + optional payments integration (Paystack basic).
+4. Background queue for notifications & auto-cancel.
+5. Deployment, monitoring, and basic admin.
+
+v1 (post-MVP):
+
+* Payments fully integrated + webhooks and reconciliation.
+* Analytics dashboard for vendors (orders/day, avg ticket, peak times).
+* Loyalty & coupons.
+* Scheduling & pre-orders for future days.
+
+Scale:
+
+* Multi-campus / multi-city support, search & discovery, delivery, routing, third-party integrations.
+
+---
+
+# 16 — Developer deliverables & next steps (pick one)
+
+I can generate any of the following next (pick one):
+
+* A. **Prisma schema + migrations** for the data model above + seed script.
+* B. **Express + TypeScript API scaffold** with auth, order endpoints, and socket integration (complete code).
+* C. **React Native Expo skeleton** for the Student app (screens: browse, cart, checkout, orders). Use Expo Go for testing. Use TypeScript.
+* D. **Vendor dashboard React app** scaffold (order list + socket live updates).
+* E. **Postman / OpenAPI spec** for the API endpoints above.
+
+---
+
+# 17 — Implementation tips & gotchas (blunt)
+
+* Keep types shared — you’ll save days fixing mismatched DTOs.
+* Don’t rush payments: implement payments after core order flow is rock-solid.
+* Use feature flags for risky features (scheduled orders, refunds).
+* Write idempotent webhooks. This is where production headaches happen.
+* Test the whole flow manually with 2 devices (student + vendor) before showing anyone.
+
+---
+
+# 18 — Appendix: sample socket event payloads
+
+`order.created` (to vendor):
+
+```json
+{
+  "id": "order-uuid",
+  "user": {"id":"u-1","name":"Ada"},
+  "items": [{"menu_item_id":"mi-1","name":"Chicken Rice","quantity":2}],
+  "total_cents": 1200,
+  "scheduled_time": null,
+  "created_at": "2025-09-18T10:01:00Z"
+}
+```
+
+`order.updated`:
+
+```json
+{ "id":"order-uuid", "status":"READY_FOR_PICKUP", "estimated_ready_time":"2025-09-18T10:20:00Z" }
+```
+
+---
+
+If you want any of the deliverables in Section 16, tell me which letter and I will generate the code or OpenAPI spec next. Otherwise, say which specific part you want implemented first and I’ll produce the scaffold.
