@@ -504,29 +504,7 @@ Scale:
 
 ---
 
-# 16 — Developer deliverables & next steps (pick one)
-
-I can generate any of the following next (pick one):
-
-* A. **Prisma schema + migrations** for the data model above + seed script.
-* B. **Express + TypeScript API scaffold** with auth, order endpoints, and socket integration (complete code).
-* C. **React Native Expo skeleton** for the Student app (screens: browse, cart, checkout, orders). Use Expo Go for testing. Use TypeScript.
-* D. **Vendor dashboard React app** scaffold (order list + socket live updates).
-* E. **Postman / OpenAPI spec** for the API endpoints above.
-
----
-
-# 17 — Implementation tips & gotchas (blunt)
-
-* Keep types shared — you’ll save days fixing mismatched DTOs.
-* Don’t rush payments: implement payments after core order flow is rock-solid.
-* Use feature flags for risky features (scheduled orders, refunds).
-* Write idempotent webhooks. This is where production headaches happen.
-* Test the whole flow manually with 2 devices (student + vendor) before showing anyone.
-
----
-
-# 18 — Appendix: sample socket event payloads
+# 16 — Appendix: sample socket event payloads
 
 `order.created` (to vendor):
 
@@ -548,5 +526,3 @@ I can generate any of the following next (pick one):
 ```
 
 ---
-
-If you want any of the deliverables in Section 16, tell me which letter and I will generate the code or OpenAPI spec next. Otherwise, say which specific part you want implemented first and I’ll produce the scaffold.
