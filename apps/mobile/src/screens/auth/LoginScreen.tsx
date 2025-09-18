@@ -12,6 +12,7 @@ import { CTAButton } from "../../ui/CTAButton";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { AuthStackParamList } from "../../navigation/types";
+import { SafeAreaWrapper } from "../../ui/SafeAreaWrapper";
 
 const schema = z.object({
 	identifier: z.string().min(3, "Enter email or phone"),
@@ -43,54 +44,56 @@ export default function LoginScreen() {
 	};
 
 	return (
-		<Gradient>
-			<KeyboardAvoidingView
-				style={{ flex: 1 }}
-				behavior={Platform.select({ ios: "padding", android: "height" })}
-				keyboardVerticalOffset={Platform.select({ ios: 64, android: 0 })}
-			>
-				<Pressable onPress={Keyboard.dismiss} style={{ flex: 1 }}>
-					<ScrollView
-						contentContainerStyle={{ flexGrow: 1, justifyContent: "center", padding: 20, gap: 18 }}
-						keyboardShouldPersistTaps="handled"
-					>
-						<Text style={{ color: theme.colors.text, fontSize:28, fontWeight: "800" }}>Welcome back</Text>
-						<Input
-							label="Email or Phone"
-							autoCapitalize="none"
-							onChangeText={(t) => setValue("identifier", t)}
-							{...register("identifier")}
-							error={errors.identifier?.message}
-						/>
-						<Input
-							label="Password"
-							secureTextEntry
-							onChangeText={(t) => setValue("password", t)}
-							{...register("password")}
-							error={errors.password?.message}
-						/>
-						<CTAButton title={loading ? "Signing in..." : "Sign In"} onPress={handleSubmit(onSubmit)} />
-						<Pressable onPress={() => navigation.navigate("ForgotPassword")}>
-							<Text style={{ color: theme.colors.muted, textAlign:"center" }}>Forgot password?</Text>
-						</Pressable>
-
-						<View style={{ height:1, backgroundColor:"#1f2937", marginVertical:6 }} />
-						<Text style={{ color: theme.colors.muted, textAlign:"center" }}>Or continue with</Text>
-						<View style={{ flexDirection:"row", gap:12, justifyContent:"center" }}>
-							<Pressable style={{ padding:12, borderRadius:12, backgroundColor:"#0f172a" }}>
-								<Text style={{ color:"white" }}>Google</Text>
+		<SafeAreaWrapper statusBarStyle="light">
+			<Gradient>
+				<KeyboardAvoidingView
+					style={{ flex: 1 }}
+					behavior={Platform.select({ ios: "padding", android: "height" })}
+					keyboardVerticalOffset={Platform.select({ ios: 0, android: 0 })}
+				>
+					<Pressable onPress={Keyboard.dismiss} style={{ flex: 1 }}>
+						<ScrollView
+							contentContainerStyle={{ flexGrow: 1, justifyContent: "center", padding: 20, gap: 18 }}
+							keyboardShouldPersistTaps="handled"
+						>
+							<Text style={{ color:"white", fontSize:28, fontWeight:"800" }}>Welcome back</Text>
+							<Input
+								label="Email or Phone"
+								autoCapitalize="none"
+								onChangeText={(t) => setValue("identifier", t)}
+								{...register("identifier")}
+								error={errors.identifier?.message}
+							/>
+							<Input
+								label="Password"
+								secureTextEntry
+								onChangeText={(t) => setValue("password", t)}
+								{...register("password")}
+								error={errors.password?.message}
+							/>
+							<CTAButton title={loading ? "Signing in..." : "Sign In"} onPress={handleSubmit(onSubmit)} />
+							<Pressable onPress={() => navigation.navigate("ForgotPassword")}>
+								<Text style={{ color: theme.colors.muted, textAlign:"center" }}>Forgot password?</Text>
 							</Pressable>
-							<Pressable style={{ padding:12, borderRadius:12, backgroundColor:"#0f172a" }}>
-								<Text style={{ color:"white" }}>Apple</Text>
-							</Pressable>
-						</View>
 
-						<Pressable onPress={() => navigation.navigate("Register")}>
-							<Text style={{ color: theme.colors.muted, textAlign:"center" }}>New here? Create account</Text>
-						</Pressable>
-					</ScrollView>
-				</Pressable>
-			</KeyboardAvoidingView>
-		</Gradient>
+							<View style={{ height:1, backgroundColor:"#1f2937", marginVertical:6 }} />
+							<Text style={{ color: theme.colors.muted, textAlign:"center" }}>Or continue with</Text>
+							<View style={{ flexDirection:"row", gap:12, justifyContent:"center" }}>
+								<Pressable style={{ padding:12, borderRadius:12, backgroundColor:"#0f172a" }}>
+									<Text style={{ color:"white" }}>Google</Text>
+								</Pressable>
+								<Pressable style={{ padding:12, borderRadius:12, backgroundColor:"#0f172a" }}>
+									<Text style={{ color:"white" }}>Apple</Text>
+								</Pressable>
+							</View>
+
+							<Pressable onPress={() => navigation.navigate("Register")}>
+								<Text style={{ color: theme.colors.muted, textAlign:"center" }}>New here? Create account</Text>
+							</Pressable>
+						</ScrollView>
+					</Pressable>
+				</KeyboardAvoidingView>
+			</Gradient>
+		</SafeAreaWrapper>
 	);
 }

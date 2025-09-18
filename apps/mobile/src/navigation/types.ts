@@ -17,4 +17,16 @@ export type AppTabParamList = {
 export type RootStackParamList = {
     AppTabs: NavigatorScreenParams<AppTabParamList>;
     AuthStack: NavigatorScreenParams<AuthStackParamList>;
-}
+    Menu: { vendorId: string };
+    Checkout: { 
+        cartItems: Record<string, number>; 
+        vendorId: string; 
+    };
+    OrderConfirmation: {
+        orderId: string;
+        pickupCode: string;
+        vendor: any;
+        items: any[];
+        total: number;
+    };
+};
