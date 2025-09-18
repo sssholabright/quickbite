@@ -1,10 +1,14 @@
-import { QueryProvider } from './src/providers/QueryProvider';
-import RootNavigator from './src/navigation/RootNavigator';
+import "react-native-gesture-handler";
+import { ThemeModeContext } from "./src/theme/theme";
+import RootNavigator from "./src/navigation/RootNavigator";
+import { QueryProvider } from "./src/providers/QueryProvider";
 
 export default function App() {
-  return (
-    <QueryProvider>
-      <RootNavigator />
-    </QueryProvider>
-  );
+	return (
+		<ThemeModeContext.Provider value="system">
+			<QueryProvider>
+				<RootNavigator />
+			</QueryProvider>
+		</ThemeModeContext.Provider>
+	);
 }

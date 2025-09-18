@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { DefaultTheme, NavigationContainer, Theme } from '@react-navigation/native';
+import { DefaultTheme, DarkTheme, NavigationContainer, Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { linking } from './Linking';
@@ -8,73 +8,91 @@ import LoginScreen from '../screens/auth/LoginScreen';
 import HomeScreen from '../screens/home/HomeScreen';
 import OrdersScreen from '../screens/order/OrdersScreen';
 import ProfileScreen from '../screens/profile/ProfileScreen';
-import { theme } from '../theme/theme';
 import { Text } from 'react-native';
 import { Icon } from '../ui/Icon';
-
-
-const navTheme: Theme = {
-    ...DefaultTheme,
-    colors: { ...DefaultTheme.colors, background: theme.colors.background }
-};
+import OnboardingScreen from '../screens/auth/OnboardingScreen';
+import RegisterScreen from '../screens/auth/RegisterScreen';
+import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
+import { useTheme } from '../theme/theme';
+import type { AuthStackParamList } from "../navigation/types";
 
 const RootStack = createNativeStackNavigator();
-const AuthStack = createNativeStackNavigator();
+const AuthStack = createNativeStackNavigator<AuthStackParamList>();
 const Tab = createBottomTabNavigator();
 
 function AuthStackNavigator() {
-    return (
-        <AuthStack.Navigator>
-            <AuthStack.Screen name="Login" component={LoginScreen} options={{ title: "Login" }} />
-        </AuthStack.Navigator>
-    );
+	const hasSeenOnboarding = useAuthStore((s) => s.hasSeenOnboarding);
+	const theme = useTheme();
+
+	return (
+		<AuthStack.Navigator
+			key={hasSeenOnboarding ? "seen" : "new"}
+			initialRouteName={hasSeenOnboarding ? "Login" : "Onboarding"}
+			screenOptions={{
+				headerStyle: { backgroundColor: theme.colors.surface },
+				headerTintColor: theme.colors.text,
+				headerTitleStyle: { fontWeight: "700" },
+				headerTitleAlign: "center",
+				headerShadowVisible: false
+			}}
+		>
+			<AuthStack.Screen name="Onboarding" component={OnboardingScreen} options={{ headerShown: false }} />
+			<AuthStack.Screen name="Login" component={LoginScreen} options={{ title: "Login" }} />
+			<AuthStack.Screen name="Register" component={RegisterScreen} options={{ title: "Register" }} />
+			<AuthStack.Screen name="ForgotPassword" component={ForgotPasswordScreen} options={{ title: "Forgot Password" }} />
+		</AuthStack.Navigator>
+	);
 }
 
 function AppTabs() {
-    return (
-        <Tab.Navigator 
-            screenOptions={({ route }) => ({
-                headerTitleAlign: "center",
-                tabBarActiveTintColor: theme.colors.primary,
-                tabBarInactiveTintColor: "#6b7280",
-                tabBarIcon: ({ color, size, focused }) => {
-                    if (route.name === "Home") {
-                        return <Icon set='ion' name={focused ? "home" : "home-outline"} color={color} size={size} />
-                    }
-                    if (route.name === "Orders") {
-						return <Icon set="mi" name={focused ? "receipt-long" : "receipt-long"} color={color} size={size} />
-					}
-                    // Profile
+	const theme = useTheme();
+	return (
+		<Tab.Navigator 
+			screenOptions={({ route }) => ({
+				headerTitleAlign: "center",
+				headerStyle: { backgroundColor: theme.colors.surface },
+				headerTintColor: theme.colors.text,
+				headerTitleStyle: { fontWeight: "700" },
+				headerShadowVisible: false,
+				tabBarActiveTintColor: theme.colors.primary,
+				tabBarInactiveTintColor: theme.colors.muted,
+				tabBarStyle: { backgroundColor: theme.colors.surface, borderTopColor: theme.colors.border },
+				tabBarIcon: ({ color, size, focused }) => {
+					if (route.name === "Home") return <Icon set='ion' name={focused ? "home" : "home-outline"} color={color} size={size} />
+					if (route.name === "Orders") return <Icon set="mi" name={"receipt-long"} color={color} size={size} />
 					return <Icon set="ion" name={focused ? "person" : "person-outline"} color={color} size={size} />;
-                } 
-            })}>
-            <Tab.Screen name="Home" component={HomeScreen} options={{ title: "Home" }} />
-            <Tab.Screen name="Orders" component={OrdersScreen} options={{ title: "Orders" }} />
-            <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: "Profile" }} />
-        </Tab.Navigator>
-    )
+				}
+			})}>
+			<Tab.Screen name="Home" component={HomeScreen} options={{ title: "Home" }} />
+			<Tab.Screen name="Orders" component={OrdersScreen} options={{ title: "Orders" }} />
+			<Tab.Screen name="Profile" component={ProfileScreen} options={{ title: "Profile" }} />
+		</Tab.Navigator>
+	)
 }
 
 export default function RootNavigator() {
-    const { token, hydrated, hydrate } = useAuthStore();
+	const { token, hydrated, hydrate } = useAuthStore();
+	const appTheme = useTheme();
 
-    useEffect(() => {
-        void hydrate();
-    }, [hydrate]);
+	useEffect(() => { void hydrate(); }, [hydrate]);
 
-    if (!hydrated) {
-        return <Text style={{ marginTop: 50, textAlign: "center" }}>Loading...</Text>
-    }
+	if (!hydrated) {
+		return <Text style={{ marginTop: 50, textAlign: "center", color: appTheme.colors.text }}>Loading...</Text>
+	}
 
-    return (
-        <NavigationContainer linking={linking} theme={navTheme}>
-            <RootStack.Navigator screenOptions={{ headerShown: false }}>
-                {token ? (
-                    <RootStack.Screen name="AppTabs" component={AppTabs} />
-                ) : (
-                    <RootStack.Screen name="AuthStack" component={AuthStackNavigator} />
-                )}
-            </RootStack.Navigator>
-        </NavigationContainer>
-    )
+	const navTheme: Theme = appTheme.mode === "dark"
+		? { ...DarkTheme, colors: { ...DarkTheme.colors, background: appTheme.colors.background, card: appTheme.colors.surface, text: appTheme.colors.text, border: appTheme.colors.border, primary: appTheme.colors.primary } }
+		: { ...DefaultTheme, colors: { ...DefaultTheme.colors, background: appTheme.colors.background, card: appTheme.colors.surface, text: appTheme.colors.text, border: appTheme.colors.border, primary: appTheme.colors.primary } };
+
+	return (
+		<NavigationContainer linking={linking} theme={navTheme}>
+			<RootStack.Navigator screenOptions={{ headerShown: false }}>
+				{token ? (
+					<RootStack.Screen name="AppTabs" component={AppTabs} />
+				) : (
+					<RootStack.Screen name="AuthStack" component={AuthStackNavigator} />
+				)}
+			</RootStack.Navigator>
+		</NavigationContainer>
+	)
 }

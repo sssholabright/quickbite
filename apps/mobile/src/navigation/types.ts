@@ -1,12 +1,11 @@
 import type { NavigatorScreenParams } from "@react-navigation/native";
 
 export type AuthStackParamList = {
-    Login: undefined;
-    Register: undefined;
-    ForgotPassword: undefined;
-    ResetPassword: undefined;
-    VerifyEmail: undefined;
-    VerifyPhone: undefined;
+	Splash: undefined;
+	Onboarding: undefined;
+	Login: undefined;
+	Register: undefined;
+	ForgotPassword: undefined;
 }
 
 export type AppTabParamList = {
