@@ -55,6 +55,7 @@ export interface CategoryChipProps {
 export interface MealCardProps {
     meal: Meal;
     onPress: () => void;
+    onAddToCart?: () => void;
 }
 
 export interface PromoBannerProps {
@@ -84,6 +85,24 @@ export interface CartBottomSheetProps {
     onUpdateQuantity: (mealId: string, quantity: number) => void;
     onRemoveItem: (mealId: string) => void;
     onProceedToCheckout: () => void;
+}
+
+export interface CartItem {
+    id: string;
+    name: string;
+    price: number;
+    quantity: number;
+    image?: string;
+    vendorId: string;
+    vendorName: string;
+}
+
+export interface CartScreenProps {
+    visible: boolean;
+    onClose: () => void;
+    cartItems: Record<string, number>;
+    onUpdateQuantity: (mealId: string, quantity: number) => void;
+    onRemoveItem: (mealId: string) => void;
 }
 
 export interface CheckoutScreenProps {

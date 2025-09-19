@@ -1,5 +1,6 @@
-import { useColorScheme } from "react-native";
-import { createContext, useContext, useMemo } from "react";
+import { useColorScheme, type ColorSchemeName } from "react-native";
+import { createContext, useContext, useMemo, useEffect, useState } from "react";
+import { useThemeStore, ThemeMode } from "../stores/theme";
 
 export type AppTheme = {
 	colors: {
@@ -49,12 +50,54 @@ export const darkTheme: AppTheme = {
 	mode: "dark"
 };
 
-type ThemeMode = "system" | "light" | "dark";
 export const ThemeModeContext = createContext<ThemeMode>("system");
 
+// Custom hook to get system color scheme with better handling
+function useSystemColorScheme() {
+	const [colorScheme, setColorScheme] = useState<ColorSchemeName>(null);
+	const rnColorScheme = useColorScheme();
+
+	useEffect(() => {
+		setColorScheme(rnColorScheme ?? null); // handle undefined safely
+	}, [rnColorScheme]);
+
+	return colorScheme;
+}
+
 export function useTheme() {
-	const sys = useColorScheme(); // "light" | "dark" | null
-	const mode = useContext(ThemeModeContext);
-	const effective = mode === "system" ? (sys === "dark" ? "dark" : "light") : mode;
+	const systemColorScheme = useSystemColorScheme();
+	const mode = useThemeStore((state) => state.mode);
+	
+	// Calculate effective theme mode
+	const effective = useMemo(() => {
+		if (mode === "system") {
+			// Default to light if system color scheme is null
+			const result = systemColorScheme === "dark" ? "dark" : "light";
+			return result;
+		}
+		return mode;
+	}, [mode, systemColorScheme]);
+	
 	return useMemo(() => (effective === "dark" ? darkTheme : lightTheme), [effective]);
+}
+
+export function useThemeMode() {
+	return useThemeStore((state) => state.mode);
+}
+
+export function useSetThemeMode() {
+	return useThemeStore((state) => state.setMode);
+}
+
+// Helper hook to get the current effective theme mode
+export function useEffectiveThemeMode() {
+	const systemColorScheme = useSystemColorScheme();
+	const mode = useThemeStore((state) => state.mode);
+	
+	return useMemo(() => {
+		if (mode === "system") {
+			return systemColorScheme === "dark" ? "dark" : "light";
+		}
+		return mode;
+	}, [mode, systemColorScheme]);
 }

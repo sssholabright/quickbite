@@ -20,6 +20,14 @@ import { SafeAreaWrapper } from '../ui/SafeAreaWrapper';
 import CheckoutScreen from '../screens/checkout/CheckoutScreen';
 import type { RootStackParamList } from "./types";
 import OrderConfirmationScreen from '../screens/order/OrderConfirmationScreen';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
+import OrderDetailScreen from '../screens/order/OrderDetailScreen';
+import AddressManagementScreen from '../screens/profile/AddressManagementScreen';
+import SettingsScreen from '../screens/profile/SettingsScreen';
+import AddAddressScreen from '../screens/profile/AddAddressScreen';
+import PaymentMethodsScreen from '../screens/profile/PaymentMethodsScreen';
+import EditAddressScreen from '../screens/profile/EditAddressScreen';
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
@@ -30,46 +38,43 @@ function AuthStackNavigator() {
 	const theme = useTheme();
 
 	return (
-		<SafeAreaWrapper statusBarStyle="light">
-			<AuthStack.Navigator
-				key={hasSeenOnboarding ? "seen" : "new"}
-				initialRouteName={hasSeenOnboarding ? "Login" : "Onboarding"}
-				screenOptions={{
-					headerStyle: { backgroundColor: theme.colors.surface },
-					headerTintColor: theme.colors.text,
-					headerTitleStyle: { fontWeight: "700" },
-					headerTitleAlign: "center",
-					headerShadowVisible: false
-				}}
-			>
-				<AuthStack.Screen name="Onboarding" component={OnboardingScreen} options={{ headerShown: false }} />
-				<AuthStack.Screen name="Login" component={LoginScreen} options={{ title: "Login" }} />
-				<AuthStack.Screen name="Register" component={RegisterScreen} options={{ title: "Register" }} />
-				<AuthStack.Screen name="ForgotPassword" component={ForgotPasswordScreen} options={{ title: "Forgot Password" }} />
-			</AuthStack.Navigator>
-		</SafeAreaWrapper>
+		<AuthStack.Navigator
+			key={hasSeenOnboarding ? "seen" : "new"}
+			initialRouteName={hasSeenOnboarding ? "Login" : "Onboarding"}
+			screenOptions={{
+				headerStyle: { backgroundColor: theme.colors.surface },
+				headerTintColor: theme.colors.text,
+				headerTitleStyle: { fontWeight: "700" },
+				headerTitleAlign: "center",
+				headerShadowVisible: false
+			}}
+		>
+			<AuthStack.Screen name="Onboarding" component={OnboardingScreen} options={{ headerShown: false }} />
+			<AuthStack.Screen name="Login" component={LoginScreen} options={{ title: "Login" }} />
+			<AuthStack.Screen name="Register" component={RegisterScreen} options={{ title: "Register" }} />
+			<AuthStack.Screen name="ForgotPassword" component={ForgotPasswordScreen} options={{ title: "Forgot Password" }} />
+		</AuthStack.Navigator>
 	);
 }
 
 function AppTabs() {
 	const theme = useTheme();
+	const insets = useSafeAreaInsets();
+	
 	return (
-		<SafeAreaWrapper>
+		<>
+			<StatusBar style={theme.mode === 'dark' ? 'light' : 'dark'} />
 			<Tab.Navigator 
 				screenOptions={({ route }) => ({
-					headerTitleAlign: "center",
-					headerStyle: { backgroundColor: theme.colors.surface },
-					headerTintColor: theme.colors.text,
-					headerTitleStyle: { fontWeight: "700" },
-					headerShadowVisible: false,
+					headerShown: false, // Remove header completely
 					tabBarActiveTintColor: theme.colors.primary,
 					tabBarInactiveTintColor: theme.colors.muted,
 					tabBarStyle: { 
 						backgroundColor: theme.colors.surface, 
 						borderTopColor: theme.colors.border,
-						paddingBottom: 8,
-						paddingTop: 8,
-						height: 60
+						paddingBottom: insets.bottom > 0 ? insets.bottom + 8 : 8,
+						paddingTop: 0,
+						height: insets.bottom > 0 ? 60 + insets.bottom : 60,
 					},
 					tabBarIcon: ({ color, size, focused }) => {
 						if (route.name === "Home") return <Icon set='ion' name={focused ? "home" : "home-outline"} color={color} size={size} />
@@ -81,7 +86,7 @@ function AppTabs() {
 				<Tab.Screen name="Orders" component={OrdersScreen} options={{ title: "Orders" }} />
 				<Tab.Screen name="Profile" component={ProfileScreen} options={{ title: "Profile" }} />
 			</Tab.Navigator>
-		</SafeAreaWrapper>
+		</>
 	);
 }
 
@@ -120,6 +125,36 @@ export default function RootNavigator() {
 				<RootStack.Screen 
 					name="OrderConfirmation" 
 					component={OrderConfirmationScreen} 
+					options={{ headerShown: false }} 
+				/>
+				<RootStack.Screen 
+					name="OrderDetail" 
+					component={OrderDetailScreen} 
+					options={{ headerShown: false }} 
+				/>
+				<RootStack.Screen 
+					name="AddressManagement" 
+					component={AddressManagementScreen} 
+					options={{ headerShown: false }} 
+				/>
+				<RootStack.Screen 
+					name="PaymentMethods" 
+					component={PaymentMethodsScreen} 
+					options={{ headerShown: false }} 
+				/>
+				<RootStack.Screen 
+					name="Settings" 
+					component={SettingsScreen} 
+					options={{ headerShown: false }} 
+				/>
+				<RootStack.Screen 
+					name="AddAddress" 
+					component={AddAddressScreen} 
+					options={{ headerShown: false }} 
+				/>
+				<RootStack.Screen 
+					name="EditAddress" 
+					component={EditAddressScreen} 
 					options={{ headerShown: false }} 
 				/>
 			</RootStack.Navigator>

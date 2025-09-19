@@ -15,18 +15,22 @@ export type AppTabParamList = {
 }
 
 export type RootStackParamList = {
-    AppTabs: NavigatorScreenParams<AppTabParamList>;
     AuthStack: NavigatorScreenParams<AuthStackParamList>;
+    AppTabs: NavigatorScreenParams<AppTabParamList>;
     Menu: { vendorId: string };
-    Checkout: { 
-        cartItems: Record<string, number>; 
-        vendorId: string; 
+    Checkout: { vendorId: string; items: any[]; total: number };
+    OrderConfirmation: { 
+        orderId: string; 
+        pickupCode: string; 
+        vendor: any; 
+        items: any[]; 
+        total: number; 
     };
-    OrderConfirmation: {
-        orderId: string;
-        pickupCode: string;
-        vendor: any;
-        items: any[];
-        total: number;
-    };
+    OrderDetail: { orderId: string };
+    // Profile screens
+    AddressManagement: undefined;
+    PaymentMethods: undefined;
+    Settings: undefined;
+    AddAddress: undefined;
+    EditAddress: { addressId: string };
 };

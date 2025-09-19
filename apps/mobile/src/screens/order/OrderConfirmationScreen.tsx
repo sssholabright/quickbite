@@ -20,15 +20,15 @@ export default function OrderConfirmationScreen() {
     const route = useRoute<OrderConfirmationRouteProp>();
     const { orderId, pickupCode, vendor, items, total } = route.params;
 
-    const [currentStatus, setCurrentStatus] = useState<'pending' | 'preparing' | 'ready' | 'picked'>('pending');
+    const [currentStatus, setCurrentStatus] = useState<'pending' | 'preparing' | 'out_for_delivery' | 'delivered'>('pending');
     const [pulseAnim] = useState(new Animated.Value(1));
 
     // Simulate status updates
     useEffect(() => {
         const timers = [
         setTimeout(() => setCurrentStatus('preparing'), 3000),
-        setTimeout(() => setCurrentStatus('ready'), 8000),
-        setTimeout(() => setCurrentStatus('picked'), 15000),
+        setTimeout(() => setCurrentStatus('out_for_delivery'), 8000),
+        setTimeout(() => setCurrentStatus('delivered'), 15000),
         ];
 
         return () => timers.forEach(clearTimeout);
@@ -58,8 +58,8 @@ export default function OrderConfirmationScreen() {
     const statusSteps = [
         { key: 'pending', label: 'Order Submitted', icon: 'time', time: 'Just now' },
         { key: 'preparing', label: 'Preparing', icon: 'restaurant', time: '~5 mins' },
-        { key: 'ready', label: 'Ready for Pickup', icon: 'checkmark-circle', time: '~10 mins' },
-        { key: 'picked', label: 'Picked Up', icon: 'checkmark-done', time: 'Complete' },
+        { key: 'out_for_delivery', label: 'Out for Delivery', icon: 'car', time: '~10 mins' },
+        { key: 'delivered', label: 'Delivered', icon: 'checkmark-done', time: 'Complete' },
     ];
 
     const getStatusColor = (status: string) => {
@@ -77,7 +77,6 @@ export default function OrderConfirmationScreen() {
     const renderOrderSummary = () => (
         <OrderSummary items={items} vendor={vendor} total={total} />
     )
-
 
     return (
         <SafeAreaWrapper>
@@ -136,7 +135,7 @@ export default function OrderConfirmationScreen() {
                     </Text>
                 </View>
 
-                {/* Pickup Code */}
+                {/* Delivery Info */}
                 <View style={{
                     backgroundColor: theme.colors.primary,
                     borderRadius: 16,
@@ -150,23 +149,24 @@ export default function OrderConfirmationScreen() {
                         marginBottom: 8,
                         opacity: 0.9,
                     }}>
-                        Pickup Code
+                        Delivery Information
                     </Text>
                     <Text style={{
-                        fontSize: 48,
+                        fontSize: 24,
                         fontWeight: '700',
                         color: 'white',
-                        letterSpacing: 4,
                         marginBottom: 8,
+                        textAlign: 'center',
                     }}>
-                        {pickupCode}
+                        {vendor.eta} delivery
                     </Text>
                     <Text style={{
                         fontSize: 14,
                         color: 'white',
                         opacity: 0.8,
+                        textAlign: 'center',
                     }}>
-                        Show this code at pickup
+                        We'll track your order and notify you when it's on the way
                     </Text>
                 </View>
 
@@ -210,7 +210,7 @@ export default function OrderConfirmationScreen() {
                         color: theme.colors.text,
                         textAlign: 'center',
                     }}>
-                        We'll notify you when your order is ready
+                        We'll notify you when your order is out for delivery
                     </Text>
                 </View>
             </ScrollView>

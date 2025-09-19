@@ -13,7 +13,7 @@ export function SearchBar({ value, onChangeText, onFocus, placeholder = "Search 
             backgroundColor: theme.colors.surface,
             borderRadius: 12,
             paddingHorizontal: 16,
-            paddingVertical: 12,
+            paddingVertical: 2,
             marginHorizontal: 16,
             marginVertical: 8,
             borderWidth: 1,

@@ -97,9 +97,22 @@ export default function MenuScreen() {
 
     const handleProceedToCheckout = () => {
         setShowCart(false);
+        
+        // Convert cartItems to items array
+        const items = Object.entries(cartItems).map(([mealId, quantity]) => {
+            const meal = mockMeals.find(m => m.id === mealId);
+            return {
+                id: mealId,
+                name: meal?.name || '',
+                price: meal?.price || 0,
+                quantity: quantity
+            };
+        });
+        
         navigation.navigate('Checkout', {
-            cartItems: cartItems,
-            vendorId: vendorId
+            vendorId: vendorId,
+            items: items,
+            total: cartTotal
         });
     };
 

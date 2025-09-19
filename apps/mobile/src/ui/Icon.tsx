@@ -84,6 +84,18 @@ const iconMap: Record<string, { name: string; set: IconSet }> = {
 	"checkmark-circle": { name: "checkmark-circle-outline", set: "ion" },
 	"checkmark-done": { name: "checkmark-done-outline", set: "ion" },
 	"notifications": { name: "notifications-outline", set: "ion" },
+	'create': { name: 'create-outline', set: 'ion' },
+	'location-outline': { name: 'location-outline', set: 'ion' },
+	'chatbubble': { name: 'chatbubble-outline', set: 'ion' },
+	'language': { name: 'language-outline', set: 'ion' },
+	'help-circle': { name: 'help-circle-outline', set: 'ion' },
+	'chatbubble-ellipses': { name: 'chatbubble-ellipses-outline', set: 'ion' },
+	'information-circle': { name: 'information-circle-outline', set: 'ion' },
+	'document-text': { name: 'document-text-outline', set: 'ion' },
+	'shield-checkmark': { name: 'shield-checkmark-outline', set: 'ion' },
+	'card-outline': { name: 'card-outline', set: 'ion' },
+	'wallet': { name: 'wallet-outline', set: 'ion' },
+	'color-palette': { name: 'color-palette-outline', set: 'ion' },
 };
 
 function IconImpl({ name, size = 24, color = "#111827", style, set = "ion" }: Props) {
