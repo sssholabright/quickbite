@@ -35,7 +35,8 @@
             "@/middlewares/*": ["middlewares/*"],
             "@/modules/*": ["modules/*"],
             "@/socket/*": ["socket/*"]
-        }
+        },
+        "typeRoots": ["./node_modules/@types", "./src/types"]
     },
     "include": [
         "src/**/*"

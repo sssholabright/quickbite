@@ -7,8 +7,9 @@ import { logger } from './utils/logger.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 import { notFoundHandler } from './middlewares/notFoundHandler.js';
 
-// Import route modules (we'll create these next)
-// import authRoutes from './modules/auth/routes.js';
+// Import route modules
+import authRoutes from './modules/auth/auth.routes.js';
+import { authRateLimit, generalRateLimit } from './middlewares/rateLimiter.js';
 // import userRoutes from './modules/users/routes.js';
 // import orderRoutes from './modules/orders/routes.js';
 // import vendorRoutes from './modules/vendors/routes.js';
@@ -32,19 +33,8 @@ app.use(cors({
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 
-// Rate limiting
-// const limiter = rateLimit({
-//   windowMs: 15 * 60 * 1000, // 15 minutes
-//   max: 100, // limit each IP to 100 requests per windowMs
-//   message: {
-//     error: 'Too many requests from this IP, please try again later.',
-//     retryAfter: '15 minutes'
-//   },
-//   standardHeaders: true,
-//   legacyHeaders: false,
-// });
-
-// app.use('/api/', limiter);
+// General rate limiting for all API routes
+app.use('/api/', generalRateLimit);
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
@@ -72,15 +62,8 @@ app.get('/health', (req, res) => {
     });
 });
 
-// API routes
-// app.use('/api/v1', (req, res, next) => {
-//     // Add API version to request
-//     req.apiVersion = 'v1';
-//     next();
-// });
-
-// Route modules (we'll uncomment these as we create them)
-// app.use('/api/v1/auth', authRoutes);
+// Route modules 
+app.use('/api/v1/auth', authRateLimit, authRoutes);
 // app.use('/api/v1/users', userRoutes);
 // app.use('/api/v1/orders', orderRoutes);
 // app.use('/api/v1/vendors', vendorRoutes);
