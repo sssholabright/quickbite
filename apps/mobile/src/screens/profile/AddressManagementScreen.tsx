@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, Pressable, Alert } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../navigation/types';
@@ -173,11 +173,7 @@ export default function AddressManagementScreen() {
     );
 
     return (
-        <View style={{ 
-            flex: 1, 
-            backgroundColor: theme.colors.background,
-            paddingTop: insets.top,
-        }}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['top','bottom']}>
             {/* Header */}
             <View style={{
                 flexDirection: 'row',
@@ -201,7 +197,7 @@ export default function AddressManagementScreen() {
 
             <ScrollView
                 style={{ flex: 1 }}
-                contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+                contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 80 }}
                 showsVerticalScrollIndicator={false}
             >
                 {addresses.length > 0 ? (
@@ -240,11 +236,10 @@ export default function AddressManagementScreen() {
             {/* Add Address Button */}
             <View style={{
                 position: 'absolute',
-                bottom: 0,
-                left: 0,
-                right: 0,
+                left: 0, right: 0, bottom: 0,
                 backgroundColor: theme.colors.surface,
                 padding: 16,
+                paddingBottom: insets.bottom + 12,
                 borderTopWidth: 1,
                 borderTopColor: theme.colors.border,
             }}>
@@ -253,6 +248,6 @@ export default function AddressManagementScreen() {
                     onPress={() => navigation.navigate('AddAddress' as any)}
                 />
             </View>
-        </View>
+        </SafeAreaView>
     );
 }

@@ -2,12 +2,11 @@ import React, { useState } from "react";
 import { View, Text, ScrollView, Pressable, Alert } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useTheme } from "../../theme/theme";
-import { useAuthStore } from "../../stores/auth";
-import { SafeAreaWrapper } from "../../ui/SafeAreaWrapper";
-import { Icon } from "../../ui/Icon";
-import { CTAButton } from "../../ui/CTAButton";
-import type { RootStackParamList } from "../../navigation/types";
+import { RootStackParamList } from "../navigation/types";
+import { useTheme } from "../theme/theme";
+import { useAuthStore } from "../stores/auth";
+import { Icon } from "../ui/Icon";
+import { CTAButton } from "../ui/CTAButton";
 
 type ProfileNav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -16,12 +15,12 @@ export default function ProfileScreen() {
 	const navigation = useNavigation<ProfileNav>();
 	const logout = useAuthStore((s) => s.logout);
 
-	// Mock customer data
-	const [customerData] = useState({
-		name: "John Customer",
+	// Mock rider data
+	const [riderData] = useState({
+		name: "John Rider",
 		phone: "+2348012345678",
-		email: "customer@example.com",
-		customerId: "CUS-001",
+		email: "rider@example.com",
+		riderId: "RID-001",
 		status: "Active" as "Active" | "Suspended",
 		photo: null,
 	});
@@ -82,7 +81,7 @@ export default function ProfileScreen() {
 	);
 
 	return (
-		<View style={{ flex: 1, backgroundColor: theme.colors.background, paddingHorizontal: 5 }}>
+        <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
 			<ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 32 }}>
 				{/* Header */}
 				<View style={{
@@ -108,13 +107,13 @@ export default function ProfileScreen() {
 							color: theme.colors.text,
 							marginBottom: 4,
 						}}>
-							{customerData.name}
+							{riderData.name}
 						</Text>
 						<Text style={{
 							fontSize: 14,
 							color: theme.colors.muted,
 						}}>
-							Customer ID: {customerData.customerId}
+							Rider ID: {riderData.riderId}
 						</Text>
 						<View style={{
 							flexDirection: "row",
@@ -125,15 +124,15 @@ export default function ProfileScreen() {
 								width: 8,
 								height: 8,
 								borderRadius: 4,
-								backgroundColor: customerData.status === "Active" ? "#10B981" : "#EF4444",
+								backgroundColor: riderData.status === "Active" ? "#10B981" : "#EF4444",
 								marginRight: 6,
 							}} />
 							<Text style={{
 								fontSize: 12,
-								color: customerData.status === "Active" ? "#10B981" : "#EF4444",
+								color: riderData.status === "Active" ? "#10B981" : "#EF4444",
 								fontWeight: "600",
 							}}>
-								{customerData.status}
+								{riderData.status}
 							</Text>
 						</View>
 					</View>
@@ -163,27 +162,6 @@ export default function ProfileScreen() {
 						"Update your password",
 						() => navigation.navigate("ChangePassword")
 					)}
-				</View>
-
-				{/* Account */}
-				<View style={{ marginBottom: 24 }}>
-					<Text style={{
-						fontSize: 18,
-						fontWeight: "600",
-						color: theme.colors.text,
-						marginBottom: 16,
-					}}>
-						Account
-					</Text>
-
-					{renderProfileItem(
-						"location",
-						"Addresses",
-						"Manage your delivery addresses",
-						() => navigation.navigate("AddressManagement")
-					)}
-
-					
 				</View>
 
 				{/* Settings */}
@@ -229,38 +207,6 @@ export default function ProfileScreen() {
 						"Terms, Privacy Policy & more",
 						() => navigation.navigate("Legal")
 					)}
-				</View>
-
-				{/* App Info */}
-				<View style={{
-					backgroundColor: theme.colors.surface,
-					borderRadius: 12,
-					borderWidth: 1,
-					borderColor: theme.colors.border,
-					padding: 16,
-					marginBottom: 16,
-				}}>
-					<Text style={{
-						fontSize: 16,
-						fontWeight: "600",
-						color: theme.colors.text,
-						marginBottom: 8,
-					}}>
-						QuickBite
-					</Text>
-					<Text style={{
-						fontSize: 14,
-						color: theme.colors.muted,
-						marginBottom: 4,
-					}}>
-						Version 1.0.0
-					</Text>
-					<Text style={{
-						fontSize: 14,
-						color: theme.colors.muted,
-					}}>
-						Made with ❤️ for students
-					</Text>
 				</View>
 
 				{/* Logout */}

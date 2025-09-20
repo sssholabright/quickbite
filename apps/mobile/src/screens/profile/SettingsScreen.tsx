@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, Pressable, Switch, Alert, Linking } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../navigation/types';
@@ -165,11 +165,7 @@ export default function SettingsScreen() {
     );
 
     return (
-        <View style={{ 
-            flex: 1, 
-            backgroundColor: theme.colors.background,
-            paddingTop: insets.top,
-        }}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['top','bottom']}>
             {/* Header */}
             <View style={{
                 flexDirection: 'row',
@@ -193,7 +189,7 @@ export default function SettingsScreen() {
 
             <ScrollView
                 style={{ flex: 1 }}
-                contentContainerStyle={{ padding: 16, paddingBottom: 20 }}
+                contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 20 }}
                 showsVerticalScrollIndicator={false}
             >
                 {/* Appearance */}
@@ -366,6 +362,6 @@ export default function SettingsScreen() {
                     )}
                 </View>
             </ScrollView>
-        </View>
+        </SafeAreaView>
     );
 }

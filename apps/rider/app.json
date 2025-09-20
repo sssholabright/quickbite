@@ -1,0 +1,79 @@
+{
+    "expo": {
+        "name": "QuickBite Rider",
+        "slug": "quickbite-rider",
+        "version": "1.0.0",
+        "orientation": "portrait",
+        "icon": "../mobile/assets/icon.png",
+        "scheme": "quickbite-rider",
+        "userInterfaceStyle": "light",
+        "newArchEnabled": true,
+        "splash": {
+            "image": "../mobile/assets/splash-icon.png",
+            "resizeMode": "contain",
+            "backgroundColor": "#ffffff"
+        },
+        "ios": {
+            "bundleIdentifier": "com.quickbite.rider",
+            "supportsTablet": true,
+            "config": {
+                "usesNonExemptEncryption": false
+            },
+            "infoPlist": {
+                "NSLocationWhenInUseUsageDescription": "Allow QuickBite Rider to access your location for delivery routing.",
+                "NSCameraUsageDescription": "Allow QuickBite Rider to use your camera for proof-of-delivery.",
+                "NSUserTrackingUsageDescription": "QuickBite Rider uses location and app activity to improve route tracking."
+            }
+        },
+        "android": {
+            "package": "com.quickbite.rider",
+            "adaptiveIcon": {
+                "foregroundImage": "../mobile/assets/adaptive-icon.png",
+                "backgroundColor": "#ffffff"
+            },
+            "permissions": [
+                "ACCESS_FINE_LOCATION",
+                "ACCESS_COARSE_LOCATION",
+                "INTERNET",
+                "CAMERA",
+                "VIBRATE",
+                "RECEIVE_BOOT_COMPLETED",
+                "POST_NOTIFICATIONS",
+                "android.permission.ACCESS_COARSE_LOCATION",
+                "android.permission.ACCESS_FINE_LOCATION"
+            ],
+            "edgeToEdgeEnabled": true,
+            "predictiveBackGestureEnabled": false
+        },
+        "web": {
+            "favicon": "../mobile/assets/favicon.png"
+        },
+        "plugins": [
+            [
+                "@rnmapbox/maps",
+                {}
+            ],
+            "expo-secure-store",
+            [
+                "expo-notifications",
+                {
+                "color": "#FF4500"
+                }
+            ],
+            "expo-build-properties"
+        ],
+        "updates": {
+            "enabled": true,
+            "checkAutomatically": "ON_LOAD",
+            "fallbackToCacheTimeout": 0
+        },
+        "assetBundlePatterns": [
+            "**/*"
+        ],
+        "runtimeVersion": {
+            "policy": "sdkVersion"
+        },
+        
+        "owner": "sssholabright"
+    }
+}

@@ -1,4 +1,5 @@
 import type { NavigatorScreenParams } from "@react-navigation/native";
+import { RiderAvailableOrder } from "../types/order";
 
 export type AuthStackParamList = {
 	Splash: undefined;
@@ -10,6 +11,7 @@ export type AuthStackParamList = {
 
 export type AppTabParamList = {
     Home: undefined;
+    Earnings: undefined;
     Orders: undefined;
     Profile: undefined;
 }
@@ -17,25 +19,13 @@ export type AppTabParamList = {
 export type RootStackParamList = {
     AuthStack: NavigatorScreenParams<AuthStackParamList>;
     AppTabs: NavigatorScreenParams<AppTabParamList>;
-    Menu: { vendorId: string };
-    Checkout: { vendorId: string; items: any[]; total: number };
-    OrderConfirmation: { 
-        orderId: string; 
-        pickupCode: string; 
-        vendor: any; 
-        items: any[]; 
-        total: number; 
-    };
-    OrderDetail: { orderId: string };
+    OrderDetail: { order: RiderAvailableOrder };
     // Profile screens
-    AddressManagement: undefined;
-    PaymentMethods: undefined;
-    Settings: undefined;
-    AddAddress: undefined;
-    EditAddress: { addressId: string };
     EditProfile: undefined;
     ChangePassword: undefined;
+    Settings: undefined;
     Support: undefined;
     Legal: undefined;
     Notifications: undefined;
+    AppPreferences: undefined;
 };

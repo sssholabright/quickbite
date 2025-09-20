@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, Pressable, Modal, Animated } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import { useTheme } from '../../theme/theme';
@@ -11,6 +11,7 @@ import { Order } from '../../types/order';
 import type { RootStackParamList } from '../../navigation/types';
 import StatusStep from '../../components/orders/StatusStep';
 import OrderSummary from '../../components/orders/OrderSummary';
+import MapCompat from '../../components/maps/MapCompat';
 
 type OrderDetailRouteProp = RouteProp<RootStackParamList, 'OrderDetail'>;
 
@@ -25,6 +26,19 @@ const mockDriver = {
     plateNumber: 'ABC 123 XY'
 };
 
+// Mock locations (replace with real vendor/customer coords when available)
+const vendorLoc = { latitude: 6.5244, longitude: 3.3792 };    // Lagos (example)
+const customerLoc = { latitude: 6.5167, longitude: 3.3841 };  // Nearby (example)
+const driverPath: Array<{ latitude: number; longitude: number }> = [
+	{ latitude: 6.5228, longitude: 3.3805 },
+	{ latitude: 6.5218, longitude: 3.3812 },
+	{ latitude: 6.5209, longitude: 3.3820 },
+	{ latitude: 6.5199, longitude: 3.3828 },
+	{ latitude: 6.5188, longitude: 3.3833 },
+	{ latitude: 6.5178, longitude: 3.3837 },
+	{ latitude: 6.5167, longitude: 3.3841 }, // customer
+];
+
 export default function OrderDetailScreen() {
     const theme = useTheme();
     const insets = useSafeAreaInsets();
@@ -34,6 +48,7 @@ export default function OrderDetailScreen() {
     
     const [showDriverInfo, setShowDriverInfo] = useState(false);
     const [pulseAnim] = useState(new Animated.Value(1));
+    const [driverIdx, setDriverIdx] = useState(0);
 
     // Find the order by ID
     const order = mockOrders.find(o => o.id === orderId);
@@ -78,6 +93,23 @@ export default function OrderDetailScreen() {
 
         return () => pulse.stop();
     }, [order.status]);
+
+    // Simulate driver movement along path
+    useEffect(() => {
+        if (order.status !== 'out_for_delivery') return;
+        const t = setInterval(() => setDriverIdx((i) => (i < driverPath.length - 1 ? i + 1 : i)), 1500);
+        return () => clearInterval(t);
+    }, [order.status]);
+
+    const driverLoc = driverPath[Math.min(driverIdx, driverPath.length - 1)];
+    const region = {
+        latitude: (driverLoc.latitude + customerLoc.latitude) / 2,
+        longitude: (driverLoc.longitude + customerLoc.longitude) / 2,
+        latitudeDelta: Math.abs(driverLoc.latitude - customerLoc.latitude) + 0.01,
+        longitudeDelta: Math.abs(driverLoc.longitude - customerLoc.longitude) + 0.01,
+    };
+
+    const etaMinutes = Math.max(1, Math.ceil((driverPath.length - 1 - driverIdx) * 2)); // simple mock ETA
 
     const getActionButton = () => {
         switch (order.status) {
@@ -218,157 +250,8 @@ export default function OrderDetailScreen() {
         </View>
     );
 
-    const renderDriverInfoModal = () => (
-        <Modal
-            visible={showDriverInfo}
-            transparent
-            animationType="slide"
-            onRequestClose={() => setShowDriverInfo(false)}
-        >
-            <View style={{
-                flex: 1,
-                backgroundColor: 'rgba(0,0,0,0.5)',
-                justifyContent: 'flex-end',
-            }}>
-                <View style={{
-                    backgroundColor: theme.colors.surface,
-                    borderTopLeftRadius: 20,
-                    borderTopRightRadius: 20,
-                    padding: 20,
-                    maxHeight: '80%',
-                }}>
-                    <View style={{
-                        flexDirection: 'row',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        marginBottom: 20,
-                    }}>
-                        <Text style={{
-                            fontSize: 20,
-                            fontWeight: '700',
-                            color: theme.colors.text,
-                        }}>
-                            Track Your Order
-                        </Text>
-                        <Pressable onPress={() => setShowDriverInfo(false)}>
-                            <Icon name="close" size={24} color={theme.colors.muted} />
-                        </Pressable>
-                    </View>
-
-                    {/* Driver Info */}
-                    <View style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        marginBottom: 20,
-                    }}>
-                        <View style={{
-                            width: 60,
-                            height: 60,
-                            borderRadius: 30,
-                            backgroundColor: theme.colors.background,
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            marginRight: 16,
-                        }}>
-                            <Icon name="person" size={28} color={theme.colors.primary} />
-                        </View>
-                        <View style={{ flex: 1 }}>
-                            <Text style={{
-                                fontSize: 18,
-                                fontWeight: '600',
-                                color: theme.colors.text,
-                                marginBottom: 4,
-                            }}>
-                                {mockDriver.name}
-                            </Text>
-                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                <Icon name="star" size={16} color="#fbbf24" />
-                                <Text style={{
-                                    fontSize: 14,
-                                    color: theme.colors.muted,
-                                    marginLeft: 4,
-                                }}>
-                                    {mockDriver.rating} • {mockDriver.vehicle}
-                                </Text>
-                            </View>
-                        </View>
-                        <Pressable
-                            onPress={() => console.log('Call driver')}
-                            style={{
-                                backgroundColor: theme.colors.primary,
-                                borderRadius: 25,
-                                padding: 12,
-                            }}
-                        >
-                            <Icon name="call" size={20} color="white" />
-                        </Pressable>
-                    </View>
-
-                    {/* ETA */}
-                    <View style={{
-                        backgroundColor: theme.colors.background,
-                        borderRadius: 12,
-                        padding: 16,
-                        marginBottom: 20,
-                        alignItems: 'center',
-                    }}>
-                        <Text style={{
-                            fontSize: 14,
-                            color: theme.colors.muted,
-                            marginBottom: 8,
-                        }}>
-                            Estimated Arrival
-                        </Text>
-                        <Text style={{
-                            fontSize: 32,
-                            fontWeight: '700',
-                            color: theme.colors.primary,
-                            marginBottom: 4,
-                        }}>
-                            8-12 mins
-                        </Text>
-                        <Text style={{
-                            fontSize: 14,
-                            color: theme.colors.muted,
-                        }}>
-                            Driver is on the way
-                        </Text>
-                    </View>
-
-                    {/* Map Placeholder */}
-                    <View style={{
-                        backgroundColor: theme.colors.background,
-                        borderRadius: 12,
-                        height: 200,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        marginBottom: 20,
-                    }}>
-                        <Icon name="map" size={48} color={theme.colors.muted} />
-                        <Text style={{
-                            fontSize: 16,
-                            color: theme.colors.muted,
-                            marginTop: 8,
-                        }}>
-                            Live tracking map would be here
-                        </Text>
-                    </View>
-
-                    <CTAButton
-                        title="Close"
-                        onPress={() => setShowDriverInfo(false)}
-                    />
-                </View>
-            </View>
-        </Modal>
-    );
-
     return (
-        <View style={{ 
-            flex: 1, 
-            backgroundColor: theme.colors.background,
-            paddingTop: insets.top,
-        }}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['top','bottom']}>
             {/* Header */}
             <View style={{
                 flexDirection: 'row',
@@ -392,7 +275,7 @@ export default function OrderDetailScreen() {
 
             <ScrollView
                 style={{ flex: 1 }}
-                contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+                contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 80 }}
                 showsVerticalScrollIndicator={false}
             >
                 {/* Status Tracker */}
@@ -426,6 +309,72 @@ export default function OrderDetailScreen() {
 
                 {/* Driver Info (only show if out for delivery) */}
                 {order.status === 'out_for_delivery' && renderDriverInfo()}
+
+                {/* Live Map */}
+                {order.status === 'out_for_delivery' && (
+                    <View style={{
+                        height: 240,
+                        borderRadius: 12,
+                        overflow: 'hidden',
+                        marginBottom: 20,
+                        borderWidth: 1,
+                        borderColor: theme.colors.border,
+                    }}>
+                        <MapCompat
+                            style={{ flex: 1 }}
+                            region={region}
+                            annotations={[
+                                {
+                                    id: 'vendor',
+                                    coordinates: vendorLoc,
+                                    title: order.vendor.name,
+                                    tintColor: theme.colors.primary,
+                                },
+                                {
+                                    id: 'customer',
+                                    coordinates: customerLoc,
+                                    title: 'Delivery',
+                                },
+                                {
+                                    id: 'driver',
+                                    coordinates: driverLoc,
+                                    title: 'Driver',
+                                },
+                            ]}
+                            routes={[
+                                {
+                                    id: 'delivery-route',
+                                    from: driverLoc,
+                                    to: customerLoc,
+                                    strokeColor: theme.colors.primary,
+                                    strokeWidth: 4,
+                                    profile: 'driving',
+                                },
+                            ]}
+                        />
+
+                        {/* Floating ETA badge */}
+                        <View style={{
+                            position: 'absolute',
+                            top: 12,
+                            right: 12,
+                            backgroundColor: theme.colors.surface,
+                            borderRadius: 16,
+                            paddingHorizontal: 12,
+                            paddingVertical: 8,
+                            borderWidth: 1,
+                            borderColor: theme.colors.border,
+                            shadowColor: '#000',
+                            shadowOpacity: 0.15,
+                            shadowRadius: 6,
+                            elevation: 3
+                        }}>
+                            <Text style={{ color: theme.colors.text, fontWeight: '700' }}>
+                                Arriving in {etaMinutes} min
+                            </Text>
+                        </View>
+                    </View>
+                )}
 
                 {/* Order Summary */}
                 <OrderSummary
@@ -563,19 +512,16 @@ export default function OrderDetailScreen() {
             {getActionButton() && (
                 <View style={{
                     position: 'absolute',
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
+                    bottom: 0, left: 0, right: 0,
                     backgroundColor: theme.colors.surface,
                     padding: 16,
+                    paddingBottom: insets.bottom + 12, // add this
                     borderTopWidth: 1,
                     borderTopColor: theme.colors.border,
                 }}>
                     {getActionButton()}
-                </View>
+              </View>
             )}
-
-            {renderDriverInfoModal()}
-        </View>
+        </SafeAreaView>
     );
 }

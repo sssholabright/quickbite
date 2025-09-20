@@ -2,12 +2,9 @@ import { useEffect } from 'react';
 import { DefaultTheme, DarkTheme, NavigationContainer, Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { linking } from './Linking';
 import { useAuthStore } from '../stores/auth';
 import LoginScreen from '../screens/auth/LoginScreen';
 import HomeScreen from '../screens/home/HomeScreen';
-import OrdersScreen from '../screens/order/OrdersScreen';
-import ProfileScreen from '../screens/profile/ProfileScreen';
 import { Text } from 'react-native';
 import { Icon } from '../ui/Icon';
 import OnboardingScreen from '../screens/auth/OnboardingScreen';
@@ -15,22 +12,18 @@ import RegisterScreen from '../screens/auth/RegisterScreen';
 import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
 import { useTheme } from '../theme/theme';
 import type { AuthStackParamList } from "../navigation/types";
-import MenuScreen from '../screens/menu/MenuScreen';
 import { SafeAreaWrapper } from '../ui/SafeAreaWrapper';
-import CheckoutScreen from '../screens/checkout/CheckoutScreen';
 import type { RootStackParamList } from "./types";
-import OrderConfirmationScreen from '../screens/order/OrderConfirmationScreen';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import OrderDetailScreen from '../screens/order/OrderDetailScreen';
-import AddressManagementScreen from '../screens/profile/AddressManagementScreen';
-import SettingsScreen from '../screens/profile/SettingsScreen';
-import AddAddressScreen from '../screens/profile/AddAddressScreen';
-import EditAddressScreen from '../screens/profile/EditAddressScreen';
-import EditProfileScreen from '../screens/profile/EditProfileScreen';
-import ChangePasswordScreen from '../screens/profile/ChangePassword';
-import SupportScreen from '../screens/profile/SupportScreen';
-import LegalScreen from '../screens/profile/LegalScreen';
+import EarningsScreen from '../screens/earnings/EarningsScreen';
+import ProfileScreen from '../profile/ProfileScreen';
+import EditProfileScreen from '../profile/EditProfileScreen';
+import ChangePasswordScreen from '../profile/ChangePassword';
+import SettingsScreen from '../profile/SettingsScreen';
+import SupportScreen from '../profile/SupportScreen';
+import LegalScreen from '../profile/LegalScreen';
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
@@ -42,6 +35,7 @@ function AuthStackNavigator() {
 
 	return (
 		<AuthStack.Navigator
+			id={undefined}
 			key={hasSeenOnboarding ? "seen" : "new"}
 			initialRouteName={hasSeenOnboarding ? "Login" : "Onboarding"}
 			screenOptions={{
@@ -73,7 +67,7 @@ function AppTabs() {
 					headerShown: route.name !== "Home",
 					headerStyle: { 
 						backgroundColor: theme.colors.surface,
-						height: 100,
+						height: 80,
 						borderBottomWidth: 0,
 						elevation: 0,
 						shadowOpacity: 0,
@@ -97,13 +91,14 @@ function AppTabs() {
 					tabBarSafeAreaInsets: { bottom: insets.bottom },
 					tabBarIcon: ({ color, size, focused }) => {
 						if (route.name === "Home") return <Icon set='ion' name={focused ? "home" : "home-outline"} color={color} size={size} />
-						if (route.name === "Orders") return <Icon set="mi" name={"receipt-long"} color={color} size={size} />
-						return <Icon set="ion" name={focused ? "person" : "person-outline"} color={color} size={size} />
+						if (route.name === "Earnings") return <Icon set="ion" name={focused ? "cash" : "cash-outline"} color={color} size={size} />
+						if (route.name === "Profile") return <Icon set="ion" name={focused ? "person" : "person-outline"} color={color} size={size} />
+						return <Icon set="ion" name="home" color={color} size={size} />
 					}
 				})}
 			>
 				<Tab.Screen name="Home" component={HomeScreen} />
-				<Tab.Screen name="Orders" component={OrdersScreen} />
+				<Tab.Screen name="Earnings" component={EarningsScreen} />
 				<Tab.Screen name="Profile" component={ProfileScreen} />
 			</Tab.Navigator>
 		</>
@@ -129,49 +124,22 @@ export default function RootNavigator() {
 		: { ...DefaultTheme, colors: { ...DefaultTheme.colors, background: appTheme.colors.background, card: appTheme.colors.surface, text: appTheme.colors.text, border: appTheme.colors.border, primary: appTheme.colors.primary } };
 
 	return (
-		<NavigationContainer linking={linking} theme={navTheme}>
-			<RootStack.Navigator screenOptions={{ headerShown: false }}>
+		<NavigationContainer theme={navTheme}>
+			<RootStack.Navigator id={undefined} screenOptions={{ headerShown: false }}>
 				{token ? (
 					<RootStack.Screen name="AppTabs" component={AppTabs} />
 				) : (
 					<RootStack.Screen name="AuthStack" component={AuthStackNavigator} />
 				)}
-                <RootStack.Screen name="Menu" component={MenuScreen} options={{ headerShown: false }} />
-				<RootStack.Screen 
-					name="Checkout" 
-					component={CheckoutScreen} 
-					options={{ headerShown: false }} 
-				/>
-				<RootStack.Screen 
-					name="OrderConfirmation" 
-					component={OrderConfirmationScreen} 
-					options={{ headerShown: false }} 
-				/>
+				
+				{/* Order Screens */}
 				<RootStack.Screen 
 					name="OrderDetail" 
 					component={OrderDetailScreen} 
 					options={{ headerShown: false }} 
 				/>
-				<RootStack.Screen 
-					name="AddressManagement" 
-					component={AddressManagementScreen} 
-					options={{ headerShown: false }} 
-				/>
-				<RootStack.Screen 
-					name="Settings" 
-					component={SettingsScreen} 
-					options={{ headerShown: false }} 
-				/>
-				<RootStack.Screen 
-					name="AddAddress" 
-					component={AddAddressScreen} 
-					options={{ headerShown: false }} 
-				/>
-				<RootStack.Screen 
-					name="EditAddress" 
-					component={EditAddressScreen} 
-					options={{ headerShown: false }} 
-				/>
+				
+				{/* Profile Screens */}
 				<RootStack.Screen 
 					name="EditProfile" 
 					component={EditProfileScreen} 
@@ -180,6 +148,11 @@ export default function RootNavigator() {
 				<RootStack.Screen 
 					name="ChangePassword" 
 					component={ChangePasswordScreen} 
+					options={{ headerShown: false }} 
+				/>
+				<RootStack.Screen 
+					name="Settings" 
+					component={SettingsScreen} 
 					options={{ headerShown: false }} 
 				/>
 				<RootStack.Screen 

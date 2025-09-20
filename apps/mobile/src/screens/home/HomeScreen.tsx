@@ -97,7 +97,10 @@ export default function HomeScreen() {
                 placeholder="Search vendors or meals..."
             />
 
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
+            >
                 {/* Categories */}
                 <View style={{ marginBottom: 20 }}>
                     <ScrollView

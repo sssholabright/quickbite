@@ -81,7 +81,7 @@ export default function OrdersScreen() {
         <View style={{ 
             flex: 1, 
             backgroundColor: theme.colors.background,
-            paddingTop: insets.top + 16,
+            paddingTop: 10,
         }}>
             {/* Header */}
             <View style={{
