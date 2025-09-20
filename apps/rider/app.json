@@ -73,7 +73,11 @@
         "runtimeVersion": {
             "policy": "sdkVersion"
         },
-        
+        "extra": {
+            "eas": {
+                "projectId": "e2bfe484-e58e-4529-9507-61a89a1c5936"
+            }
+        },
         "owner": "sssholabright"
     }
 }
