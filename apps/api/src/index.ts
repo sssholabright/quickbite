@@ -13,7 +13,7 @@ const io = new SocketIOServer(server, {
     cors: {
         origin: env.NODE_ENV === 'production' 
             ? ['https://yourdomain.com'] 
-            : ['http://localhost:3000', 'http://localhost:3001'],
+            : ['http://localhost:3000', 'http://localhost:3001', 'http://10.200.122.234:8081'], 
         methods: ['GET', 'POST'],
         credentials: true
     }

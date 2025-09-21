@@ -24,3 +24,9 @@ export interface AuthResult {
         refreshToken: string;
     };
 }
+
+export interface UpdateUser {
+    name?: string | undefined;
+    phone?: string | undefined;
+    avatar?: string | undefined;
+}

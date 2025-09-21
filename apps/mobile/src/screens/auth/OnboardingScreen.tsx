@@ -4,6 +4,9 @@ import { useAuthStore } from "../../stores/auth";
 import { Gradient } from "../../ui/Gradient";
 import { CTAButton } from "../../ui/CTAButton";
 import { useTheme } from "../../theme/theme";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import type { AuthStackParamList } from "../../navigation/types";
 
 const { width } = Dimensions.get("window");
 
@@ -18,6 +21,7 @@ export default function OnboardingScreen() {
 	const ref = useRef<FlatList>(null);
 	const markSeen = useAuthStore((s) => s.markOnboardingSeen);
 	const theme = useTheme();
+	const navigation = useNavigation<NativeStackNavigationProp<AuthStackParamList, "Onboarding">>();
 
 	return (
 		<Gradient>
@@ -53,8 +57,12 @@ export default function OnboardingScreen() {
 				<CTAButton
 					title={idx < slides.length - 1 ? "Next" : "Get Started"}
 					onPress={() => {
-						if (idx < slides.length - 1) ref.current?.scrollToIndex({ index: idx + 1, animated: true });
-						else markSeen();
+						if (idx < slides.length - 1) {
+							ref.current?.scrollToIndex({ index: idx + 1, animated: true });
+						} else {
+							markSeen();
+							navigation.navigate("Login");
+						}
 					}}
 				/>
 			</View>

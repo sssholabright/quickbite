@@ -1,9 +1,9 @@
 export interface User {
-    id: string;
-    name: string;
-    email: string;
-    phone: string;
-    avatar?: string;
+    id: string | undefined;
+    name: string | undefined;
+    email: string | undefined;
+    phone: string | undefined;
+    avatar?: string | undefined;
 }
 
 export interface Address {

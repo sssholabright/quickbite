@@ -8,7 +8,7 @@ import LoginScreen from '../screens/auth/LoginScreen';
 import HomeScreen from '../screens/home/HomeScreen';
 import OrdersScreen from '../screens/order/OrdersScreen';
 import ProfileScreen from '../screens/profile/ProfileScreen';
-import { Text } from 'react-native';
+import { Text, View, ActivityIndicator, StatusBar } from 'react-native';
 import { Icon } from '../ui/Icon';
 import OnboardingScreen from '../screens/auth/OnboardingScreen';
 import RegisterScreen from '../screens/auth/RegisterScreen';
@@ -21,7 +21,6 @@ import CheckoutScreen from '../screens/checkout/CheckoutScreen';
 import type { RootStackParamList } from "./types";
 import OrderConfirmationScreen from '../screens/order/OrderConfirmationScreen';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { StatusBar } from 'expo-status-bar';
 import OrderDetailScreen from '../screens/order/OrderDetailScreen';
 import AddressManagementScreen from '../screens/profile/AddressManagementScreen';
 import SettingsScreen from '../screens/profile/SettingsScreen';
@@ -37,26 +36,29 @@ const AuthStack = createNativeStackNavigator<AuthStackParamList>();
 const Tab = createBottomTabNavigator();
 
 function AuthStackNavigator() {
-	const hasSeenOnboarding = useAuthStore((s) => s.hasSeenOnboarding);
 	const theme = useTheme();
+	const { hasSeenOnboarding } = useAuthStore();
 
 	return (
-		<AuthStack.Navigator
-			key={hasSeenOnboarding ? "seen" : "new"}
-			initialRouteName={hasSeenOnboarding ? "Login" : "Onboarding"}
-			screenOptions={{
-				headerStyle: { backgroundColor: theme.colors.surface },
-				headerTintColor: theme.colors.text,
-				headerTitleStyle: { fontWeight: "700" },
-				headerTitleAlign: "center",
-				headerShadowVisible: false
-			}}
-		>
-			<AuthStack.Screen name="Onboarding" component={OnboardingScreen} options={{ headerShown: false }} />
-			<AuthStack.Screen name="Login" component={LoginScreen} options={{ title: "Login" }} />
-			<AuthStack.Screen name="Register" component={RegisterScreen} options={{ title: "Register" }} />
-			<AuthStack.Screen name="ForgotPassword" component={ForgotPasswordScreen} options={{ title: "Forgot Password" }} />
-		</AuthStack.Navigator>
+		<>
+			<StatusBar backgroundColor={theme.mode === 'dark' ? 'light' : 'dark'} barStyle={theme.mode === 'dark' ? 'light-content' : 'dark-content'} />
+			<AuthStack.Navigator
+				initialRouteName={hasSeenOnboarding ? "Login" : "Onboarding"}
+				screenOptions={{
+					headerShown: false,
+					headerStyle: { backgroundColor: theme.colors.surface },
+					headerTintColor: theme.colors.text,
+					headerTitleStyle: { fontWeight: "700" },
+					headerTitleAlign: "center",
+					headerShadowVisible: false
+				}}
+			>
+				<AuthStack.Screen name="Onboarding" component={OnboardingScreen} options={{ headerShown: false }} />
+				<AuthStack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
+				<AuthStack.Screen name="Register" component={RegisterScreen} options={{ headerShown: false }} />
+				<AuthStack.Screen name="ForgotPassword" component={ForgotPasswordScreen} options={{ headerShown: false }} />
+			</AuthStack.Navigator>
+		</>
 	);
 }
 
@@ -66,7 +68,7 @@ function AppTabs() {
 
 	return (
 		<>
-			<StatusBar style={theme.mode === 'dark' ? 'light' : 'dark'} />
+			<StatusBar backgroundColor={theme.mode === 'dark' ? 'light' : 'dark'} barStyle={theme.mode === 'dark' ? 'light-content' : 'dark-content'} />
 			<Tab.Navigator
 				id={undefined}
 				screenOptions={({ route }) => ({
@@ -110,18 +112,43 @@ function AppTabs() {
 	);
 }
 
+function LoadingScreen() {
+	const theme = useTheme();
+	
+	return (
+		<SafeAreaWrapper>
+			<View style={{ 
+				flex: 1, 
+				justifyContent: 'center', 
+				alignItems: 'center',
+				backgroundColor: theme.colors.background 
+			}}>
+				<ActivityIndicator size="large" color={theme.colors.primary} />
+				<Text style={{ 
+					marginTop: 16, 
+					color: theme.colors.text,
+					fontSize: 16 
+				}}>
+					Loading...
+				</Text>
+			</View>
+		</SafeAreaWrapper>
+	);
+}
+
 export default function RootNavigator() {
-	const { token, hydrated, hydrate } = useAuthStore();
+	const { isAuthenticated, isLoading, hydrated, hydrate } = useAuthStore();
 	const appTheme = useTheme();
 
-	useEffect(() => { void hydrate(); }, [hydrate]);
+	useEffect(() => { 
+		if (!hydrated) {
+			hydrate(); 
+		}
+	}, [hydrate, hydrated]);
 
-	if (!hydrated) {
-		return (
-			<SafeAreaWrapper>
-				<Text style={{ marginTop: 50, textAlign: "center", color: appTheme.colors.text }}>Loading...</Text>
-			</SafeAreaWrapper>
-		);
+	// Show loading screen while hydrating or loading
+	if (!hydrated || isLoading) {
+		return <LoadingScreen />;
 	}
 
 	const navTheme: Theme = appTheme.mode === "dark"
@@ -131,7 +158,7 @@ export default function RootNavigator() {
 	return (
 		<NavigationContainer linking={linking} theme={navTheme}>
 			<RootStack.Navigator screenOptions={{ headerShown: false }}>
-				{token ? (
+				{isAuthenticated ? (
 					<RootStack.Screen name="AppTabs" component={AppTabs} />
 				) : (
 					<RootStack.Screen name="AuthStack" component={AuthStackNavigator} />

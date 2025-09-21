@@ -1,10 +1,9 @@
-import React, { useState } from "react";
+import React from "react";
 import { View, Text, ScrollView, Pressable, Alert } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useTheme } from "../../theme/theme";
 import { useAuthStore } from "../../stores/auth";
-import { SafeAreaWrapper } from "../../ui/SafeAreaWrapper";
 import { Icon } from "../../ui/Icon";
 import { CTAButton } from "../../ui/CTAButton";
 import type { RootStackParamList } from "../../navigation/types";
@@ -15,16 +14,7 @@ export default function ProfileScreen() {
 	const theme = useTheme();
 	const navigation = useNavigation<ProfileNav>();
 	const logout = useAuthStore((s) => s.logout);
-
-	// Mock customer data
-	const [customerData] = useState({
-		name: "John Customer",
-		phone: "+2348012345678",
-		email: "customer@example.com",
-		customerId: "CUS-001",
-		status: "Active" as "Active" | "Suspended",
-		photo: null,
-	});
+	const { user } = useAuthStore()
 
 	const renderProfileItem = (
 		icon: string,
@@ -107,14 +97,15 @@ export default function ProfileScreen() {
 							fontWeight: "700",
 							color: theme.colors.text,
 							marginBottom: 4,
+							textTransform: 'capitalize'
 						}}>
-							{customerData.name}
+							{user?.name}
 						</Text>
 						<Text style={{
 							fontSize: 14,
 							color: theme.colors.muted,
 						}}>
-							Customer ID: {customerData.customerId}
+							Phone: {user?.phone}
 						</Text>
 						<View style={{
 							flexDirection: "row",
@@ -125,15 +116,15 @@ export default function ProfileScreen() {
 								width: 8,
 								height: 8,
 								borderRadius: 4,
-								backgroundColor: customerData.status === "Active" ? "#10B981" : "#EF4444",
+								backgroundColor: user?.isActive ? "#10B981" : "#EF4444",
 								marginRight: 6,
 							}} />
 							<Text style={{
 								fontSize: 12,
-								color: customerData.status === "Active" ? "#10B981" : "#EF4444",
+								color: user?.isActive ? "#10B981" : "#EF4444",
 								fontWeight: "600",
 							}}>
-								{customerData.status}
+								{user?.isActive ? "Active" : "Inactive"}
 							</Text>
 						</View>
 					</View>

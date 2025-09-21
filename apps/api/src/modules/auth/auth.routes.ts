@@ -14,8 +14,9 @@ router.post('/refresh', AuthController.refreshToken);
 router.use(authGuard()); // Apply auth guard to all routes below
 
 router.post('/logout', AuthController.logout);
-// router.get('/me', AuthController.getProfile);
-// router.put('/profile', AuthController.updateProfile);
-// router.put('/change-password', AuthController.changePassword);
+router.get('/me', AuthController.getProfile);
+router.put('/profile', AuthController.updateProfile);
+// Change password route - remove duplicate authGuard
+router.put('/change-password', AuthController.changePassword);
 
 export default router;

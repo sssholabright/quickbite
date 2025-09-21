@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { RegisterData, LoginCredentials } from './../../types/auth.js';
-import { registerSchema, loginSchema, refreshTokenSchema } from './../../validations/auth.js';
+import { registerSchema, loginSchema, refreshTokenSchema, updateProfileSchema, changePasswordSchema } from './../../validations/auth.js';
 import { AuthService } from './auth.service.js';
 import { ResponseHandler } from '../../utils/response.js';
 import { logger } from '../../utils/logger.js';
@@ -101,6 +101,87 @@ export class AuthController {
             
             ResponseHandler.success(res as any, null, 'Logout successful');
         } catch (error) {
+            next(error);
+        }
+    }
+
+    // Get current user profile
+    static async getProfile(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+        try {
+            const userId = req.user?.userId;
+            
+            if (!userId) {
+                ResponseHandler.unauthorized(res as any, 'User not authenticated');
+                return;
+            }
+            
+            // Get user profile
+            const user = await AuthService.getUserProfile(userId);
+            
+            logger.info(`User profile retrieved: ${user.email}`);
+            
+            ResponseHandler.success(res as any, user, 'Profile retrieved successfully');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    // Update user profile
+    static async updateProfile(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+        try {
+            const userId = req.user?.userId;
+            
+            if (!userId) {
+                ResponseHandler.unauthorized(res as any, 'User not authenticated');
+                return;
+            }
+
+            // Validate request body
+            const validatedData = updateProfileSchema.parse(req.body);
+            
+            // Update user profile
+            const user = await AuthService.updateUserProfile(userId, validatedData);
+            
+            logger.info(`User profile updated: ${user.email}`);
+            
+            ResponseHandler.success(res as any, user, 'Profile updated successfully');
+        } catch (error) {
+            if (error instanceof z.ZodError) {
+                const errorMessage = error.issues.map(err => `${err.path.join('.')}: ${err.message}`).join(', ');
+                ResponseHandler.validationError(res as any, 'Validation failed', errorMessage);
+                return;
+            }
+            
+            next(error);
+        }
+    }
+
+    // Change password
+    static async changePassword(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+        try {
+            const userId = req.user?.userId;
+            
+            if (!userId) {
+                ResponseHandler.unauthorized(res as any, 'User not authenticated');
+                return;
+            }
+
+            // Validate request body
+            const validatedData = changePasswordSchema.parse(req.body);
+            
+            // Change password
+            await AuthService.changePassword(userId, validatedData);
+            
+            logger.info(`Password changed for user: ${userId}`);
+            
+            ResponseHandler.success(res as any, null, 'Password changed successfully');
+        } catch (error) {
+            if (error instanceof z.ZodError) {
+                const errorMessage = error.issues.map(err => `${err.path.join('.')}: ${err.message}`).join(', ');
+                ResponseHandler.validationError(res as any, 'Validation failed', errorMessage);
+                return;
+            }
+            
             next(error);
         }
     }

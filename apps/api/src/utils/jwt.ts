@@ -13,7 +13,7 @@ export class JWTService {
             return jwt.sign(payload, env.JWT_SECRET, {
                 expiresIn: this.ACCESS_TOKEN_EXPIRY,
                 issuer: 'quickbite-api',
-                audience: 'quickbite-api'
+                audience: 'quickbite-app'
             });
         } catch (error) {
             logger.error({ error }, 'Error generating access token');

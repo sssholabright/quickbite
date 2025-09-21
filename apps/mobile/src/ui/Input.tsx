@@ -14,6 +14,7 @@ export const Input = forwardRef<TextInput, TextInputProps & { label?: string; er
 					style={[{
 						backgroundColor: theme.colors.surface,
 						color: theme.colors.text,
+						marginBottom: 15,
 						paddingVertical: 14, paddingHorizontal: 14,
 						borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border
 					}, style]}

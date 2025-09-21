@@ -96,6 +96,8 @@ const iconMap: Record<string, { name: string; set: IconSet }> = {
 	'card-outline': { name: 'card-outline', set: 'ion' },
 	'wallet': { name: 'wallet-outline', set: 'ion' },
 	'color-palette': { name: 'color-palette-outline', set: 'ion' },
+	"eye": { name: "eye-outline", set: "ion" },
+	"eye-off": { name: "eye-off-outline", set: "ion" },
 };
 
 function IconImpl({ name, size = 24, color = "#111827", style, set = "ion" }: Props) {

@@ -6,12 +6,12 @@ import morgan from 'morgan';
 import { logger } from './utils/logger.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 import { notFoundHandler } from './middlewares/notFoundHandler.js';
+import { authRateLimit, generalRateLimit } from './middlewares/rateLimiter.js';
 
 // Import route modules
 import authRoutes from './modules/auth/auth.routes.js';
-import { authRateLimit, generalRateLimit } from './middlewares/rateLimiter.js';
+import orderRoutes from './modules/orders/order.routes.js';
 // import userRoutes from './modules/users/routes.js';
-// import orderRoutes from './modules/orders/routes.js';
 // import vendorRoutes from './modules/vendors/routes.js';
 // import riderRoutes from './modules/riders/routes.js';
 // import paymentRoutes from './modules/payments/routes.js';
@@ -27,7 +27,7 @@ app.use(helmet({
 app.use(cors({
     origin: env.NODE_ENV === 'production' 
         ? ['https://yourdomain.com'] 
-        : ['http://localhost:3000', 'http://localhost:3001'],
+        : ['http://localhost:3000', 'http://localhost:3001', 'http://10.200.122.234:8081'],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
@@ -64,8 +64,8 @@ app.get('/health', (req, res) => {
 
 // Route modules 
 app.use('/api/v1/auth', authRateLimit, authRoutes);
+app.use('/api/v1/orders', orderRoutes);
 // app.use('/api/v1/users', userRoutes);
-// app.use('/api/v1/orders', orderRoutes);
 // app.use('/api/v1/vendors', vendorRoutes);
 // app.use('/api/v1/riders', riderRoutes);
 // app.use('/api/v1/payments', paymentRoutes);
