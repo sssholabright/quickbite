@@ -138,21 +138,41 @@ model Category {
 
 // Menu Item model
 model MenuItem {
-    id          String      @id @default(cuid())
-    vendorId    String
-    vendor      Vendor      @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-    categoryId  String
-    category    Category    @relation(fields: [categoryId], references: [id])
+    id              String      @id @default(cuid())
+    vendorId        String
+    vendor          Vendor      @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+    categoryId      String
+    category        Category    @relation(fields: [categoryId], references: [id])
+    name            String
+    description     String?
+    price           Float
+    image           String?
+    isAvailable     Boolean     @default(true)
+    preparationTime Int         @default(15) // in minutes
+    addOns          MenuAddOn[]
+    orderItems      OrderItem[]
+    createdAt       DateTime    @default(now())
+    updatedAt       DateTime    @updatedAt
+
+    @@map("menu_items")
+}
+
+// Menu Add-on model
+model MenuAddOn {
+    id          String   @id @default(cuid())
+    menuItemId  String
+    menuItem    MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
     name        String
     description String?
     price       Float
-    image       String?
-    isAvailable Boolean     @default(true)
-    orderItems  OrderItem[]
-    createdAt   DateTime    @default(now())
-    updatedAt   DateTime    @updatedAt
+    isRequired  Boolean  @default(false)
+    maxQuantity Int      @default(1)
+    category    AddOnCategory
+    orderItemAddOns OrderItemAddOn[]
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
 
-    @@map("menu_items")
+    @@map("menu_add_ons")
 }
 
 // Order model
@@ -171,7 +191,7 @@ model Order {
     serviceFee            Float
     total                 Float?
     items                 OrderItem[]
-    deliveryAddress       Json // Change from String to Json
+    deliveryAddress       Json
     specialInstructions   String?
     estimatedDeliveryTime DateTime?
     cancellationReason    String?
@@ -189,12 +209,27 @@ model OrderItem {
     menuItemId          String
     menuItem            MenuItem @relation(fields: [menuItemId], references: [id])
     quantity            Int
-    unitPrice           Float // Add this field
-    totalPrice          Float // Add this field
-    specialInstructions String? // Add this field
+    unitPrice           Float
+    totalPrice          Float
+    specialInstructions String?
+    addOns              OrderItemAddOn[]
     createdAt           DateTime @default(now())
 
     @@map("order_items")
+}
+
+// Order Item Add-on model
+model OrderItemAddOn {
+    id          String    @id @default(cuid())
+    orderItemId String
+    orderItem   OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+    addOnId     String
+    addOn       MenuAddOn @relation(fields: [addOnId], references: [id])
+    quantity    Int       @default(1)
+    price       Float
+    createdAt   DateTime  @default(now())
+
+    @@map("order_item_add_ons")
 }
 
 // Review model
@@ -236,4 +271,11 @@ enum OrderStatus {
     OUT_FOR_DELIVERY
     DELIVERED
     CANCELLED
+}
+
+enum AddOnCategory {
+    EXTRA
+    SIZE
+    SIDE
+    CUSTOMIZATION
 }
