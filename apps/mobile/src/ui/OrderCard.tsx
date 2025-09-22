@@ -9,9 +9,11 @@ export default function OrderCard({ order, onPress }: OrderCardProps) {
 
     const getStatusColor = (status: string) => {
         switch (status) {
-            case 'pending': return theme.colors.muted;
-            case 'preparing': return '#FFA500';
-            case 'out_for_delivery': return theme.colors.primary;
+            case 'pending': return '#FF9500';
+            case 'confirmed': return '#34C759';
+            case 'preparing': return '#007AFF';
+            case 'ready_for_pickup': return '#FF9500';
+            case 'out_for_delivery': return '#5856D6';
             case 'delivered': return '#007AFF';
             case 'cancelled': return '#FF3B30';
             default: return theme.colors.muted;
@@ -21,7 +23,9 @@ export default function OrderCard({ order, onPress }: OrderCardProps) {
     const getStatusLabel = (status: string) => {
         switch (status) {
             case 'pending': return 'Pending';
+            case 'confirmed': return 'Confirmed';
             case 'preparing': return 'Preparing';
+            case 'ready_for_pickup': return 'Ready for Pickup';
             case 'out_for_delivery': return 'Out for Delivery';
             case 'delivered': return 'Delivered';
             case 'cancelled': return 'Cancelled';
@@ -44,6 +48,8 @@ export default function OrderCard({ order, onPress }: OrderCardProps) {
     const itemSummary = order.items.length === 1 
         ? order.items[0].name
         : `${order.items.length} items`;
+
+    const hasAddOns = order.items.some(item => item.addOns && item.addOns.length > 0);
 
     return (
         <Pressable
@@ -129,6 +135,19 @@ export default function OrderCard({ order, onPress }: OrderCardProps) {
                     }}>
                         {order.vendor.location}
                     </Text>
+                    {hasAddOns && (
+                        <Text style={{
+                            fontSize: 12,
+                            color: theme.colors.muted,
+                            marginTop: 4,
+                        }}>
+                            {order.items.map(item => 
+                                item.addOns?.map(addOn => 
+                                    `+ ${addOn.addOn.name} x${addOn.quantity}`
+                                ).join(', ')
+                            ).filter(Boolean).join(', ')}
+                        </Text>
+                    )}
                 </View>
                 
                 <Text style={{

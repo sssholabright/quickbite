@@ -1,26 +1,15 @@
 import { createServer } from 'http';
-import { Server as SocketIOServer } from 'socket.io';
 import { app } from './app.js';
 import { env } from './config/env.js';
 import { prisma } from './config/db.js';
 import { logger } from './utils/logger.js';
+import { initializeSocket } from './config/socket.js';
 
 // Create HTTP server
 const server = createServer(app);
 
-// Setup Socket.IO
-const io = new SocketIOServer(server, {
-    cors: {
-        origin: env.NODE_ENV === 'production' 
-            ? ['https://yourdomain.com'] 
-            : ['http://localhost:3000', 'http://localhost:3001', 'http://192.168.0.176:8081', 'http://localhost:5173', 'http://10.200.122.234:8081'], 
-        methods: ['GET', 'POST'],
-        credentials: true
-    }
-});
-
-// Setup socket handlers
-// setupSocketIO(io);
+// Initialize Socket.IO with our custom manager
+const socketManager = initializeSocket(server);
 
 // Graceful shutdown
 const gracefulShutdown = async (signal: string) => {
@@ -41,13 +30,20 @@ process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // Start server
-const PORT = env.PORT || 5000;
+const PORT = Number(env.PORT); // Convert to number
 
 server.listen(PORT, () => {
     logger.info(`🚀 Server running on port ${PORT}`);
-    logger.info(`📱 Environment: ${env.NODE_ENV}`);
+    logger.info(`�� Environment: ${env.NODE_ENV}`);
     logger.info(`🔗 API URL: http://localhost:${PORT}/api/v1`);
-    logger.info(`🔌 Socket.IO enabled`);
+    logger.info(`�� Socket.IO enabled`);
+}).on('error', (err: any) => {
+    if (err.code === 'EADDRINUSE') {
+        logger.error(`Port ${PORT} is already in use. Trying port ${PORT + 1}...`);
+        server.listen(PORT + 1);
+    } else {
+        throw err;
+    }
 });
 
 // Handle uncaught exceptions

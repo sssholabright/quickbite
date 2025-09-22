@@ -245,6 +245,7 @@ export default function CheckoutScreen() {
     const placeOrder = async () => {
         try {
             const orderData = formatOrderData();
+            console.log('orderData', JSON.stringify(orderData, null, 2));
             const order = await createOrderMutation.mutateAsync(orderData);
             
             // Clear cart after successful order

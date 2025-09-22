@@ -16,6 +16,7 @@ import menuRoutes from './modules/menu/menu.routes.js';
 // import vendorRoutes from './modules/vendors/routes.js';
 // import riderRoutes from './modules/riders/routes.js';
 // import paymentRoutes from './modules/payments/routes.js';
+import { initializeSocket } from './config/socket.js';
 
 const app = express();
 
@@ -28,7 +29,7 @@ app.use(helmet({
 app.use(cors({
     origin: env.NODE_ENV === 'production' 
         ? ['https://yourdomain.com'] 
-        : ['http://localhost:3000', 'http://localhost:3001', 'http://192.168.0.176:8081', 'http://localhost:5173', 'http://10.200.122.234:8081'],
+        : ['http://localhost:3000', 'http://localhost:3001', 'http://192.168.0.176:8081', 'http://localhost:5173', 'http://10.213.134.234:8081'],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
@@ -78,4 +79,5 @@ app.use(notFoundHandler);
 // Global error handler
 app.use(errorHandler);
 
+// Initialize WebSocket after creating HTTP server
 export { app };

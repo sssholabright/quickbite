@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { OrderFilters as OrderFiltersType, OrderStatus } from '../../types/order'
+import { OrderFilters as OrderFiltersType } from '../../types/order'
 import { FaSearch, FaCalendarAlt } from 'react-icons/fa'
 
 interface OrderFiltersProps {

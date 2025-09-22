@@ -1,43 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, Pressable, Modal, Animated } from 'react-native';
+import { View, Text, ScrollView, Pressable, Animated } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
 import { useTheme } from '../../theme/theme';
 import { Icon } from '../../ui/Icon';
 import { CTAButton } from '../../ui/CTAButton';
-import { mockOrders } from '../../lib/mockOrders';
-import { Order } from '../../types/order';
+import { Order, OrderStatus } from '../../types/order'; // Use Order interface, not OrderResponse
 import type { RootStackParamList } from '../../navigation/types';
 import StatusStep from '../../components/orders/StatusStep';
 import OrderSummary from '../../components/orders/OrderSummary';
 import MapCompat from '../../components/maps/MapCompat';
+import { useQueryClient } from '@tanstack/react-query';
+import AlertModal from '../../ui/AlertModal';
+import { useEnhancedOrder } from '../../hooks/useEnhancedOrder';
+import { useRealtimeStore } from '../../stores/realtime';
 
 type OrderDetailRouteProp = RouteProp<RootStackParamList, 'OrderDetail'>;
-
-// Mock driver data
-const mockDriver = {
-    id: '1',
-    name: 'John Doe',
-    phone: '+234 801 234 5678',
-    photo: 'https://via.placeholder.com/50',
-    rating: 4.8,
-    vehicle: 'Honda CB125F',
-    plateNumber: 'ABC 123 XY'
-};
-
-// Mock locations (replace with real vendor/customer coords when available)
-const vendorLoc = { latitude: 6.5244, longitude: 3.3792 };    // Lagos (example)
-const customerLoc = { latitude: 6.5167, longitude: 3.3841 };  // Nearby (example)
-const driverPath: Array<{ latitude: number; longitude: number }> = [
-	{ latitude: 6.5228, longitude: 3.3805 },
-	{ latitude: 6.5218, longitude: 3.3812 },
-	{ latitude: 6.5209, longitude: 3.3820 },
-	{ latitude: 6.5199, longitude: 3.3828 },
-	{ latitude: 6.5188, longitude: 3.3833 },
-	{ latitude: 6.5178, longitude: 3.3837 },
-	{ latitude: 6.5167, longitude: 3.3841 }, // customer
-];
 
 export default function OrderDetailScreen() {
     const theme = useTheme();
@@ -45,36 +24,87 @@ export default function OrderDetailScreen() {
     const route = useRoute<OrderDetailRouteProp>();
     const navigation = useNavigation();
     const { orderId } = route.params;
+
+    const formatNaira = (amount: number): string => {
+        return `₦${amount.toLocaleString('en-NG')}`
+    }
     
+    // ALL useState hooks first
     const [showDriverInfo, setShowDriverInfo] = useState(false);
     const [pulseAnim] = useState(new Animated.Value(1));
     const [driverIdx, setDriverIdx] = useState(0);
+    const [alert, setAlert] = useState({
+        visible: false,
+        title: '',
+        message: '',
+        type: 'info' as 'success' | 'error' | 'warning' | 'info'
+    });
 
-    // Find the order by ID
-    const order = mockOrders.find(o => o.id === orderId);
+    // ALL query hooks next
+    const { data: backendOrderData, isLoading, error, hasRealtimeUpdate } = useEnhancedOrder(orderId);
+    const { connectionStatus } = useRealtimeStore();
+    const queryClient = useQueryClient();
 
-    if (!order) {
-        return (
-            <View style={{ 
-                flex: 1, 
-                justifyContent: 'center', 
-                alignItems: 'center',
-                backgroundColor: theme.colors.background,
-            }}>
-                <Text style={{ color: theme.colors.text }}>Order not found</Text>
-            </View>
-        );
-    }
+    // Helper function to map backend status to mobile OrderStatus
+    const getStatusMapping = (backendStatus: string): OrderStatus => {
+        switch (backendStatus) {
+            case 'PENDING': return 'pending';
+            case 'CONFIRMED': return 'confirmed';
+            case 'PREPARING': return 'preparing';
+            case 'READY_FOR_PICKUP': return 'ready_for_pickup';
+            case 'PICKED_UP': return 'out_for_delivery';
+            case 'OUT_FOR_DELIVERY': return 'out_for_delivery';
+            case 'DELIVERED': return 'delivered';
+            case 'CANCELLED': return 'cancelled';
+            default: return 'pending';
+        }
+    };
 
-    const statusSteps = [
-        { key: 'pending', label: 'Order Submitted', icon: 'time', time: 'Just now' },
-        { key: 'preparing', label: 'Preparing', icon: 'restaurant', time: '~5 mins' },
-        { key: 'out_for_delivery', label: 'Out for Delivery', icon: 'car', time: '~10 mins' },
-        { key: 'delivered', label: 'Delivered', icon: 'checkmark-done', time: 'Complete' },
-    ];
+    // Transform backend data to match UI expectations (same as OrdersScreen)
+    const orderData: Order | null = backendOrderData ? {
+        id: backendOrderData.id,
+        orderId: backendOrderData.orderNumber,
+        vendor: {
+            id: backendOrderData.vendor.id,
+            name: backendOrderData.vendor.businessName,
+            logo: undefined,
+            location: backendOrderData.vendor.address || 'Address not available'
+        },
+        items: backendOrderData.items.map((orderItem: any) => ({
+            id: orderItem.id,
+            name: orderItem.menuItem.name,
+            price: orderItem.unitPrice,
+            quantity: orderItem.quantity,
+            image: orderItem.menuItem.image,
+            addOns: orderItem.addOns?.map((addOn: any) => ({
+                id: addOn.id,
+                addOn: {
+                    id: addOn.addOn.id,
+                    name: addOn.addOn.name,
+                    description: addOn.addOn.description,
+                    price: addOn.addOn.price,
+                    category: addOn.addOn.category
+                },
+                quantity: addOn.quantity,
+                price: addOn.price
+            })) || []
+        })),
+        status: getStatusMapping(backendOrderData.status),
+        total: backendOrderData.pricing.total,
+        subtotal: backendOrderData.pricing.subtotal,
+        fees: backendOrderData.pricing.deliveryFee + backendOrderData.pricing.serviceFee,
+        paymentMethod: 'cash' as const,
+        paymentStatus: 'paid' as const,
+        notes: backendOrderData.specialInstructions,
+        pickupTime: 'asap',
+        placedAt: new Date(backendOrderData.createdAt),
+        estimatedReadyAt: backendOrderData.estimatedDeliveryTime ? new Date(backendOrderData.estimatedDeliveryTime) : undefined
+    } : null;
 
-    // Pulse animation for current status
+    // ALL useEffect hooks together
     useEffect(() => {
+        if (!orderData?.status) return;
+        
         const pulse = Animated.loop(
             Animated.sequence([
                 Animated.timing(pulseAnim, {
@@ -92,42 +122,227 @@ export default function OrderDetailScreen() {
         pulse.start();
 
         return () => pulse.stop();
-    }, [order.status]);
+    }, [orderData?.status, pulseAnim]);
 
-    // Simulate driver movement along path
+    // WebSocket listeners for real-time updates
     useEffect(() => {
-        if (order.status !== 'out_for_delivery') return;
-        const t = setInterval(() => setDriverIdx((i) => (i < driverPath.length - 1 ? i + 1 : i)), 1500);
-        return () => clearInterval(t);
-    }, [order.status]);
+        if (!backendOrderData) return;
 
-    const driverLoc = driverPath[Math.min(driverIdx, driverPath.length - 1)];
-    const region = {
-        latitude: (driverLoc.latitude + customerLoc.latitude) / 2,
-        longitude: (driverLoc.longitude + customerLoc.longitude) / 2,
-        latitudeDelta: Math.abs(driverLoc.latitude - customerLoc.latitude) + 0.01,
-        longitudeDelta: Math.abs(driverLoc.longitude - customerLoc.longitude) + 0.01,
+        const handleOrderStatusUpdate = (data: any) => {
+            if (data.orderId === orderId) {
+                console.log('Order status updated:', data);
+                queryClient.invalidateQueries({ queryKey: ['order', orderId] });
+                
+                const statusMessages = {
+                    'CONFIRMED': {
+                        title: 'Order Confirmed ✅',
+                        message: `Order confirmed by ${backendOrderData?.vendor.businessName || 'restaurant'}.`,
+                        type: 'success' as const
+                    },
+                    'PREPARING': {
+                        title: 'Preparing Your Food 👨‍🍳',
+                        message: `${backendOrderData?.vendor.businessName || 'Restaurant'} is preparing your food.`,
+                        type: 'info' as const
+                    },
+                    'READY_FOR_PICKUP': {
+                        title: 'Ready for Pickup 🍱',
+                        message: 'Your food is ready for pickup.',
+                        type: 'info' as const
+                    },
+                    'PICKED_UP': {
+                        title: 'Picked Up 🚴',
+                        message: 'Your rider has picked up your order. On the way!',
+                        type: 'info' as const
+                    },
+                    'DELIVERED': {
+                        title: 'Order Delivered 📦',
+                        message: 'Order delivered. Enjoy your meal!',
+                        type: 'success' as const
+                    },
+                    'CANCELLED': {
+                        title: 'Order Cancelled ❌',
+                        message: 'Order cancelled. Refund in progress.',
+                        type: 'error' as const
+                    }
+                };
+
+                const statusUpdate = statusMessages[data.status as keyof typeof statusMessages];
+                if (statusUpdate) {
+                    setAlert({
+                        visible: true,
+                        ...statusUpdate
+                    });
+                }
+            }
+        };
+
+        const handleDeliveryUpdate = (data: any) => {
+            if (data.orderId === orderId) {
+                console.log('Delivery update:', data);
+                queryClient.invalidateQueries({ queryKey: ['order', orderId] });
+            }
+        };
+
+        // The original code had socket listeners here, but socket is no longer imported.
+        // Assuming these listeners are no longer relevant or will be re-added if socket is re-introduced.
+        // For now, removing the socket listeners as per the new_code.
+
+        return () => {
+            // No socket listeners to off here as socket is removed.
+        };
+    }, [backendOrderData, orderId, queryClient]);
+
+    const hideAlert = () => {
+        setAlert(prev => ({ ...prev, visible: false }));
     };
 
-    const etaMinutes = Math.max(1, Math.ceil((driverPath.length - 1 - driverIdx) * 2)); // simple mock ETA
+    // Add this helper function after the existing helper functions (around line 57)
+    const getRelativeTime = (timestamp: string) => {
+        const now = new Date();
+        const time = new Date(timestamp);
+        const diff = now.getTime() - time.getTime();
+        const minutes = Math.floor(diff / (1000 * 60));
+        
+        if (minutes < 1) return 'Just now';
+        if (minutes < 60) return `${minutes}m ago`;
+        const hours = Math.floor(minutes / 60);
+        if (hours < 24) return `${hours}h ago`;
+        return time.toLocaleDateString();
+    };
+
+    // NOW conditional returns
+    if (isLoading) {
+        return (
+            <View style={{ 
+                flex: 1, 
+                justifyContent: 'center', 
+                alignItems: 'center',
+                backgroundColor: theme.colors.background,
+            }}>
+                <Text style={{ color: theme.colors.text }}>Loading order...</Text>
+            </View>
+        );
+    }
+
+    if (error || !orderData) {
+        return (
+            <View style={{ 
+                flex: 1, 
+                justifyContent: 'center', 
+                alignItems: 'center',
+                backgroundColor: theme.colors.background,
+            }}>
+                <Text style={{ color: theme.colors.text }}>Order not found</Text>
+            </View>
+        );
+    }
+
+    // Map backend status to customer-friendly status steps
+    const getStatusSteps = (currentBackendStatus: string) => {
+        const steps = [
+            { 
+                key: 'pending', 
+                label: 'Order Placed', 
+                icon: 'time', 
+                time: backendOrderData?.createdAt ? getRelativeTime(backendOrderData.createdAt.toString()) : '',
+                description: 'Order placed. Waiting for vendor confirmation.',
+                active: ['PENDING'].includes(currentBackendStatus)
+            },
+            { 
+                key: 'confirmed', 
+                label: 'Confirmed', 
+                icon: 'checkmark-circle', 
+                time: ['CONFIRMED', 'PREPARING', 'READY_FOR_PICKUP', 'PICKED_UP', 'OUT_FOR_DELIVERY', 'DELIVERED'].includes(currentBackendStatus) 
+                    ? (backendOrderData?.updatedAt ? getRelativeTime(backendOrderData.updatedAt.toString()) : '') 
+                    : '',
+                description: `Order confirmed by ${orderData.vendor.name}.`,
+                active: ['CONFIRMED', 'PREPARING', 'READY_FOR_PICKUP', 'PICKED_UP', 'OUT_FOR_DELIVERY', 'DELIVERED'].includes(currentBackendStatus)
+            },
+            { 
+                key: 'preparing', 
+                label: 'Preparing', 
+                icon: 'restaurant', 
+                time: ['PREPARING', 'READY_FOR_PICKUP', 'PICKED_UP', 'OUT_FOR_DELIVERY', 'DELIVERED'].includes(currentBackendStatus)
+                    ? (backendOrderData?.updatedAt ? getRelativeTime(backendOrderData.updatedAt.toString()) : '')
+                    : '',
+                description: `${orderData.vendor.name} is preparing your food.`,
+                active: ['PREPARING', 'READY_FOR_PICKUP', 'PICKED_UP', 'OUT_FOR_DELIVERY', 'DELIVERED'].includes(currentBackendStatus)
+            },
+            { 
+                key: 'ready_for_pickup',
+                label: 'Ready for Pickup', 
+                icon: 'bag', 
+                time: ['READY_FOR_PICKUP', 'PICKED_UP', 'OUT_FOR_DELIVERY', 'DELIVERED'].includes(currentBackendStatus)
+                    ? (backendOrderData?.updatedAt ? getRelativeTime(backendOrderData.updatedAt.toString()) : '')
+                    : '',
+                description: 'Your food is ready for pickup.',
+                active: ['READY_FOR_PICKUP', 'PICKED_UP', 'OUT_FOR_DELIVERY', 'DELIVERED'].includes(currentBackendStatus)
+            },
+            { 
+                key: 'out_for_delivery',
+                label: 'Picked Up', 
+                icon: 'bicycle', 
+                time: ['PICKED_UP', 'OUT_FOR_DELIVERY', 'DELIVERED'].includes(currentBackendStatus)
+                    ? (backendOrderData?.updatedAt ? getRelativeTime(backendOrderData.updatedAt.toString()) : '')
+                    : '',
+                description: backendOrderData?.rider ? `Your rider ${backendOrderData.rider.name} has picked up your order. On the way!` : 'Order picked up for delivery.',
+                active: ['PICKED_UP', 'OUT_FOR_DELIVERY', 'DELIVERED'].includes(currentBackendStatus)
+            },
+            { 
+                key: 'delivered', 
+                label: 'Delivered', 
+                icon: 'checkmark-done', 
+                time: ['DELIVERED'].includes(currentBackendStatus)
+                    ? (backendOrderData?.updatedAt ? getRelativeTime(backendOrderData.updatedAt.toString()) : '')
+                    : '',
+                description: 'Order delivered. Enjoy your meal!',
+                active: ['DELIVERED'].includes(currentBackendStatus)
+            },
+        ];
+
+        // Filter out cancelled status from normal flow
+        if (currentBackendStatus === 'CANCELLED') {
+            return [{
+                key: 'cancelled',
+                label: 'Order Cancelled',
+                icon: 'close-circle',
+                time: backendOrderData?.updatedAt ? getRelativeTime(backendOrderData.updatedAt.toString()) : 'Cancelled',
+                description: 'Order cancelled. Refund in progress.',
+                active: true
+            }];
+        }
+
+        return steps;
+    };
+
+    const statusSteps = getStatusSteps(backendOrderData?.status || 'PENDING'); // Use backend status for steps
+    const currentStep = statusSteps.find(step => step.active);
 
     const getActionButton = () => {
-        switch (order.status) {
-            case 'out_for_delivery':
+        switch (backendOrderData?.status) { // Use backend status for actions
+            case 'PENDING':
+                return (
+                    <CTAButton
+                        title="Cancel Order"
+                        onPress={() => {
+                            setAlert({
+                                visible: true,
+                                title: 'Cancel Order',
+                                message: 'Are you sure you want to cancel this order?',
+                                type: 'warning'
+                            });
+                        }}
+                    />
+                );
+            case 'PICKED_UP':
+            case 'OUT_FOR_DELIVERY':
                 return (
                     <CTAButton
                         title="Track Delivery"
                         onPress={() => setShowDriverInfo(true)}
                     />
                 );
-            case 'pending':
-                return (
-                    <CTAButton
-                        title="Cancel Order"
-                        onPress={() => console.log('Cancel order')}
-                    />
-                );
-            case 'delivered':
+            case 'DELIVERED':
                 return (
                     <CTAButton
                         title="Reorder"
@@ -154,105 +369,90 @@ export default function OrderDetailScreen() {
                 color: theme.colors.text,
                 marginBottom: 16,
             }}>
-                Driver Information
+                Rider Information
             </Text>
 
-            <View style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                marginBottom: 12,
-            }}>
-                <View style={{
-                    width: 50,
-                    height: 50,
-                    borderRadius: 25,
-                    backgroundColor: theme.colors.background,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    marginRight: 12,
-                }}>
-                    <Icon name="person" size={24} color={theme.colors.primary} />
-                </View>
-                <View style={{ flex: 1 }}>
-                    <Text style={{
-                        fontSize: 16,
-                        fontWeight: '600',
-                        color: theme.colors.text,
-                        marginBottom: 2,
+            {backendOrderData?.rider ? (
+                <>
+                    <View style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        marginBottom: 12,
                     }}>
-                        {mockDriver.name}
-                    </Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <Icon name="star" size={14} color="#fbbf24" />
+                        <View style={{
+                            width: 50,
+                            height: 50,
+                            borderRadius: 25,
+                            backgroundColor: theme.colors.background,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            marginRight: 12,
+                        }}>
+                            <Icon name="person" size={24} color={theme.colors.primary} />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                            <Text style={{
+                                fontSize: 16,
+                                fontWeight: '600',
+                                color: theme.colors.text,
+                                marginBottom: 2,
+                            }}>
+                                {backendOrderData.rider.name}
+                            </Text>
+                            <Text style={{
+                                fontSize: 14,
+                                color: theme.colors.muted,
+                            }}>
+                                {backendOrderData.rider.vehicleType} • Rider
+                            </Text>
+                        </View>
+                        <Pressable
+                            onPress={() => console.log('Call rider:', backendOrderData.rider?.phone)}
+                            style={{
+                                backgroundColor: theme.colors.primary,
+                                borderRadius: 20,
+                                padding: 8,
+                            }}
+                        >
+                            <Icon name="call" size={16} color="white" />
+                        </Pressable>
+                    </View>
+
+                    <View style={{
+                        backgroundColor: theme.colors.background,
+                        borderRadius: 8,
+                        padding: 12,
+                    }}>
                         <Text style={{
                             fontSize: 14,
                             color: theme.colors.muted,
-                            marginLeft: 4,
+                            marginBottom: 4,
                         }}>
-                            {mockDriver.rating} • {mockDriver.vehicle}
+                            Estimated Arrival
+                        </Text>
+                        <Text style={{
+                            fontSize: 16,
+                            fontWeight: '600',
+                            color: theme.colors.primary,
+                        }}>
+                            {backendOrderData.estimatedDeliveryTime ? 
+                                `${Math.ceil((new Date(backendOrderData.estimatedDeliveryTime).getTime() - Date.now()) / (1000 * 60))} minutes` :
+                                '8-12 minutes'
+                            }
                         </Text>
                     </View>
-                </View>
-                <Pressable
-                    onPress={() => console.log('Call driver')}
-                    style={{
-                        backgroundColor: theme.colors.primary,
-                        borderRadius: 20,
-                        padding: 8,
-                    }}
-                >
-                    <Icon name="call" size={16} color="white" />
-                </Pressable>
-            </View>
-
-            <View style={{
-                backgroundColor: theme.colors.background,
-                borderRadius: 8,
-                padding: 12,
-                marginBottom: 12,
-            }}>
-                <Text style={{
-                    fontSize: 14,
-                    color: theme.colors.muted,
-                    marginBottom: 4,
-                }}>
-                    Estimated Arrival
+                </>
+            ) : (
+                <Text style={{ color: theme.colors.muted }}>
+                    Rider will be assigned soon
                 </Text>
-                <Text style={{
-                    fontSize: 16,
-                    fontWeight: '600',
-                    color: theme.colors.primary,
-                }}>
-                    8-12 minutes
-                </Text>
-            </View>
-
-            <View style={{
-                backgroundColor: theme.colors.background,
-                borderRadius: 8,
-                padding: 12,
-            }}>
-                <Text style={{
-                    fontSize: 14,
-                    color: theme.colors.muted,
-                    marginBottom: 4,
-                }}>
-                    Vehicle
-                </Text>
-                <Text style={{
-                    fontSize: 16,
-                    fontWeight: '600',
-                    color: theme.colors.text,
-                }}>
-                    {mockDriver.vehicle} • {mockDriver.plateNumber}
-                </Text>
-            </View>
+            )}
         </View>
     );
 
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['top','bottom']}>
-            {/* Header */}
+            {/* Header with real-time indicator */}
             <View style={{
                 flexDirection: 'row',
                 alignItems: 'center',
@@ -268,9 +468,33 @@ export default function OrderDetailScreen() {
                     fontSize: 18,
                     fontWeight: '600',
                     color: theme.colors.text,
+                    flex: 1,
                 }}>
-                    Order Details
+                    Order #{orderData.orderId}
                 </Text>
+                
+                {/* Real-time connection indicator */}
+                <View style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                }}>
+                    <View style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: 4,
+                        backgroundColor: connectionStatus === 'connected' ? '#34C759' : '#FF3B30',
+                        marginRight: 4,
+                    }} />
+                    {hasRealtimeUpdate && (
+                        <Text style={{
+                            fontSize: 10,
+                            color: theme.colors.primary,
+                            fontWeight: '600',
+                        }}>
+                            LIVE
+                        </Text>
+                    )}
+                </View>
             </View>
 
             <ScrollView
@@ -278,7 +502,36 @@ export default function OrderDetailScreen() {
                 contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 80 }}
                 showsVerticalScrollIndicator={false}
             >
-                {/* Status Tracker */}
+                {/* Current Status Banner */}
+                <View style={{
+                    backgroundColor: theme.colors.primary + '15',
+                    borderRadius: 12,
+                    padding: 16,
+                    marginBottom: 20,
+                    borderWidth: 1,
+                    borderColor: theme.colors.primary + '30',
+                }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                        <Icon name={currentStep?.icon || 'time'} size={24} color={theme.colors.primary} />
+                        <Text style={{
+                            fontSize: 18,
+                            fontWeight: '600',
+                            color: theme.colors.primary,
+                            marginLeft: 12,
+                        }}>
+                            {currentStep?.label}
+                        </Text>
+                    </View>
+                    <Text style={{
+                        fontSize: 14,
+                        color: theme.colors.text,
+                        lineHeight: 20,
+                    }}>
+                        {currentStep?.description}
+                    </Text>
+                </View>
+
+                {/* Status Timeline */}
                 <View style={{
                     backgroundColor: theme.colors.surface,
                     borderRadius: 12,
@@ -293,103 +546,37 @@ export default function OrderDetailScreen() {
                         color: theme.colors.text,
                         marginBottom: 20,
                     }}>
-                        Order Status
+                        Order Timeline
                     </Text>
 
                     {statusSteps.map((step, index) => (
                         <StatusStep
                             key={step.key}
                             step={step}
-                            currentStatus={order.status}
+                            currentStatus={orderData.status}
                             statusSteps={statusSteps}
                             pulseAnim={pulseAnim}
                         />
                     ))}
                 </View>
 
-                {/* Driver Info (only show if out for delivery) */}
-                {order.status === 'out_for_delivery' && renderDriverInfo()}
+                {/* Rider Info (only show if picked up or out for delivery) */}
+                {backendOrderData?.status && ['PICKED_UP', 'OUT_FOR_DELIVERY'].includes(backendOrderData.status) && renderDriverInfo()}
 
-                {/* Live Map */}
-                {order.status === 'out_for_delivery' && (
-                    <View style={{
-                        height: 240,
-                        borderRadius: 12,
-                        overflow: 'hidden',
-                        marginBottom: 20,
-                        borderWidth: 1,
-                        borderColor: theme.colors.border,
-                    }}>
-                        <MapCompat
-                            style={{ flex: 1 }}
-                            region={region}
-                            annotations={[
-                                {
-                                    id: 'vendor',
-                                    coordinates: vendorLoc,
-                                    title: order.vendor.name,
-                                    tintColor: theme.colors.primary,
-                                },
-                                {
-                                    id: 'customer',
-                                    coordinates: customerLoc,
-                                    title: 'Delivery',
-                                },
-                                {
-                                    id: 'driver',
-                                    coordinates: driverLoc,
-                                    title: 'Driver',
-                                },
-                            ]}
-                            routes={[
-                                {
-                                    id: 'delivery-route',
-                                    from: driverLoc,
-                                    to: customerLoc,
-                                    strokeColor: theme.colors.primary,
-                                    strokeWidth: 4,
-                                    profile: 'driving',
-                                },
-                            ]}
-                        />
-
-                        {/* Floating ETA badge */}
-                        <View style={{
-                            position: 'absolute',
-                            top: 12,
-                            right: 12,
-                            backgroundColor: theme.colors.surface,
-                            borderRadius: 16,
-                            paddingHorizontal: 12,
-                            paddingVertical: 8,
-                            borderWidth: 1,
-                            borderColor: theme.colors.border,
-                            shadowColor: '#000',
-                            shadowOpacity: 0.15,
-                            shadowRadius: 6,
-                            elevation: 3
-                        }}>
-                            <Text style={{ color: theme.colors.text, fontWeight: '700' }}>
-                                Arriving in {etaMinutes} min
-                            </Text>
-                        </View>
-                    </View>
-                )}
-
-                {/* Order Summary */}
+                {/* Order Summary - Use transformed data */}
                 <OrderSummary
-                    items={order.items}
+                    items={orderData.items}
                     vendor={{
-                        name: order.vendor.name,
-                        distance: order.vendor.location,
-                        eta: order.estimatedReadyAt ? 
-                            `Ready in ${Math.ceil((order.estimatedReadyAt.getTime() - Date.now()) / (1000 * 60))} mins` :
+                        name: orderData.vendor.name,
+                        distance: orderData.vendor.location || 'Address not provided',
+                        eta: orderData.estimatedReadyAt ? 
+                            `Ready by ${orderData.estimatedReadyAt.toLocaleTimeString()}` :
                             'ASAP'
                     }}
-                    total={order.total}
+                    total={orderData.total}
                 />
 
-                {/* Payment Info */}
+                {/* Payment Info - Use backend pricing data */}
                 <View style={{
                     backgroundColor: theme.colors.surface,
                     borderRadius: 12,
@@ -413,23 +600,10 @@ export default function OrderDetailScreen() {
                         marginBottom: 8,
                     }}>
                         <Text style={{ fontSize: 14, color: theme.colors.muted }}>
-                            Payment Method
-                        </Text>
-                        <Text style={{ fontSize: 14, color: theme.colors.text, textTransform: 'capitalize' }}>
-                            {order.paymentMethod}
-                        </Text>
-                    </View>
-
-                    <View style={{
-                        flexDirection: 'row',
-                        justifyContent: 'space-between',
-                        marginBottom: 8,
-                    }}>
-                        <Text style={{ fontSize: 14, color: theme.colors.muted }}>
                             Subtotal
                         </Text>
                         <Text style={{ fontSize: 14, color: theme.colors.text }}>
-                            ₦{order.subtotal.toLocaleString()}
+                            {formatNaira(backendOrderData?.pricing.subtotal || 0)}
                         </Text>
                     </View>
 
@@ -442,7 +616,20 @@ export default function OrderDetailScreen() {
                             Delivery Fee
                         </Text>
                         <Text style={{ fontSize: 14, color: theme.colors.text }}>
-                            ₦{order.fees.toLocaleString()}
+                            {formatNaira(backendOrderData?.pricing.deliveryFee || 0)}
+                        </Text>
+                    </View>
+
+                    <View style={{
+                        flexDirection: 'row',
+                        justifyContent: 'space-between',
+                        marginBottom: 8,
+                    }}>
+                        <Text style={{ fontSize: 14, color: theme.colors.muted }}>
+                            Service Fee
+                        </Text>
+                        <Text style={{ fontSize: 14, color: theme.colors.text }}>
+                            {formatNaira(backendOrderData?.pricing.serviceFee || 0)}
                         </Text>
                     </View>
 
@@ -457,31 +644,13 @@ export default function OrderDetailScreen() {
                             Total
                         </Text>
                         <Text style={{ fontSize: 16, fontWeight: '600', color: theme.colors.primary }}>
-                            ₦{order.total.toLocaleString()}
-                        </Text>
-                    </View>
-
-                    <View style={{
-                        flexDirection: 'row',
-                        justifyContent: 'space-between',
-                        marginTop: 8,
-                    }}>
-                        <Text style={{ fontSize: 14, color: theme.colors.muted }}>
-                            Payment Status
-                        </Text>
-                        <Text style={{ 
-                            fontSize: 14, 
-                            color: order.paymentStatus === 'paid' ? theme.colors.primary : theme.colors.muted,
-                            textTransform: 'capitalize',
-                            fontWeight: '600',
-                        }}>
-                            {order.paymentStatus}
+                            {formatNaira(backendOrderData?.pricing.total || 0)}
                         </Text>
                     </View>
                 </View>
 
-                {/* Notes */}
-                {order.notes && (
+                {/* Special Instructions */}
+                {backendOrderData?.specialInstructions && (
                     <View style={{
                         backgroundColor: theme.colors.surface,
                         borderRadius: 12,
@@ -496,13 +665,13 @@ export default function OrderDetailScreen() {
                             color: theme.colors.text,
                             marginBottom: 8,
                         }}>
-                            Notes
+                            Special Instructions
                         </Text>
                         <Text style={{
                             fontSize: 14,
                             color: theme.colors.text,
                         }}>
-                            {order.notes}
+                            {backendOrderData.specialInstructions}
                         </Text>
                     </View>
                 )}
@@ -515,13 +684,23 @@ export default function OrderDetailScreen() {
                     bottom: 0, left: 0, right: 0,
                     backgroundColor: theme.colors.surface,
                     padding: 16,
-                    paddingBottom: insets.bottom + 12, // add this
+                    paddingBottom: insets.bottom + 12,
                     borderTopWidth: 1,
                     borderTopColor: theme.colors.border,
                 }}>
                     {getActionButton()}
-              </View>
+                </View>
             )}
+
+            {/* Alert Modal for status updates */}
+            <AlertModal
+                visible={alert.visible}
+                title={alert.title}
+                message={alert.message}
+                type={alert.type}
+                onConfirm={hideAlert}
+                confirmText="OK"
+            />
         </SafeAreaView>
     );
 }

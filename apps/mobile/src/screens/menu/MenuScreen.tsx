@@ -8,7 +8,7 @@ import { SafeAreaWrapper } from '../../ui/SafeAreaWrapper'
 import MealGridCard from '../../ui/MealGridCard'
 import MealListCard from '../../ui/MealListCard'
 import { RootStackParamList } from '../../navigation/types'
-import CartBottomSheet from '../../ui/CartBottomSheet'
+// import CartBottomSheet from '../../ui/CartBottomSheet'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useVendors, useVendorCategories, useVendorMenuItems } from '../../hooks/useMenu'
 import ItemCustomizeModal from '../../ui/ItemCustomizeModal'

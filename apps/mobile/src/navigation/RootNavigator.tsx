@@ -72,7 +72,7 @@ function AppTabs() {
 			<Tab.Navigator
 				id={undefined}
 				screenOptions={({ route }) => ({
-					headerShown: route.name !== "Home",
+					headerShown: false,
 					headerStyle: { 
 						backgroundColor: theme.colors.surface,
 						height: 100,

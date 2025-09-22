@@ -1,6 +1,6 @@
 import { Animated } from "react-native";
 
-export type OrderStatus = 'pending' | 'preparing' | 'out_for_delivery' | 'delivered' | 'cancelled';
+export type OrderStatus = 'pending' | 'confirmed' | 'preparing' | 'ready_for_pickup' | 'out_for_delivery' | 'delivered' | 'cancelled';
 export type FilterType = 'all' | 'active' | 'past';
 
 export interface OrderItem {
@@ -9,6 +9,18 @@ export interface OrderItem {
     price: number;
     quantity: number;
     image?: string;
+    addOns?: Array<{
+        id: string;
+        addOn: {
+            id: string;
+            name: string;
+            description?: string;
+            price: number;
+            category: string;
+        };
+        quantity: number;
+        price: number;
+    }>;
 }
 
 export interface Order {
@@ -18,7 +30,7 @@ export interface Order {
         id: string;
         name: string;
         logo?: string;
-        location: string;
+        location?: string; // Make optional since address can be null
     };
     items: OrderItem[];
     status: OrderStatus;
@@ -28,7 +40,7 @@ export interface Order {
     paymentMethod: 'cash' | 'card';
     paymentStatus: 'paid' | 'unpaid' | 'refunded';
     notes?: string;
-    pickupTime: 'asap' | string; // 'asap' or scheduled time
+    pickupTime: 'asap' | string;
     placedAt: Date;
     estimatedReadyAt?: Date;
     pickupCode?: string;

@@ -6,9 +6,11 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { AppTabParamList } from '../../navigation/types';
 import { Icon } from '../../ui/Icon';
-import { useOrders } from '../../hooks/useOrders';
 import OrderCard from '../../ui/OrderCard';
 import AlertModal from '../../ui/AlertModal';
+import { OrderStatus } from '../../types/order';
+import { useRealtimeStore } from '../../stores/realtime';
+import { useEnhancedOrders } from '../../hooks/useEnhancedOrders';
 
 type OrdersScreenNavigationProp = NativeStackNavigationProp<AppTabParamList, 'Orders'>;
 
@@ -58,7 +60,8 @@ export default function OrdersScreen() {
         limit: 50
     };
 
-    const { data: ordersData, isLoading, error, refetch } = useOrders(apiFilters);
+    const { data: ordersData, isLoading, error, refetch } = useEnhancedOrders(apiFilters);
+    const { connectionStatus } = useRealtimeStore();
 
     const orders = ordersData?.orders || [];
     const isRefreshing = false;
@@ -91,6 +94,20 @@ export default function OrdersScreen() {
         setFilter(newFilter);
     };
 
+    const getStatusMapping = (backendStatus: string): OrderStatus => {
+        switch (backendStatus) {
+            case 'PENDING': return 'pending';
+            case 'CONFIRMED': return 'confirmed';
+            case 'PREPARING': return 'preparing';
+            case 'READY_FOR_PICKUP': return 'ready_for_pickup';
+            case 'PICKED_UP': return 'out_for_delivery';
+            case 'OUT_FOR_DELIVERY': return 'out_for_delivery';
+            case 'DELIVERED': return 'delivered';
+            case 'CANCELLED': return 'cancelled';
+            default: return 'pending';
+        }
+    };
+
     const renderOrderItem = ({ item }: { item: any }) => (
         <OrderCard 
             order={{
@@ -100,16 +117,29 @@ export default function OrdersScreen() {
                     id: item.vendor.id,
                     name: item.vendor.businessName,
                     logo: undefined,
-                    location: item.vendor.address
+                    location: item.vendor.address || 'Address not available' // Handle null case
                 },
                 items: item.items.map((orderItem: any) => ({
                     id: orderItem.id,
                     name: orderItem.menuItem.name,
                     price: orderItem.unitPrice,
                     quantity: orderItem.quantity,
-                    image: orderItem.menuItem.image
+                    image: orderItem.menuItem.image,
+                    // Match web structure for addOns
+                    addOns: orderItem.addOns?.map((addOn: any) => ({
+                        id: addOn.id,
+                        addOn: {
+                            id: addOn.addOn.id,
+                            name: addOn.addOn.name,
+                            description: addOn.addOn.description,
+                            price: addOn.addOn.price,
+                            category: addOn.addOn.category
+                        },
+                        quantity: addOn.quantity,
+                        price: addOn.price
+                    })) || []
                 })),
-                status: item.status.toLowerCase().replace('_', ' '),
+                status: getStatusMapping(item.status),
                 total: item.pricing.total,
                 subtotal: item.pricing.subtotal,
                 fees: item.pricing.deliveryFee + item.pricing.serviceFee,
@@ -221,7 +251,7 @@ export default function OrdersScreen() {
     return (
         <SafeAreaWrapper>
             <View style={{ flex: 1 }}>
-                {/* Header */}
+                {/* Header with connection status */}
                 <View style={{ 
                     flexDirection: 'row', 
                     alignItems: 'center', 
@@ -237,10 +267,38 @@ export default function OrdersScreen() {
                         fontSize: 18, 
                         fontWeight: '700', 
                         color: theme.colors.text,
-                        marginLeft: 12
+                        marginLeft: 12,
+                        flex: 1,
                     }}>
                         My Orders
                     </Text>
+                    
+                    {/* Connection status indicator */}
+                    <View style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        paddingHorizontal: 8,
+                        paddingVertical: 4,
+                        borderRadius: 12,
+                        backgroundColor: connectionStatus === 'connected' 
+                            ? '#34C759' + '15' 
+                            : theme.colors.danger + '15',
+                    }}>
+                        <View style={{
+                            width: 6,
+                            height: 6,
+                            borderRadius: 3,
+                            backgroundColor: connectionStatus === 'connected' ? '#34C759' : '#FF3B30',
+                            marginRight: 4,
+                        }} />
+                        <Text style={{
+                            fontSize: 10,
+                            color: connectionStatus === 'connected' ? '#34C759' : '#FF3B30',
+                            fontWeight: '600',
+                        }}>
+                            {connectionStatus === 'connected' ? 'LIVE' : 'OFFLINE'}
+                        </Text>
+                    </View>
                 </View>
 
                 {/* Filter Tabs */}

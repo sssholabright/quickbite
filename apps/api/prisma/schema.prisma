@@ -194,6 +194,7 @@ model Order {
     deliveryAddress       Json
     specialInstructions   String?
     estimatedDeliveryTime DateTime?
+    cancelledAt           DateTime?
     cancellationReason    String?
     createdAt             DateTime    @default(now())
     updatedAt             DateTime    @updatedAt

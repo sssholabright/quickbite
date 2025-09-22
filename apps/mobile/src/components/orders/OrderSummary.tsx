@@ -4,6 +4,9 @@ import { Icon } from "../../ui/Icon";
 import { OrderSummaryProps } from "../../types/order";
 
 export default function OrderSummary({ items, vendor, total}: OrderSummaryProps) {
+    const formatNaira = (amount: number): string => {
+        return `₦${amount.toLocaleString('en-NG')}`
+    }
     const theme = useTheme()
 
     return (
@@ -64,29 +67,61 @@ export default function OrderSummary({ items, vendor, total}: OrderSummaryProps)
 
             {/* Items */}
             {items.map((item: any) => (
-                <View
-                    key={item.id}
-                    style={{
-                        flexDirection: 'row',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        paddingVertical: 8,
-                    }}
-                >
-                    <Text style={{
-                        fontSize: 14,
-                        color: theme.colors.text,
-                        flex: 1,
-                    }}>
-                        {item.quantity}x {item.name}
-                    </Text>
-                    <Text style={{
-                        fontSize: 14,
-                        fontWeight: '600',
-                        color: theme.colors.text,
-                    }}>
-                        ${(item.price * item.quantity).toFixed(2)}
-                    </Text>
+                <View key={item.id}>
+                    <View
+                        style={{
+                            flexDirection: 'row',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            paddingVertical: 8,
+                        }}
+                    >
+                        <Text style={{
+                            fontSize: 14,
+                            color: theme.colors.text,
+                            flex: 1,
+                        }}>
+                            {item.quantity}x {item.name}
+                        </Text>
+                        <Text style={{
+                            fontSize: 14,
+                            fontWeight: '600',
+                            color: theme.colors.text,
+                        }}>
+                            {formatNaira(item.price * item.quantity)}
+                        </Text>
+                    </View>
+                    
+                    {/* Add-ons for this item */}
+                    {item.addOns && item.addOns.length > 0 && (
+                        <View style={{ marginLeft: 16, marginBottom: 4 }}>
+                            {item.addOns.map((addOn: any) => (
+                                <View
+                                    key={addOn.id}
+                                    style={{
+                                        flexDirection: 'row',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        paddingVertical: 2,
+                                    }}
+                                >
+                                    <Text style={{
+                                        fontSize: 12,
+                                        color: theme.colors.muted,
+                                        flex: 1,
+                                    }}>
+                                        + {addOn.addOn.name} x{addOn.quantity}
+                                    </Text>
+                                    <Text style={{
+                                        fontSize: 12,
+                                        color: theme.colors.muted,
+                                    }}>
+                                        {formatNaira(addOn.price * addOn.quantity)}
+                                    </Text>
+                                </View>
+                            ))}
+                        </View>
+                    )}
                 </View>
             ))}
 
@@ -112,7 +147,7 @@ export default function OrderSummary({ items, vendor, total}: OrderSummaryProps)
                     fontWeight: '700',
                     color: theme.colors.primary,
                 }}>
-                    ${total.toFixed(2)}
+                    {formatNaira(total)}
                 </Text>
             </View>
         </View>

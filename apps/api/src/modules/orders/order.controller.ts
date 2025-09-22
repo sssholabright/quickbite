@@ -4,15 +4,25 @@ import { createOrderSchema, updateOrderStatusSchema, cancelOrderSchema } from '.
 import { logger } from '../../utils/logger.js';
 import { CustomError } from '../../middlewares/errorHandler.js';
 import { OrderFilters } from '../../types/order.js';
+import { prisma } from '../../config/db.js';
 
 export class OrderController {
     // Create new order
     static async createOrder(req: Request, res: Response): Promise<void> {
         try {
-            const customerId = (req.user as any).id;
+            const userId = (req.user as any).userId; // Change from 'id' to 'userId'
             const validatedData = createOrderSchema.parse(req.body);
 
-            const order = await OrderService.createOrder(customerId, validatedData);
+            // Find the customer record for this user
+            const customer = await prisma.customer.findFirst({
+                where: { userId: userId }
+            });
+
+            if (!customer) {
+                throw new CustomError('Customer profile not found', 404);
+            }
+
+            const order = await OrderService.createOrder(customer.id, validatedData);
 
             res.status(201).json({
                 success: true,
@@ -40,7 +50,7 @@ export class OrderController {
     static async getOrderById(req: Request, res: Response): Promise<void> {
         try {
             const { orderId } = req.params;
-            const userId = (req.user as any).id as string;
+            const userId = (req.user as any).userId as string;
             const userRole = (req.user as any).role as string;
 
             const order = await OrderService.getOrderById(orderId!, userId, userRole);
@@ -71,7 +81,7 @@ export class OrderController {
     static async updateOrderStatus(req: Request, res: Response): Promise<void> {
         try {
             const { orderId } = req.params;
-            const userId = (req.user as any).id as string;
+            const userId = (req.user as any).userId as string; // Change from 'id' to 'userId'
             const userRole = (req.user as any).role as string;
             const validatedData = updateOrderStatusSchema.parse(req.body);
 
@@ -103,7 +113,7 @@ export class OrderController {
     // Get orders with filters
     static async getOrders(req: Request, res: Response): Promise<void> {
         try {
-            const userId = (req.user as any).id as string;
+            const userId = (req.user as any).userId as string;
             const userRole = (req.user as any).role as string;
             
             // Parse query parameters
@@ -145,7 +155,7 @@ export class OrderController {
     static async cancelOrder(req: Request, res: Response): Promise<void> {
         try {
             const { orderId } = req.params;
-            const userId = (req.user as any).id as string;
+            const userId = (req.user as any).userId as string;
             const userRole = (req.user as any).role as string;
             const validatedData = cancelOrderSchema.parse(req.body);
 

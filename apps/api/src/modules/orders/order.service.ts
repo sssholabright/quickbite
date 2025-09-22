@@ -2,6 +2,7 @@ import { logger } from './../../utils/logger.js';
 import { CustomError } from './../../middlewares/errorHandler.js';
 import { prisma } from './../../config/db.js';
 import { CreateOrderRequest, OrderFilters, OrderResponse, OrderStatusUpdate } from './../../types/order.js';
+import { getSocketManager } from '../../config/socket.js';
 
 export class OrderService {
     // Create new order
@@ -11,8 +12,8 @@ export class OrderService {
             const vendor = await prisma.vendor.findFirst({
                 where: {
                     id: orderData.vendorId,
-                    isActive: true,
-                    isOpen: true
+                    isActive: true
+                    // isOpen: true
                 },
                 include: {
                     user: true
@@ -140,7 +141,12 @@ export class OrderService {
                     },
                     items: {
                         include: {
-                            menuItem: true
+                            menuItem: true,
+                            addOns: {
+                                include: {
+                                    addOn: true
+                                }
+                            }
                         }
                     }
                 }
@@ -148,7 +154,18 @@ export class OrderService {
 
             logger.info(`Order created: ${order.orderNumber} for customer ${customerId}`);
 
-            return this.formatOrderResponse(order)
+            const formattedOrder = this.formatOrderResponse(order);
+
+            // Emit WebSocket events
+            try {
+                const socketManager = getSocketManager();
+                socketManager.emitNewOrder(formattedOrder);
+                socketManager.emitOrderUpdate(order.id, formattedOrder);
+            } catch (socketError) {
+                logger.error({ error: socketError }, 'Failed to emit socket events');
+            }
+
+            return formattedOrder;
 
         } catch (error) {
             logger.error({ error }, 'Error creating order');
@@ -292,9 +309,35 @@ export class OrderService {
                 }
             });
 
-            logger.info(`Order ${order.orderNumber} status updated to ${statusUpdate.status}`);
+            const formattedOrder = this.formatOrderResponse(updatedOrder);
 
-            return this.formatOrderResponse(updatedOrder);
+            // Emit WebSocket events
+            try {
+                const socketManager = getSocketManager();
+                socketManager.emitOrderUpdate(orderId, formattedOrder);
+                
+                // Emit status update to customer using userId instead of customer.id
+                socketManager.emitOrderStatusUpdate(orderId, updatedOrder.customer.userId, statusUpdate.status);
+                
+                // Emit delivery updates if rider is assigned
+                if (statusUpdate.riderId && ['PICKED_UP', 'OUT_FOR_DELIVERY', 'DELIVERED'].includes(statusUpdate.status)) {
+                    const rider = await prisma.rider.findUnique({
+                        where: { id: statusUpdate.riderId },
+                        include: { user: true }
+                    });
+                    if (rider) {
+                        socketManager.emitDeliveryUpdate(orderId, updatedOrder.customer.id, {
+                            id: rider.id,
+                            name: rider.user.name,
+                            phone: rider.user.phone
+                        });
+                    }
+                }
+            } catch (socketError) {
+                logger.error({ error: socketError }, 'Failed to emit socket events');
+            }
+
+            return formattedOrder;
         } catch (error) {
             logger.error({ error }, 'Error updating order status');
             if (error instanceof CustomError) {
@@ -330,7 +373,12 @@ export class OrderService {
                         },
                         items: {
                             include: {
-                                menuItem: true
+                                menuItem: true,
+                                addOns: {
+                                    include: {
+                                        addOn: true
+                                    }
+                                }
                             }
                         }
                     },
@@ -374,11 +422,12 @@ export class OrderService {
                 throw new CustomError('Access denied', 403);
             }
 
-            const updatedOrder = await prisma.order.update({
+            const cancelledOrder = await prisma.order.update({
                 where: { id: orderId },
                 data: {
                     status: 'CANCELLED',
-                    ...(reason && { cancellationReason: reason })
+                    cancelledAt: new Date(),
+                    cancellationReason: reason || null
                 },
                 include: {
                     vendor: {
@@ -409,9 +458,18 @@ export class OrderService {
                 }
             });
 
-            logger.info(`Order ${order.orderNumber} cancelled by ${userRole} ${userId}`);
+            const formattedOrder = this.formatOrderResponse(cancelledOrder);
 
-            return this.formatOrderResponse(updatedOrder);
+            // Emit WebSocket events
+            try {
+                const socketManager = getSocketManager();
+                socketManager.emitOrderCancellation(orderId, formattedOrder);
+                socketManager.emitOrderStatusUpdate(orderId, cancelledOrder.customer.id, 'CANCELLED');
+            } catch (socketError) {
+                logger.error({ error: socketError }, 'Failed to emit socket events');
+            }
+
+            return formattedOrder;
         } catch (error) {
             logger.error({ error }, 'Error cancelling order');
             if (error instanceof CustomError) {
@@ -533,11 +591,11 @@ export class OrderService {
     private static canUserViewOrder(order: any, userId: string, userRole: string): boolean {
         switch (userRole) {
             case 'CUSTOMER':
-                return order.customerId === userId;
+                return order.customer.userId === userId;
             case 'VENDOR':
-                return order.vendorId === userId;
+                return order.vendor.userId === userId;
             case 'RIDER':
-                return order.riderId === userId;
+                return order.rider?.userId === userId;
             case 'ADMIN':
                 return true;
             default:
@@ -548,27 +606,28 @@ export class OrderService {
     private static canUserUpdateOrder(order: any, userId: string, userRole: string, newStatus: string): boolean {
         switch (userRole) {
             case 'VENDOR':
-                return order.vendorId === userId && ['CONFIRMED', 'PREPARING', 'READY_FOR_PICKUP'].includes(newStatus);
+                const hasPermission = order.vendor.userId === userId && ['CONFIRMED', 'PREPARING', 'READY_FOR_PICKUP'].includes(newStatus);
+                return hasPermission;
             case 'RIDER':
-                return order.riderId === userId && ['PICKED_UP', 'OUT_FOR_DELIVERY', 'DELIVERED'].includes(newStatus);
+                return order.rider?.userId === userId && ['PICKED_UP', 'OUT_FOR_DELIVERY', 'DELIVERED'].includes(newStatus);
             case 'ADMIN':
                 return true;
             default:
                 return false;
-            }
+        }
     }
     
     private static canUserCancelOrder(order: any, userId: string, userRole: string): boolean {
         switch (userRole) {
             case 'CUSTOMER':
-                return order.customerId === userId && ['PENDING', 'CONFIRMED'].includes(order.status);
+                return order.customer.userId === userId && ['PENDING', 'CONFIRMED'].includes(order.status);
             case 'VENDOR':
-                return order.vendorId === userId && ['PENDING', 'CONFIRMED', 'PREPARING'].includes(order.status);
+                return order.vendor.userId === userId && ['PENDING', 'CONFIRMED', 'PREPARING'].includes(order.status);
             case 'ADMIN':
                 return true;
             default:
                 return false;
-            }
+        }
     }
 
     private static canOrderBeCancelled(status: string): boolean {

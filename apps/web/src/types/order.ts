@@ -6,6 +6,18 @@ export interface OrderItem {
     unitPrice: number
     totalPrice: number
     specialInstructions?: string
+    addOns?: Array<{
+        id: string
+        addOn: {
+            id: string
+            name: string
+            description?: string
+            price: number
+            category: string
+        }
+        quantity: number
+        price: number
+    }>
 }
 
 export interface DeliveryAddress {
@@ -69,4 +81,78 @@ export interface OrderFilters {
     dateFrom?: string
     dateTo?: string
     search?: string
+}
+
+export interface ApiOrderResponse {
+    id: string
+    orderNumber: string
+    status: string
+    vendor: {
+        id: string
+        name: string
+        businessName: string
+        address: string
+        phone: string
+        coordinates: {
+            lat: number
+            lng: number
+        }
+    }
+    customer: {
+        id: string
+        name: string
+        phone: string
+    }
+    rider?: {
+        id: string
+        name: string
+        phone: string
+        vehicleType: string
+    }
+    items: Array<{
+        id: string
+        menuItem: {
+            id: string
+            name: string
+            description?: string
+            price: number
+            image?: string
+        }
+        quantity: number
+        unitPrice: number
+        totalPrice: number
+        specialInstructions?: string
+        addOns?: Array<{
+            id: string
+            addOn: {
+                id: string
+                name: string
+                description?: string
+                price: number
+                category: string
+            }
+            quantity: number
+            price: number
+        }>
+    }>
+    deliveryAddress: {
+        label: string
+        address: string
+        city: string
+        state: string
+        coordinates: {
+            lat: number
+            lng: number
+        }
+    }
+    pricing: {
+        subtotal: number
+        deliveryFee: number
+        serviceFee: number
+        total: number
+    }
+    specialInstructions?: string
+    estimatedDeliveryTime?: string
+    createdAt: string
+    updatedAt: string
 }

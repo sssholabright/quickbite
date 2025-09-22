@@ -1,10 +1,7 @@
 import { useState } from 'react'
 import { Order, OrderStatus } from '../../types/order'
-import { useOrderStore } from '../../stores/orderStore'
 import { formatNaira } from '../../lib/mockOrders'
-import { showConfirm, showSuccess, showError } from '../../utils/sweetAlert'
 import { 
-    FaUser, 
     FaMapMarkerAlt, 
     FaClock, 
     FaCheck, 
@@ -17,12 +14,20 @@ import {
 
 interface OrderCardProps {
     order: Order
+    onAccept?: () => void
+    onReject?: () => void
+    onStatusUpdate?: (status: string) => void
+    isLoading?: boolean
 }
 
-export default function OrderCard({ order }: OrderCardProps) {
+export default function OrderCard({ 
+    order, 
+    onAccept, 
+    onReject, 
+    onStatusUpdate, 
+    isLoading = false 
+}: OrderCardProps) {
     const [isExpanded, setIsExpanded] = useState(false)
-    const [isLoading, setIsLoading] = useState(false)
-    const { updateOrderStatus, acceptOrder, rejectOrder } = useOrderStore()
 
     const getStatusColor = (status: OrderStatus) => {
         switch (status) {
@@ -52,80 +57,13 @@ export default function OrderCard({ order }: OrderCardProps) {
         }
     }
 
-    const handleStatusUpdate = async (newStatus: OrderStatus) => {
-        const statusText = getStatusText(newStatus)
-        const result = await showConfirm(
-            'Update Order Status',
-            `Are you sure you want to mark this order as "${statusText}"?`,
-            `Yes, mark as ${statusText}`,
-            'Cancel'
-        )
-
-        if (result.isConfirmed) {
-            setIsLoading(true)
-            try {
-                await updateOrderStatus(order.id, newStatus)
-                showSuccess('Status Updated', `Order ${order.orderNumber} has been marked as ${statusText}`)
-            } catch (error) {
-                console.error('Failed to update order status:', error)
-                showError('Error', 'Failed to update order status. Please try again.')
-            } finally {
-                setIsLoading(false)
-            }
-        }
-    }
-
-    const handleAccept = async () => {
-        const result = await showConfirm(
-            'Accept Order',
-            `Are you sure you want to accept order ${order.orderNumber}?`,
-            'Yes, accept order',
-            'Cancel'
-        )
-
-        if (result.isConfirmed) {
-            setIsLoading(true)
-            try {
-                await acceptOrder(order.id)
-                showSuccess('Order Accepted', `Order ${order.orderNumber} has been accepted successfully`)
-            } catch (error) {
-                console.error('Failed to accept order:', error)
-                showError('Error', 'Failed to accept order. Please try again.')
-            } finally {
-                setIsLoading(false)
-            }
-        }
-    }
-
-    const handleReject = async () => {
-        const result = await showConfirm(
-            'Reject Order',
-            `Are you sure you want to reject order ${order.orderNumber}? This action cannot be undone.`,
-            'Yes, reject order',
-            'Cancel'
-        )
-
-        if (result.isConfirmed) {
-            setIsLoading(true)
-            try {
-                await rejectOrder(order.id, 'Rejected by vendor')
-                showSuccess('Order Rejected', `Order ${order.orderNumber} has been rejected`)
-            } catch (error) {
-                console.error('Failed to reject order:', error)
-                showError('Error', 'Failed to reject order. Please try again.')
-            } finally {
-                setIsLoading(false)
-            }
-        }
-    }
-
     const getActionButtons = () => {
         switch (order.status) {
             case 'PENDING':
                 return (
                     <div className="flex space-x-2">
                         <button
-                            onClick={handleAccept}
+                            onClick={onAccept}
                             disabled={isLoading}
                             className="flex items-center px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
                         >
@@ -133,7 +71,7 @@ export default function OrderCard({ order }: OrderCardProps) {
                             Accept
                         </button>
                         <button
-                            onClick={handleReject}
+                            onClick={onReject}
                             disabled={isLoading}
                             className="flex items-center px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
                         >
@@ -145,7 +83,7 @@ export default function OrderCard({ order }: OrderCardProps) {
             case 'CONFIRMED':
                 return (
                     <button
-                        onClick={() => handleStatusUpdate('PREPARING')}
+                        onClick={() => onStatusUpdate?.('PREPARING')}
                         disabled={isLoading}
                         className="flex items-center px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
                     >
@@ -156,7 +94,7 @@ export default function OrderCard({ order }: OrderCardProps) {
             case 'PREPARING':
                 return (
                     <button
-                        onClick={() => handleStatusUpdate('READY_FOR_PICKUP')}
+                        onClick={() => onStatusUpdate?.('READY_FOR_PICKUP')}
                         disabled={isLoading}
                         className="flex items-center px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
                     >
@@ -237,6 +175,15 @@ export default function OrderCard({ order }: OrderCardProps) {
                                             <p className="text-sm text-gray-600">Qty: {item.quantity}</p>
                                             {item.specialInstructions && (
                                                 <p className="text-xs text-gray-500 italic">Note: {item.specialInstructions}</p>
+                                            )}
+                                            {item.addOns && item.addOns.length > 0 && (
+                                                <div className="mt-1">
+                                                    {item.addOns.map((addOn) => (
+                                                        <p key={addOn.id} className="text-xs text-gray-500">
+                                                            + {addOn.addOn?.name} x{addOn.quantity} ({formatNaira((addOn.price || addOn.addOn?.price || 0) * addOn.quantity)})
+                                                        </p>
+                                                    ))}
+                                                </div>
                                             )}
                                         </div>
                                         <p className="font-medium text-gray-900">{formatNaira(item.totalPrice)}</p>

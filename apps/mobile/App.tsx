@@ -6,16 +6,19 @@ import { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuthStore } from './src/stores/auth';
+import { useSocket } from './src/hooks/useSocket';
 
 const queryClient = new QueryClient();
 
 function AppContent() {
   const { hydrate } = useAuthStore();
+  
+  // Initialize socket at app level - persists across navigation
+  useSocket();
 
   useEffect(() => {
-    // Initialize auth store on app start - only run once
     hydrate();
-  }, []); // Remove hydrate from dependencies
+  }, []);
 
   return (
     <>

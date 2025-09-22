@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { VendorProfile, ChangePasswordData } from '../../types/vendor'
 import { useVendorStore } from '../../stores/vendorStore'
 import { showSuccess, showError, showConfirm } from '../../utils/sweetAlert'
-import { FaEdit, FaSave, FaTimes, FaBell, FaLock, FaToggleOn, FaToggleOff } from 'react-icons/fa'
+import { FaBell, FaLock } from 'react-icons/fa'
 
 interface AccountSettingsProps {
     profile: VendorProfile
@@ -59,7 +59,7 @@ export default function AccountSettings({ profile }: AccountSettingsProps) {
             'Cancel'
         )
 
-        if (result.isConfirmed) {
+        if (result) {
             setIsLoading(true)
             try {
                 await changePassword(passwordData)

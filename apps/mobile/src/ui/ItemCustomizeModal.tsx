@@ -171,7 +171,7 @@ export default function ItemCustomizeModal({ visible, onClose, item, onConfirm }
                     </View>
                 </View>
             </View>
-            <View style={{ height: 80 }} /> 
+            <View style={{ height: 30 }} /> 
         </Modal>
     )
 }

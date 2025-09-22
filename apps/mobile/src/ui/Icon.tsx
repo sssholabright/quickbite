@@ -78,26 +78,42 @@ const iconMap: Record<string, { name: string; set: IconSet }> = {
 	"chevron-down": { name: "chevron-down-outline", set: "ion" },
 	"chevron-left": { name: "chevron-back-outline", set: "ion" },
 	"chevron-right": { name: "chevron-forward-outline", set: "ion" },
+	
+	// Payment & Money
 	"cash": { name: "cash-outline", set: "ion" },
 	"card": { name: "card-outline", set: "ion" },
+	"dollar-sign": { name: "cash-outline", set: "ion" },
+	"credit-card": { name: "card-outline", set: "ion" },
+	
+	// Location & Maps
+	"map-pin": { name: "location-outline", set: "ion" },
+	"location-outline": { name: "location-outline", set: "ion" },
+	
+	// Checkmarks
 	"checkmark": { name: "checkmark-outline", set: "ion" },
 	"checkmark-circle": { name: "checkmark-circle-outline", set: "ion" },
 	"checkmark-done": { name: "checkmark-done-outline", set: "ion" },
+	
+	// Notifications & Communication
 	"notifications": { name: "notifications-outline", set: "ion" },
-	'create': { name: 'create-outline', set: 'ion' },
-	'location-outline': { name: 'location-outline', set: 'ion' },
-	'chatbubble': { name: 'chatbubble-outline', set: 'ion' },
-	'language': { name: 'language-outline', set: 'ion' },
-	'help-circle': { name: 'help-circle-outline', set: 'ion' },
-	'chatbubble-ellipses': { name: 'chatbubble-ellipses-outline', set: 'ion' },
-	'information-circle': { name: 'information-circle-outline', set: 'ion' },
-	'document-text': { name: 'document-text-outline', set: 'ion' },
-	'shield-checkmark': { name: 'shield-checkmark-outline', set: 'ion' },
-	'card-outline': { name: 'card-outline', set: 'ion' },
-	'wallet': { name: 'wallet-outline', set: 'ion' },
-	'color-palette': { name: 'color-palette-outline', set: 'ion' },
+	"create": { name: "create-outline", set: "ion" },
+	"chatbubble": { name: "chatbubble-outline", set: "ion" },
+	"language": { name: "language-outline", set: "ion" },
+	"help-circle": { name: "help-circle-outline", set: "ion" },
+	"chatbubble-ellipses": { name: "chatbubble-ellipses-outline", set: "ion" },
+	"information-circle": { name: "information-circle-outline", set: "ion" },
+	"document-text": { name: "document-text-outline", set: "ion" },
+	"shield-checkmark": { name: "shield-checkmark-outline", set: "ion" },
+	"card-outline": { name: "card-outline", set: "ion" },
+	"wallet": { name: "wallet-outline", set: "ion" },
+	"color-palette": { name: "color-palette-outline", set: "ion" },
 	"eye": { name: "eye-outline", set: "ion" },
 	"eye-off": { name: "eye-off-outline", set: "ion" },
+	
+	// Package & Orders
+	"package": { name: "cube-outline", set: "ion" },
+	"alert-circle": { name: "alert-circle-outline", set: "ion" },
+	"close-circle": { name: "close-circle-outline", set: "ion" },
 };
 
 function IconImpl({ name, size = 24, color = "#111827", style, set = "ion" }: Props) {
