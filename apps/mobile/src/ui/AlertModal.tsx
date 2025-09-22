@@ -33,28 +33,28 @@ export default function AlertModal({
         switch (type) {
             case 'success':
                 return {
-                color: theme.colors.primary,
-                icon: 'checkmark-circle',
-                backgroundColor: theme.colors.primary + '15',
+                    color: theme.colors.primary,
+                    icon: 'checkmark-circle',
+                    backgroundColor: theme.colors.primary + '15',
                 };
             case 'error':
                 return {
-                color: theme.colors.danger,
-                icon: 'close-circle',
-                backgroundColor: theme.colors.danger + '15',
+                    color: theme.colors.danger,
+                    icon: 'close-circle',
+                    backgroundColor: theme.colors.danger + '15',
                 };
             case 'warning':
                 return {
-                color: '#FF9800',
-                icon: 'warning',
-                backgroundColor: '#FF980015',
+                    color: '#FF9800',
+                    icon: 'warning',
+                    backgroundColor: '#FF980015',
                 };
             case 'info':
             default:
                 return {
-                color: theme.colors.primary,
-                icon: 'information-circle',
-                backgroundColor: theme.colors.primary + '15',
+                    color: theme.colors.primary,
+                    icon: 'information-circle',
+                    backgroundColor: theme.colors.primary + '15',
                 };
         }
     };

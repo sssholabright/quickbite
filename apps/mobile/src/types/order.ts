@@ -70,3 +70,120 @@ export interface StatusStepProps {
     }>;
     pulseAnim: Animated.Value;
 }
+
+export interface CreateOrderRequest {
+    vendorId: string;
+    items: OrderItemRequest[];
+    deliveryAddress: {
+        label: string;
+        address: string;
+        city: string;
+        state: string;
+        coordinates: {
+            lat: number;
+            lng: number;
+        };
+    };
+    specialInstructions?: string;
+}
+
+export interface OrderItemRequest {
+    menuItemId: string;
+    quantity: number;
+    specialInstructions?: string;
+    addOns?: OrderItemAddOnRequest[];
+}
+
+export interface OrderItemAddOnRequest {
+    addOnId: string;
+    quantity: number;
+}
+
+export interface OrderResponse {
+    id: string;
+    orderNumber: string;
+    status: string;
+    vendor: {
+        id: string;
+        name: string;
+        businessName: string;
+        address: string;
+        phone: string;
+        coordinates: {
+            lat: number;
+            lng: number;
+        };
+    };
+    customer: {
+        id: string;
+        name: string;
+        phone: string;
+    };
+    rider?: {
+        id: string;
+        name: string;
+        phone: string;
+        vehicleType: string;
+    };
+    items: OrderItemResponse[];
+    deliveryAddress: {
+        label: string;
+        address: string;
+        city: string;
+        state: string;
+        coordinates: {
+            lat: number;
+            lng: number;
+        };
+    };
+    pricing: {
+        subtotal: number;
+        deliveryFee: number;
+        serviceFee: number;
+        total: number;
+    };
+    specialInstructions?: string;
+    estimatedDeliveryTime?: Date;
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+export interface OrderItemResponse {
+    id: string;
+    menuItem: {
+        id: string;
+        name: string;
+        description?: string;
+        price: number;
+        image?: string;
+    };
+    quantity: number;
+    unitPrice: number;
+    totalPrice: number;
+    specialInstructions?: string;
+    addOns?: OrderItemAddOnResponse[];
+}
+
+export interface OrderItemAddOnResponse {
+    id: string;
+    addOn: {
+        id: string;
+        name: string;
+        description?: string;
+        price: number;
+        category: string;
+    };
+    quantity: number;
+    price: number;
+}
+
+export interface OrderFilters {
+    status?: string;
+    vendorId?: string;
+    customerId?: string;
+    riderId?: string;
+    dateFrom?: Date;
+    dateTo?: Date;
+    page?: number;
+    limit?: number;
+}

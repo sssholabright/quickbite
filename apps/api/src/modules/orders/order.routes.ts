@@ -1,30 +1,37 @@
-import { Router } from "express";
-import { authGuard, requireRole } from './../../middlewares/authGuard.js';
+import { Router } from 'express';
 import { OrderController } from './order.controller.js';
-import { orderCreationRateLimit } from './../../middlewares/rateLimiter.js';
+import { authGuard } from '../../middlewares/authGuard.js';
 
 const router = Router();
 
-// All routes require authentication
-router.use(authGuard());
-
-// Create order (customers only)
-router.post('/', requireRole('CUSTOMER'), orderCreationRateLimit, OrderController.createOrder);
-
-// Get order by ID (any authenticated user)
-router.get('/:id', OrderController.getOrderById);
-
-// Get orders with filters (any authenticated user)
-router.get('/', OrderController.getOrders);
-
-// Update order status (vendors, riders, admins)
-router.put('/:id/status', requireRole('VENDOR', 'RIDER', 'ADMIN'), OrderController.updateOrderStatus);
-
-// Cancel order (customers, vendors, admins)
-router.put('/:id/cancel', requireRole('CUSTOMER', 'VENDOR', 'ADMIN'), OrderController.cancelOrder
+// Create order (Customer only)
+router.post('/', 
+    authGuard({ requiredRoles: ['CUSTOMER'] }),
+    OrderController.createOrder
 );
 
-// Get order statistics (any authenticated user)
-router.get('/stats/overview', OrderController.getOrderStats);
+// Get orders (All authenticated users)
+router.get('/',
+    authGuard({ requiredRoles: ['CUSTOMER', 'VENDOR', 'RIDER', 'ADMIN'] }),
+    OrderController.getOrders
+);
+
+// Get order by ID (All authenticated users)
+router.get('/:orderId',
+    authGuard({ requiredRoles: ['CUSTOMER', 'VENDOR', 'RIDER', 'ADMIN'] }),
+    OrderController.getOrderById
+);
+
+// Update order status (Vendor, Rider, Admin only)
+router.patch('/:orderId/status',
+    authGuard({ requiredRoles: ['VENDOR', 'RIDER', 'ADMIN'] }),
+    OrderController.updateOrderStatus
+);
+
+// Cancel order (Customer, Vendor, Admin only)
+router.patch('/:orderId/cancel',
+    authGuard({ requiredRoles: ['CUSTOMER', 'VENDOR', 'ADMIN'] }),
+    OrderController.cancelOrder
+);
 
 export default router;

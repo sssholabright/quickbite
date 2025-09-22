@@ -20,6 +20,7 @@ export interface Meal {
     vendorId: string;
     category: string;
     popular: boolean;
+    preparationTime?: number;
 }
   
 export interface Category {

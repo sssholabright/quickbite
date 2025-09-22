@@ -1,66 +1,144 @@
-import { FlatList, Pressable, Text, View } from 'react-native'
-import { useTheme } from '../../theme/theme'
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useMemo, useState } from 'react';
-import { FilterType, Order } from '../../types/order';
-import { mockOrders } from '../../lib/mockOrders';
-import OrderCard from '../../ui/OrderCard';
-import { Icon } from '../../ui/Icon';
+import React, { useState } from 'react';
+import { View, Text, FlatList, Pressable, RefreshControl } from 'react-native';
+import { SafeAreaWrapper } from '../../ui/SafeAreaWrapper';
+import { useTheme } from '../../theme/theme';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { RootStackParamList } from '../../navigation/types';
+import type { AppTabParamList } from '../../navigation/types';
+import { Icon } from '../../ui/Icon';
+import { useOrders } from '../../hooks/useOrders';
+import OrderCard from '../../ui/OrderCard';
+import AlertModal from '../../ui/AlertModal';
 
-type OrdersScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'AppTabs'>;
+type OrdersScreenNavigationProp = NativeStackNavigationProp<AppTabParamList, 'Orders'>;
+
+interface AlertState {
+    visible: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'error' | 'warning' | 'info';
+    onConfirm?: () => void;
+    onCancel?: () => void;
+    showCancel?: boolean;
+    confirmText?: string;
+    cancelText?: string;
+}
 
 export default function OrdersScreen() {
-    const theme = useTheme()
-    const insets = useSafeAreaInsets();
+    const theme = useTheme();
     const navigation = useNavigation<OrdersScreenNavigationProp>();
-    const [filter, setFilter] = useState<FilterType>('all');
+    const [filter, setFilter] = useState<'all' | 'active' | 'past'>('all');
 
-    const { activeOrders, pastOrders } = useMemo(() => {
-        const active = mockOrders.filter(order => 
-            ['pending', 'preparing', 'out_for_delivery'].includes(order.status)
-        );
-        const past = mockOrders.filter(order => 
-            ['delivered', 'cancelled'].includes(order.status)
-        );
-        return { activeOrders: active, pastOrders: past };
-    }, []);
+    // Alert modal state
+    const [alert, setAlert] = useState<AlertState>({
+        visible: false,
+        title: '',
+        message: '',
+        type: 'info'
+    });
 
-    const filteredOrders = useMemo(() => {
-        switch (filter) {
-            case 'active': return activeOrders;
-            case 'past': return pastOrders;
-            default: return [...activeOrders, ...pastOrders];
-        }
-    }, [filter, activeOrders, pastOrders]);
-
-    const handleOrderPress = (order: Order) => {
-        navigation.navigate('OrderDetail', { orderId: order.id } as any);
+    // Helper function to show alert
+    const showAlert = (alertData: Omit<AlertState, 'visible'>) => {
+        setAlert({
+            ...alertData,
+            visible: true
+        });
     };
 
-    const renderOrder = ({ item }: { item: Order }) => (
-        <OrderCard
-            order={item}
-            onPress={() => handleOrderPress(item)}
+    // Helper function to hide alert
+    const hideAlert = () => {
+        setAlert(prev => ({ ...prev, visible: false }));
+    };
+
+    // Build filters for API
+    const apiFilters = {
+        ...(filter === 'active' && { status: 'PENDING,CONFIRMED,PREPARING,READY_FOR_PICKUP,PICKED_UP,OUT_FOR_DELIVERY' }),
+        ...(filter === 'past' && { status: 'DELIVERED,CANCELLED' }),
+        page: 1,
+        limit: 50
+    };
+
+    const { data: ordersData, isLoading, error, refetch } = useOrders(apiFilters);
+
+    const orders = ordersData?.orders || [];
+    const isRefreshing = false;
+
+    const handleRefresh = async () => {
+        try {
+            await refetch();
+        } catch (error) {
+            showAlert({
+                title: 'Refresh Failed',
+                message: 'Failed to refresh orders. Please check your internet connection and try again.',
+                type: 'error',
+                confirmText: 'Retry',
+                cancelText: 'Cancel',
+                showCancel: true,
+                onConfirm: () => {
+                    hideAlert();
+                    handleRefresh();
+                },
+                onCancel: hideAlert
+            });
+        }
+    };
+
+    const handleOrderPress = (orderId: string) => {
+        navigation.getParent()?.navigate('OrderDetail', { orderId });
+    };
+
+    const handleFilterChange = (newFilter: 'all' | 'active' | 'past') => {
+        setFilter(newFilter);
+    };
+
+    const renderOrderItem = ({ item }: { item: any }) => (
+        <OrderCard 
+            order={{
+                id: item.id,
+                orderId: item.orderNumber,
+                vendor: {
+                    id: item.vendor.id,
+                    name: item.vendor.businessName,
+                    logo: undefined,
+                    location: item.vendor.address
+                },
+                items: item.items.map((orderItem: any) => ({
+                    id: orderItem.id,
+                    name: orderItem.menuItem.name,
+                    price: orderItem.unitPrice,
+                    quantity: orderItem.quantity,
+                    image: orderItem.menuItem.image
+                })),
+                status: item.status.toLowerCase().replace('_', ' '),
+                total: item.pricing.total,
+                subtotal: item.pricing.subtotal,
+                fees: item.pricing.deliveryFee + item.pricing.serviceFee,
+                paymentMethod: 'cash' as const,
+                paymentStatus: 'paid' as const,
+                notes: item.specialInstructions,
+                pickupTime: 'asap',
+                placedAt: new Date(item.createdAt),
+                estimatedReadyAt: item.estimatedDeliveryTime ? new Date(item.estimatedDeliveryTime) : undefined
+            }}
+            onPress={() => handleOrderPress(item.id)}
         />
     );
-    
+
     const renderEmptyState = () => (
-        <View style={{
-            flex: 1,
+        <View style={{ 
+            flex: 1, 
+            alignItems: 'center', 
             justifyContent: 'center',
-            alignItems: 'center',
             paddingHorizontal: 32,
+            paddingTop: 60
         }}>
-            <Icon name="receipt-outline" size={64} color={theme.colors.muted} />
+            <Icon name="package" size={64} color={theme.colors.muted} />
             <Text style={{
                 fontSize: 18,
                 fontWeight: '600',
                 color: theme.colors.text,
                 marginTop: 16,
-                marginBottom: 8,
+                marginBottom: 8
             }}>
                 No orders yet
             </Text>
@@ -68,80 +146,171 @@ export default function OrdersScreen() {
                 fontSize: 14,
                 color: theme.colors.muted,
                 textAlign: 'center',
+                lineHeight: 20
             }}>
                 {filter === 'active' 
-                    ? 'You don\'t have any active orders'
-                    : 'You haven\'t placed any orders yet'
+                    ? "You don't have any active orders at the moment."
+                    : "You haven't placed any orders yet."
                 }
             </Text>
         </View>
     );
-    
-    return (
+
+    const renderErrorState = () => (
         <View style={{ 
             flex: 1, 
-            backgroundColor: theme.colors.background,
-            paddingTop: 10,
+            alignItems: 'center', 
+            justifyContent: 'center',
+            paddingHorizontal: 32,
+            paddingTop: 60
         }}>
-            {/* Header */}
-            <View style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                paddingHorizontal: 16,
-                marginBottom: 20,
+            <Icon name="alert-circle" size={64} color={theme.colors.danger} />
+            <Text style={{
+                fontSize: 18,
+                fontWeight: '600',
+                color: theme.colors.text,
+                marginTop: 16,
+                marginBottom: 8
             }}>
-                <Text style={{
-                    fontSize: 24,
-                    fontWeight: '700',
-                    color: theme.colors.text,
-                }}>
-                    My Orders
-                </Text>
-
+                Something went wrong
+            </Text>
+            <Text style={{
+                fontSize: 14,
+                color: theme.colors.muted,
+                textAlign: 'center',
+                lineHeight: 20,
+                marginBottom: 24
+            }}>
+                Failed to load your orders. Please try again.
+            </Text>
+            <Pressable
+                onPress={() => {
+                    showAlert({
+                        title: 'Retry Loading Orders',
+                        message: 'Are you sure you want to retry loading your orders?',
+                        type: 'info',
+                        confirmText: 'Retry',
+                        cancelText: 'Cancel',
+                        showCancel: true,
+                        onConfirm: () => {
+                            hideAlert();
+                            handleRefresh();
+                        },
+                        onCancel: hideAlert
+                    });
+                }}
+            >
                 <View style={{
-                    flexDirection: 'row',
-                    backgroundColor: theme.colors.surface,
-                    borderRadius: 8,
-                    padding: 2,
+                    backgroundColor: theme.colors.primary + '15',
+                    paddingVertical: 12,
+                    paddingHorizontal: 24,
+                    borderRadius: 12
                 }}>
-                    {(['all', 'active', 'past'] as FilterType[]).map((filterType) => (
+                    <Text style={{
+                        fontSize: 16,
+                        fontWeight: '600',
+                        color: theme.colors.primary
+                    }}>
+                        Retry
+                    </Text>
+                </View>
+            </Pressable>
+        </View>
+    );
+
+    return (
+        <SafeAreaWrapper>
+            <View style={{ flex: 1 }}>
+                {/* Header */}
+                <View style={{ 
+                    flexDirection: 'row', 
+                    alignItems: 'center', 
+                    paddingHorizontal: 16, 
+                    paddingVertical: 12,
+                    borderBottomWidth: 1,
+                    borderBottomColor: theme.colors.border
+                }}>
+                    <Pressable onPress={() => navigation.goBack()}>
+                        <Icon name="arrow-left" size={24} color={theme.colors.text} />
+                    </Pressable>
+                    <Text style={{ 
+                        fontSize: 18, 
+                        fontWeight: '700', 
+                        color: theme.colors.text,
+                        marginLeft: 12
+                    }}>
+                        My Orders
+                    </Text>
+                </View>
+
+                {/* Filter Tabs */}
+                <View style={{ 
+                    flexDirection: 'row', 
+                    paddingHorizontal: 16, 
+                    paddingVertical: 12,
+                    borderBottomWidth: 1,
+                    borderBottomColor: theme.colors.border
+                }}>
+                    {(['all', 'active', 'past'] as const).map((tab) => (
                         <Pressable
-                            key={filterType}
-                            onPress={() => setFilter(filterType)}
+                            key={tab}
+                            onPress={() => handleFilterChange(tab)}
                             style={{
-                                paddingHorizontal: 12,
-                                paddingVertical: 6,
-                                marginHorizontal: 3,
-                                borderRadius: 6,
-                                backgroundColor: filter === filterType ? theme.colors.primary : 'transparent',
+                                flex: 1,
+                                paddingVertical: 8,
+                                paddingHorizontal: 16,
+                                borderRadius: 20,
+                                backgroundColor: filter === tab ? theme.colors.primary : 'transparent',
+                                marginHorizontal: 4
                             }}
                         >
                             <Text style={{
-                                fontSize: 12,
+                                fontSize: 14,
                                 fontWeight: '600',
-                                color: filter === filterType ? 'white' : theme.colors.muted,
-                                textTransform: 'capitalize',
+                                color: filter === tab ? 'white' : theme.colors.muted,
+                                textAlign: 'center',
+                                textTransform: 'capitalize'
                             }}>
-                                {filterType}
+                                {tab}
                             </Text>
                         </Pressable>
                     ))}
                 </View>
-            </View>
 
-            {/* Orders List */}
-            {filteredOrders.length > 0 ? (
-                <FlatList
-                    data={filteredOrders}
-                    renderItem={renderOrder}
-                    keyExtractor={(item) => item.id}
-                    showsVerticalScrollIndicator={false}
-                    contentContainerStyle={{ paddingBottom: 20 }}
+                {/* Orders List */}
+                {error ? (
+                    renderErrorState()
+                ) : (
+                    <FlatList
+                        data={orders}
+                        renderItem={renderOrderItem}
+                        keyExtractor={(item) => item.id}
+                        contentContainerStyle={{ flexGrow: 1 }}
+                        refreshControl={
+                            <RefreshControl
+                                refreshing={isRefreshing}
+                                onRefresh={handleRefresh}
+                                tintColor={theme.colors.primary}
+                            />
+                        }
+                        ListEmptyComponent={!isLoading ? renderEmptyState : null}
+                        showsVerticalScrollIndicator={false}
+                    />
+                )}
+
+                {/* Alert Modal */}
+                <AlertModal
+                    visible={alert.visible}
+                    title={alert.title}
+                    message={alert.message}
+                    type={alert.type}
+                    onConfirm={alert.onConfirm || hideAlert}
+                    onCancel={alert.onCancel}
+                    confirmText={alert.confirmText}
+                    cancelText={alert.cancelText}
+                    showCancel={alert.showCancel}
                 />
-            ) : (
-                renderEmptyState()
-            )}
-        </View>
-    )
+            </View>
+        </SafeAreaWrapper>
+    );
 }

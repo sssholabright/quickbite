@@ -1,227 +1,175 @@
-import { NextFunction, Request, Response } from 'express';
-import { z } from 'zod';
-import { logger } from './../../utils/logger.js';
-import { ResponseHandler } from './../../utils/response.js';
-import { cancelOrderSchema, createOrderSchema, orderFiltersSchema, updateOrderStatusSchema } from './../../validations/order.js';
+import { Request, Response } from 'express';
 import { OrderService } from './order.service.js';
+import { createOrderSchema, updateOrderStatusSchema, cancelOrderSchema } from '../../validations/order.js';
+import { logger } from '../../utils/logger.js';
+import { CustomError } from '../../middlewares/errorHandler.js';
+import { OrderFilters } from '../../types/order.js';
 
 export class OrderController {
     // Create new order
-    static async createOrder(req: Request, res: Response, next: NextFunction): Promise<void> {
+    static async createOrder(req: Request, res: Response): Promise<void> {
         try {
-            // Validate request body
+            const customerId = (req.user as any).id;
             const validatedData = createOrderSchema.parse(req.body);
-            
-            // Get user info from auth middleware
-            const customerId = req.user?.userId;
-            if (!customerId) {
-                ResponseHandler.unauthorized(res as any, 'User not authenticated');
-                return
-            }
-    
-            // Create order
+
             const order = await OrderService.createOrder(customerId, validatedData);
-            
-            logger.info(`Order created successfully: ${order.orderNumber}`);
-            
-            ResponseHandler.created(res as any, order, 'Order created successfully');
+
+            res.status(201).json({
+                success: true,
+                message: 'Order created successfully',
+                data: order
+            });
         } catch (error) {
-            if (error instanceof z.ZodError) {
-                const errorMessage = error.issues.map(err => `${err.path.join('.')}: ${err.message}`).join(', ');
-                ResponseHandler.validationError(res as any, 'Validation failed', errorMessage);
+            logger.error({ error }, 'Error creating order');
+            if (error instanceof CustomError) {
+                res.status(error.statusCode).json({
+                    success: false,
+                    message: error.message
+                });
                 return;
             }
-            
-            next(error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to create order'
+            });
+            return;
         }
     }
-  
+
     // Get order by ID
-    static async getOrderById(req: Request, res: Response, next: NextFunction): Promise<void> {
+    static async getOrderById(req: Request, res: Response): Promise<void> {
         try {
-            const { id } = req.params;
-            
-            if (!id) {
-                ResponseHandler.badRequest(res as any, 'Order ID is required');
-                return
-            }
-    
-            // Get user info from auth middleware
-            const userId = req.user?.userId;
-            const userRole = req.user?.role;
-            
-            if (!userId || !userRole) {
-                ResponseHandler.unauthorized(res as any, 'User not authenticated');
+            const { orderId } = req.params;
+            const userId = (req.user as any).id as string;
+            const userRole = (req.user as any).role as string;
+
+            const order = await OrderService.getOrderById(orderId!, userId, userRole);
+
+            res.json({
+                success: true,
+                data: order
+            });
+            return;
+        } catch (error) {
+            logger.error({ error }, 'Error getting order');
+            if (error instanceof CustomError) {
+                res.status(error.statusCode).json({
+                    success: false,
+                    message: error.message
+                });
                 return;
             }
-    
-            // Get order
-            const order = await OrderService.getOrderById(id, userId, userRole);
-            
-            ResponseHandler.success(res as any, order, 'Order retrieved successfully');
-        } catch (error) {
-            next(error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to get order'
+            });
+            return;
         }
     }
-  
-    // Get orders with filters
-    static async getOrders(req: Request, res: Response, next: NextFunction): Promise<void> {
-        try {
-            // Validate query parameters
-            const validatedQuery = orderFiltersSchema.parse(req.query);
-            
-            // Get user info from auth middleware
-            const userId = req.user?.userId;
-            const userRole = req.user?.role;
-            
-            if (!userId || !userRole) {
-                ResponseHandler.unauthorized(res as any, 'User not authenticated');
-                return
-            }
-    
-            // Convert date strings to Date objects
-            const filters = {
-                ...validatedQuery,
-                dateFrom: validatedQuery.dateFrom ? new Date(validatedQuery.dateFrom) : undefined,
-                dateTo: validatedQuery.dateTo ? new Date(validatedQuery.dateTo) : undefined
-            };
-    
-            // Get orders
-            const result = await OrderService.getOrders(filters, userId, userRole);
-            
-            ResponseHandler.success(res as any, result, 'Orders retrieved successfully');
-        } catch (error) {
-            if (error instanceof z.ZodError) {
-                const errorMessage = error.issues.map(err => `${err.path.join('.')}: ${err.message}`).join(', ');
-                ResponseHandler.validationError(res as any, 'Validation failed', errorMessage);
-                return;
-            }
-            
-            next(error);
-        }
-    }
-  
+
     // Update order status
-    static async updateOrderStatus(req: Request, res: Response, next: NextFunction): Promise<void> {
+    static async updateOrderStatus(req: Request, res: Response): Promise<void> {
         try {
-            const { id } = req.params;
-            
-            if (!id) {
-                ResponseHandler.badRequest(res as any, 'Order ID is required');
-                return
-            }
-    
-            // Validate request body
+            const { orderId } = req.params;
+            const userId = (req.user as any).id as string;
+            const userRole = (req.user as any).role as string;
             const validatedData = updateOrderStatusSchema.parse(req.body);
-            
-            // Get user info from auth middleware
-            const userId = req.user?.userId;
-            const userRole = req.user?.role;
-            
-            if (!userId || !userRole) {
-                ResponseHandler.unauthorized(res as any, 'User not authenticated');
-                return;
-            }
-    
-            // Convert estimatedDeliveryTime string to Date if provided
-            const statusUpdate = {
-                ...validatedData,
-                estimatedDeliveryTime: validatedData.estimatedDeliveryTime 
-                    ? new Date(validatedData.estimatedDeliveryTime) 
-                : undefined
-            };
-    
-                // Update order status
-                const order = await OrderService.updateOrderStatus(id, statusUpdate, userId, userRole);
-                
-                logger.info(`Order ${order.orderNumber} status updated to ${statusUpdate.status}`);
-                
-                ResponseHandler.success(res as any, order, 'Order status updated successfully');
+
+            const order = await OrderService.updateOrderStatus(orderId!, validatedData, userId, userRole);
+
+            res.json({
+                success: true,
+                message: 'Order status updated successfully',
+                data: order
+            });
+            return;
         } catch (error) {
-            if (error instanceof z.ZodError) {
-                const errorMessage = error.issues.map(err => `${err.path.join('.')}: ${err.message}`).join(', ');
-                ResponseHandler.validationError(res as any, 'Validation failed', errorMessage);
+            logger.error({ error }, 'Error updating order status');
+            if (error instanceof CustomError) {
+                res.status(error.statusCode).json({
+                    success: false,
+                    message: error.message
+                });
                 return;
             }
-        
-            next(error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to update order status'
+            });
+            return;
         }
     }
-  
+
+    // Get orders with filters
+    static async getOrders(req: Request, res: Response): Promise<void> {
+        try {
+            const userId = (req.user as any).id as string;
+            const userRole = (req.user as any).role as string;
+            
+            // Parse query parameters
+            const filters = {
+                status: req.query.status as string,
+                vendorId: req.query.vendorId as string,
+                customerId: req.query.customerId as string,
+                riderId: req.query.riderId as string,
+                dateFrom: req.query.dateFrom ? new Date(req.query.dateFrom as string) : undefined,
+                dateTo: req.query.dateTo ? new Date(req.query.dateTo as string) : undefined,
+                page: req.query.page ? parseInt(req.query.page as string) : 1,
+                limit: req.query.limit ? parseInt(req.query.limit as string) : 10
+            };
+
+            const result = await OrderService.getOrders(filters as OrderFilters, userId, userRole);
+
+            res.json({
+                success: true,
+                data: result
+            });
+        } catch (error) {
+            logger.error({ error }, 'Error getting orders');
+            if (error instanceof CustomError) {
+                res.status(error.statusCode).json({
+                    success: false,
+                    message: error.message
+                });
+                return;
+            }
+            res.status(500).json({
+                success: false,
+                message: 'Failed to get orders'
+            });
+            return;
+        }
+    }
+
     // Cancel order
-    static async cancelOrder(req: Request, res: Response, next: NextFunction): Promise<void> {
+    static async cancelOrder(req: Request, res: Response): Promise<void> {
         try {
-            const { id } = req.params;
-            
-            if (!id) {
-                ResponseHandler.badRequest(res as any, 'Order ID is required');
-                return;
-            }
-    
-            // Validate request body
+            const { orderId } = req.params;
+            const userId = (req.user as any).id as string;
+            const userRole = (req.user as any).role as string;
             const validatedData = cancelOrderSchema.parse(req.body);
-            
-            // Get user info from auth middleware
-            const userId = req.user?.userId;
-            const userRole = req.user?.role;
-            
-            if (!userId || !userRole) {
-                ResponseHandler.unauthorized(res as any, 'User not authenticated');
-                return;
-            }
-    
-            // Cancel order
-            const order = await OrderService.cancelOrder(id, userId, userRole, validatedData.reason);
-            
-            logger.info(`Order ${order.orderNumber} cancelled by ${userRole} ${userId}`);
-            
-            ResponseHandler.success(res as any, order, 'Order cancelled successfully');
+
+            const order = await OrderService.cancelOrder(orderId!, userId, userRole, validatedData.reason);
+
+            res.json({
+                success: true,
+                message: 'Order cancelled successfully',
+                data: order
+            });
         } catch (error) {
-            if (error instanceof z.ZodError) {
-                const errorMessage = error.issues.map(err => `${err.path.join('.')}: ${err.message}`).join(', ');
-                ResponseHandler.validationError(res as any, 'Validation failed', errorMessage);
+            logger.error({ error }, 'Error cancelling order');
+            if (error instanceof CustomError) {
+                res.status(error.statusCode).json({
+                    success: false,
+                    message: error.message
+                });
                 return;
             }
-            
-            next(error);
-        }
-    }
-  
-    // Get order statistics (for dashboard)
-    static async getOrderStats(req: Request, res: Response, next: NextFunction): Promise<void> {
-        try {
-            // Get user info from auth middleware
-            const userId = req.user?.userId;
-            const userRole = req.user?.role;
-            
-            if (!userId || !userRole) {
-                ResponseHandler.unauthorized(res as any, 'User not authenticated');
-                return;
-            }
-    
-            // Get basic stats based on user role
-            const filters = { page: 1, limit: 1000 }; // Get all orders for stats
-            const result = await OrderService.getOrders(filters, userId, userRole);
-            
-            // Calculate basic statistics
-            const stats = {
-                totalOrders: result.total,
-                pendingOrders: result.orders.filter(o => o.status === 'PENDING').length,
-                confirmedOrders: result.orders.filter(o => o.status === 'CONFIRMED').length,
-                preparingOrders: result.orders.filter(o => o.status === 'PREPARING').length,
-                readyForPickupOrders: result.orders.filter(o => o.status === 'READY_FOR_PICKUP').length,
-                pickedUpOrders: result.orders.filter(o => o.status === 'PICKED_UP').length,
-                outForDeliveryOrders: result.orders.filter(o => o.status === 'OUT_FOR_DELIVERY').length,
-                deliveredOrders: result.orders.filter(o => o.status === 'DELIVERED').length,
-                cancelledOrders: result.orders.filter(o => o.status === 'CANCELLED').length,
-                totalRevenue: result.orders
-                    .filter(o => o.status === 'DELIVERED')
-                    .reduce((sum, order) => sum + order.pricing.total, 0)
-            };
-            
-            ResponseHandler.success(res as any, stats, 'Order statistics retrieved successfully');
-        } catch (error) {
-            next(error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to cancel order'
+            });
+            return;
         }
     }
 }

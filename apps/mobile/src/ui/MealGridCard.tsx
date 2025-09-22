@@ -6,6 +6,10 @@ import { Icon } from './Icon'
 export default function MealGridCard({ meal, onAddToCart, onRemoveFromCart, quantity }: MealGridCardProps) {
     const theme = useTheme()
 
+    const formatNaira = (amount: number): string => {
+        return `₦${amount.toLocaleString('en-NG')}`
+    }
+
     return (
         <View style={{
             backgroundColor: theme.colors.surface,
@@ -39,6 +43,25 @@ export default function MealGridCard({ meal, onAddToCart, onRemoveFromCart, quan
                         </Text>
                     </View>
                 )}
+                {/* Preparation Time */}
+                {meal.preparationTime && (
+                    <View style={{
+                        position: "absolute",
+                        top: 8,
+                        right: 8,
+                        backgroundColor: 'rgba(0,0,0,0.7)',
+                        paddingHorizontal: 6,
+                        paddingVertical: 2,
+                        borderRadius: 8,
+                        flexDirection: 'row',
+                        alignItems: 'center'
+                    }}>
+                        <Icon name="time" size={10} color="white" />
+                        <Text style={{ color: "white", fontSize: 10, fontWeight: "600", marginLeft: 2 }}>
+                            {meal.preparationTime}m
+                        </Text>
+                    </View>
+                )}
             </View>
 
             {/* Meal Info */}
@@ -69,7 +92,7 @@ export default function MealGridCard({ meal, onAddToCart, onRemoveFromCart, quan
                         fontWeight: "700",
                         color: theme.colors.primary
                     }}>
-                        ${meal.price.toFixed(2)}
+                        {formatNaira(meal.price)}
                     </Text>
 
                     {quantity > 0 ? (

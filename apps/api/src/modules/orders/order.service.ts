@@ -30,6 +30,9 @@ export class OrderService {
                     id: { in: menuItemIds },
                     vendorId: orderData.vendorId,
                     isAvailable: true
+                },
+                include: {
+                    addOns: true
                 }
             });
 
@@ -37,10 +40,42 @@ export class OrderService {
                 throw new CustomError('Some menu items are not available', 400);
             }
 
-            // Calculate pricing
+            // Validate add-ons for each item
+            for (const item of orderData.items) {
+                if (item.addOns && item.addOns.length > 0) {
+                    const menuItem = menuItems.find(mi => mi.id === item.menuItemId);
+                    if (!menuItem) continue;
+
+                    const addOnIds = item.addOns.map(addOn => addOn.addOnId);
+                    const validAddOns = menuItem.addOns.filter(addOn => addOnIds.includes(addOn.id));
+
+                    if (validAddOns.length !== addOnIds.length) {
+                        throw new CustomError(`Invalid add-ons for item ${menuItem.name}`, 400);
+                    }
+
+                    // Validate required add-ons
+                    const requiredAddOns = menuItem.addOns.filter(addOn => addOn.isRequired);
+                    for (const requiredAddOn of requiredAddOns) {
+                        const selectedAddOn = item.addOns.find(addOn => addOn.addOnId === requiredAddOn.id);
+                        if (!selectedAddOn || selectedAddOn.quantity < 1) {
+                            throw new CustomError(`Required add-on ${requiredAddOn.name} is missing or quantity is less than 1`, 400);
+                        }
+                    }
+
+                    // Vendor max quantities
+                    for (const selectedAddOn of item.addOns) {
+                        const addOn = menuItem.addOns.find(addOn => addOn.id === selectedAddOn.addOnId);
+                        if (addOn && selectedAddOn.quantity > addOn.maxQuantity) {
+                            throw new CustomError(`Add-on ${addOn.name} quantity exceeds maximum allowed ${addOn.maxQuantity}`, 400);
+                        }
+                    }
+                }
+            }
+
+            // Calculate pricing including add-ons
             const pricing = this.calculateOrderPricing(orderData.items, menuItems);
 
-            // Create order with items
+            // Create order with items and add-ons
             const order = await prisma.order.create({
                 data: {
                     orderNumber: this.generateOrderNumber(),
@@ -56,15 +91,34 @@ export class OrderService {
                     items: {
                         create: orderData.items.map(item => {
                             const menuItem = menuItems.find(mi => mi.id === item.menuItemId);
-                            return {
+                            const itemTotalPrice = this.calculateItemTotalPrice(item, menuItem!);
+
+                            const orderItemData: any = {
                                 menuItem: {
                                     connect: { id: item.menuItemId }
                                 },
                                 quantity: item.quantity,
                                 unitPrice: menuItem!.price,
-                                totalPrice: menuItem!.price * item.quantity,
+                                totalPrice: itemTotalPrice * item.quantity,
                                 specialInstructions: item.specialInstructions || null
                             };
+
+                            if (item.addOns && item.addOns.length > 0) {
+                                orderItemData.addOns = {
+                                    create: item.addOns.map(addOn => {
+                                        const menuAddOn = menuItem!.addOns.find(ao => ao.id === addOn.addOnId);
+                                        return {
+                                            addOn: {
+                                                connect: { id: addOn.addOnId }
+                                            },
+                                            quantity: addOn.quantity,
+                                            price: menuAddOn!.price
+                                        };
+                                    })
+                                };
+                            }
+
+                            return orderItemData;
                         })
                     }
                 },
@@ -128,7 +182,12 @@ export class OrderService {
                     },
                     items: {
                         include: {
-                            menuItem: true
+                            menuItem: true,
+                            addOns: {
+                                include: {
+                                    addOn: true
+                                }
+                            }
                         }
                     }
                 }
@@ -176,7 +235,12 @@ export class OrderService {
                     },
                     items: {
                         include: {
-                            menuItem: true
+                            menuItem: true,
+                            addOns: {
+                                include: {
+                                    addOn: true
+                                }
+                            }
                         }
                     }
                 }
@@ -217,7 +281,12 @@ export class OrderService {
                     },
                     items: {
                         include: {
-                            menuItem: true
+                            menuItem: true,
+                            addOns: {
+                                include: {
+                                    addOn: true
+                                }
+                            }
                         }
                     }
                 }
@@ -329,7 +398,12 @@ export class OrderService {
                     },
                     items: {
                         include: {
-                            menuItem: true
+                            menuItem: true,
+                            addOns: {
+                                include: {
+                                    addOn: true
+                                }
+                            }
                         }
                     }
                 }
@@ -351,10 +425,11 @@ export class OrderService {
     private static calculateOrderPricing(items: any[], menuItems: any[]) {
         const subtotal = items.reduce((total, item) => {
             const menuItem = menuItems.find(mi => mi.id === item.menuItemId);
-            return total + (menuItem!.price * item.quantity);
+            const itemTotalPrice = this.calculateItemTotalPrice(item, menuItem!);
+            return total + (itemTotalPrice * item.quantity);
         }, 0);
 
-        const deliveryFee = 500; // Fixed delivery fee in kobo
+        const deliveryFee = 200; // Fixed delivery fee in kobo
         const serviceFee = Math.round(subtotal * 0.05); // 5% service fee
         const total = subtotal + deliveryFee + serviceFee;
 
@@ -364,6 +439,22 @@ export class OrderService {
             serviceFee,
             total
         };
+    }
+
+    private static calculateItemTotalPrice(item: any, menuItem: any): number {
+        let totalPrice = menuItem.price;
+
+        // Add add-on prices
+        if (item.addOns && item.addOns.length > 0) {
+            item.addOns.forEach((addOn: any) => {
+                const menuAddOn = menuItem.addOns.find((ao: any) => ao.id === addOn.addOnId);
+                if (menuAddOn) {
+                    totalPrice += menuAddOn.price * addOn.quantity;
+                }
+            });
+        }
+
+        return totalPrice;
     }
 
     private static generateOrderNumber(): string {
@@ -411,7 +502,19 @@ export class OrderService {
                 quantity: item.quantity,
                 unitPrice: item.unitPrice,
                 totalPrice: item.totalPrice,
-                specialInstructions: item.specialInstructions
+                specialInstructions: item.specialInstructions,
+                addOns: item.addOns && item.addOns.length > 0 ? item.addOns.map((addOn: any) => ({
+                    id: addOn.id,
+                    addOn: {
+                        id: addOn.addOn.id,
+                        name: addOn.addOn.name,
+                        description: addOn.addOn.description,
+                        price: addOn.addOn.price,
+                        category: addOn.addOn.category
+                    },
+                    quantity: addOn.quantity,
+                    price: addOn.price
+                })) : undefined
             })),
             deliveryAddress: order.deliveryAddress,
             pricing: {
@@ -488,13 +591,25 @@ export class OrderService {
         // Role-based filtering
         switch (userRole) {
             case 'CUSTOMER':
-                where.customerId = userId;
+                where.customer = {
+                    user: {
+                        id: userId
+                    }
+                };
                 break;
             case 'VENDOR':
-                where.vendorId = userId;
+                where.vendor = {
+                    user: {
+                        id: userId
+                    }
+                };
                 break;
             case 'RIDER':
-                where.riderId = userId;
+                where.rider = {
+                    user: {
+                        id: userId
+                    }
+                };
                 break;
             case 'ADMIN':
                 // Admins can see all orders

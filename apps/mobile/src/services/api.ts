@@ -2,7 +2,11 @@ import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 import * as SecureStore from 'expo-secure-store';
 
 // API Configuration
-const API_BASE_URL = 'http://10.200.122.234:5000/api/v1';
+const API_BASE_URL = 'http://10.200.122.234:5000/api/v1'
+//  [
+//   'http://192.168.0.176:5000/api/v1',
+//   'http://10.200.122.234:5000/api/v1'
+// ];
 
 // Create axios instance
 const apiClient: AxiosInstance = axios.create({
@@ -23,9 +27,6 @@ apiClient.interceptors.request.use(
             const token = await SecureStore.getItemAsync('access_token');
             if (token) {
                 config.headers.Authorization = `Bearer ${token}`;
-                console.log('Request token:', token.substring(0, 20) + '...');
-            } else {
-                console.log('No token found for request');
             }
         } catch (error) {
             console.error('Error getting token:', error);
@@ -49,10 +50,8 @@ apiClient.interceptors.response.use(
             try {
                 // If refresh is already in progress, wait for it
                 if (refreshTokenPromise) {
-                    console.log('Waiting for existing refresh...');
                     const newToken = await refreshTokenPromise;
                     originalRequest.headers.Authorization = `Bearer ${newToken}`;
-                    console.log('Retry token from waiting:', newToken.substring(0, 20) + '...');
                     return apiClient(originalRequest);
                 }
 
@@ -62,8 +61,6 @@ apiClient.interceptors.response.use(
                     if (!refreshToken) {
                         throw new Error('No refresh token available');
                     }
-
-                    console.log('Attempting token refresh...');
                     
                     const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {
                         refreshToken,
@@ -74,8 +71,6 @@ apiClient.interceptors.response.use(
                     });
 
                     const { accessToken } = response.data.data;
-                    console.log('New access token received:', accessToken ? 'Yes' : 'No');
-                    console.log('New token:', accessToken.substring(0, 20) + '...');
                     
                     // Store new token
                     await SecureStore.setItemAsync('access_token', accessToken);
@@ -85,9 +80,6 @@ apiClient.interceptors.response.use(
 
                 const newToken = await refreshTokenPromise;
                 originalRequest.headers.Authorization = `Bearer ${newToken}`;
-                
-                console.log('Retry token from new refresh:', newToken.substring(0, 20) + '...');
-                console.log('Retrying request with new token...');
                 return apiClient(originalRequest);
 
             } catch (refreshError) {

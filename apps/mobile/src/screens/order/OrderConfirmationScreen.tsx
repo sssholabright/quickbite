@@ -1,236 +1,243 @@
-import { Animated, ScrollView, Text, View } from "react-native";
-import { SafeAreaWrapper } from "../../ui/SafeAreaWrapper";
-import { useTheme } from "../../theme/theme";
-import { Icon } from "../../ui/Icon";
-import { CTAButton } from "../../ui/CTAButton";
-import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
-import { RootStackParamList } from "../../navigation/types";
-import { Dimensions } from "react-native";
-import { useEffect, useState } from "react";
+import React, { useState } from 'react';
+import { View, Text, Pressable } from 'react-native';
+import { SafeAreaWrapper } from '../../ui/SafeAreaWrapper';
+import { useTheme } from '../../theme/theme';
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import OrderSummary from "../../components/orders/OrderSummary";
-import StatusStep from "../../components/orders/StatusStep";
+import type { RootStackParamList } from '../../navigation/types';
+import { Icon } from '../../ui/Icon';
+import { CTAButton } from '../../ui/CTAButton';
+import AlertModal from '../../ui/AlertModal';
 
+type OrderConfirmationScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'OrderConfirmation'>;
 type OrderConfirmationRouteProp = RouteProp<RootStackParamList, 'OrderConfirmation'>;
-type OrderConfirmationNavigationProp = NativeStackNavigationProp<RootStackParamList, 'OrderConfirmation'>;
+
+interface AlertState {
+    visible: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'error' | 'warning' | 'info';
+    onConfirm?: () => void;
+    onCancel?: () => void;
+    showCancel?: boolean;
+    confirmText?: string;
+    cancelText?: string;
+}
 
 export default function OrderConfirmationScreen() {
-    const theme = useTheme()
-    const navigation = useNavigation<OrderConfirmationNavigationProp>();
+    const theme = useTheme();
+    const navigation = useNavigation<OrderConfirmationScreenNavigationProp>();
     const route = useRoute<OrderConfirmationRouteProp>();
     const { orderId, pickupCode, vendor, items, total } = route.params;
 
-    const [currentStatus, setCurrentStatus] = useState<'pending' | 'preparing' | 'out_for_delivery' | 'delivered'>('pending');
-    const [pulseAnim] = useState(new Animated.Value(1));
+    // Alert modal state
+    const [alert, setAlert] = useState<AlertState>({
+        visible: false,
+        title: '',
+        message: '',
+        type: 'info'
+    });
 
-    // Simulate status updates
-    useEffect(() => {
-        const timers = [
-        setTimeout(() => setCurrentStatus('preparing'), 3000),
-        setTimeout(() => setCurrentStatus('out_for_delivery'), 8000),
-        setTimeout(() => setCurrentStatus('delivered'), 15000),
-        ];
-
-        return () => timers.forEach(clearTimeout);
-    }, []);
-
-    // Pulse animation for current status
-    useEffect(() => {
-        const pulse = Animated.loop(
-            Animated.sequence([
-                Animated.timing(pulseAnim, {
-                    toValue: 1.2,
-                    duration: 1000,
-                    useNativeDriver: true,
-                }),
-                Animated.timing(pulseAnim, {
-                    toValue: 1,
-                    duration: 1000,
-                    useNativeDriver: true,
-                }),
-            ])
-        );
-        pulse.start();
-
-        return () => pulse.stop();
-    }, [currentStatus]);
-
-    const statusSteps = [
-        { key: 'pending', label: 'Order Submitted', icon: 'time', time: 'Just now' },
-        { key: 'preparing', label: 'Preparing', icon: 'restaurant', time: '~5 mins' },
-        { key: 'out_for_delivery', label: 'Out for Delivery', icon: 'car', time: '~10 mins' },
-        { key: 'delivered', label: 'Delivered', icon: 'checkmark-done', time: 'Complete' },
-    ];
-
-    const getStatusColor = (status: string) => {
-        if (status === currentStatus) return theme.colors.primary;
-        if (statusSteps.findIndex(s => s.key === status) < statusSteps.findIndex(s => s.key === currentStatus)) {
-            return theme.colors.primary;
-        }
-        return theme.colors.muted;
+    // Helper function to show alert
+    const showAlert = (alertData: Omit<AlertState, 'visible'>) => {
+        setAlert({
+            ...alertData,
+            visible: true
+        });
     };
 
-    const renderStatusStep = (step: any, index: number) => {
-        return <StatusStep step={step} currentStatus={currentStatus} statusSteps={statusSteps} pulseAnim={pulseAnim} />
-    }
+    // Helper function to hide alert
+    const hideAlert = () => {
+        setAlert(prev => ({ ...prev, visible: false }));
+    };
 
-    const renderOrderSummary = () => (
-        <OrderSummary items={items} vendor={vendor} total={total} />
-    )
+    const handleViewOrder = () => {
+        navigation.replace('OrderDetail', { orderId });
+    };
+
+    const handleBackToHome = () => {
+        showAlert({
+            title: 'Leave Order Details?',
+            message: 'Are you sure you want to go back to home? You can always view your order details later.',
+            type: 'info',
+            confirmText: 'Yes, Go Home',
+            cancelText: 'Stay Here',
+            showCancel: true,
+            onConfirm: () => {
+                hideAlert();
+                navigation.reset({
+                    index: 0,
+                    routes: [{ name: 'AppTabs' }],
+                });
+            },
+            onCancel: hideAlert
+        });
+    };
+
+    const handleShareOrder = () => {
+        showAlert({
+            title: 'Share Order',
+            message: `Order ${pickupCode} has been placed successfully! Share this with your friends.`,
+            type: 'success',
+            confirmText: 'OK',
+            onConfirm: hideAlert
+        });
+    };
 
     return (
         <SafeAreaWrapper>
-            <ScrollView
-                style={{ flex: 1 }}
-                contentContainerStyle={{ padding: 20, paddingBottom: 100 }}
-                showsVerticalScrollIndicator={false}
-            >
-                {/* Header */}
-                <View style={{ alignItems: 'center', marginBottom: 32 }}>
-                    <Text style={{
-                        fontSize: 24,
-                        fontWeight: '700',
-                        color: theme.colors.text,
-                        marginBottom: 8,
-                    }}>
-                        Order Placed
-                    </Text>
-                    <Text style={{
-                        fontSize: 16,
-                        color: theme.colors.muted,
-                        textAlign: 'center',
-                    }}>
-                        We've sent this to {vendor.name}
-                    </Text>
-                </View>
-
-                {/* Success State */}
-                <View style={{ alignItems: 'center', marginBottom: 32 }}>
+            <View style={{ flex: 1, padding: 16 }}>
+                {/* Success Icon */}
+                <View style={{ 
+                    alignItems: 'center', 
+                    marginTop: 60,
+                    marginBottom: 32
+                }}>
                     <View style={{
-                        width: 80,
-                        height: 80,
-                        borderRadius: 40,
-                        backgroundColor: theme.colors.primary,
+                        width: 120,
+                        height: 120,
+                        borderRadius: 60,
+                        backgroundColor: theme.colors.primary + '20',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        marginBottom: 16,
+                        marginBottom: 24
                     }}>
-                        <Icon name="checkmark" size={40} color="white" />
+                        <Icon name="check" size={60} color={theme.colors.primary} />
                     </View>
-                
-                    <Text style={{
-                        fontSize: 20,
-                        fontWeight: '600',
-                        color: theme.colors.text,
-                        marginBottom: 8,
-                    }}>
-                        Your order is confirmed!
-                    </Text>
 
-                    <Text style={{
-                        fontSize: 14,
-                        color: theme.colors.muted,
-                    }}>
-                        Order #{orderId}
-                    </Text>
-                </View>
-
-                {/* Delivery Info */}
-                <View style={{
-                    backgroundColor: theme.colors.primary,
-                    borderRadius: 16,
-                    padding: 24,
-                    alignItems: 'center',
-                    marginBottom: 32,
-                }}>
-                    <Text style={{
-                        fontSize: 16,
-                        color: 'white',
-                        marginBottom: 8,
-                        opacity: 0.9,
-                    }}>
-                        Delivery Information
-                    </Text>
                     <Text style={{
                         fontSize: 24,
                         fontWeight: '700',
-                        color: 'white',
-                        marginBottom: 8,
-                        textAlign: 'center',
-                    }}>
-                        {vendor.eta} delivery
-                    </Text>
-                    <Text style={{
-                        fontSize: 14,
-                        color: 'white',
-                        opacity: 0.8,
-                        textAlign: 'center',
-                    }}>
-                        We'll track your order and notify you when it's on the way
-                    </Text>
-                </View>
-
-                {/* Order Summary */}
-                {renderOrderSummary()}
-
-                {/* Live Status Tracker */}
-                <View style={{
-                    backgroundColor: theme.colors.surface,
-                    borderRadius: 12,
-                    padding: 20,
-                    marginBottom: 20,
-                    borderWidth: 1,
-                    borderColor: theme.colors.border,
-                }}>
-                    <Text style={{
-                        fontSize: 18,
-                        fontWeight: '600',
                         color: theme.colors.text,
-                        marginBottom: 20,
+                        textAlign: 'center',
+                        marginBottom: 8
                     }}>
-                        Order Status
+                        Order Placed!
                     </Text>
 
-                    {statusSteps.map((step, index) => renderStatusStep(step, index))}
+                    <Text style={{
+                        fontSize: 16,
+                        color: theme.colors.muted,
+                        textAlign: 'center',
+                        lineHeight: 24
+                    }}>
+                        Your order has been placed successfully. We'll notify you when it's ready for pickup.
+                    </Text>
                 </View>
 
-                {/* Notifications */}
+                {/* Order Details */}
                 <View style={{
                     backgroundColor: theme.colors.background,
-                    borderRadius: 12,
-                    padding: 16,
-                    alignItems: 'center',
-                    marginBottom: 20,
                     borderWidth: 1,
                     borderColor: theme.colors.border,
+                    borderRadius: 16,
+                    padding: 20,
+                    marginBottom: 32
                 }}>
-                    <Icon name="notifications" size={24} color={theme.colors.primary} style={{ marginBottom: 8 }} />
-                    <Text style={{
-                        fontSize: 14,
-                        color: theme.colors.text,
-                        textAlign: 'center',
-                    }}>
-                        We'll notify you when your order is out for delivery
-                    </Text>
-                </View>
-            </ScrollView>
+                    <View style={{ alignItems: 'center', marginBottom: 20 }}>
+                        <Text style={{
+                            fontSize: 18,
+                            fontWeight: '700',
+                            color: theme.colors.text,
+                            marginBottom: 4
+                        }}>
+                            {pickupCode}
+                        </Text>
+                        <Text style={{
+                            fontSize: 14,
+                            color: theme.colors.muted
+                        }}>
+                            Order ID: {pickupCode}
+                        </Text>
+                    </View>
 
-            {/* Sticky Footer */}
-            <View style={{
-                position: 'absolute',
-                bottom: 0,
-                left: 0,
-                right: 0,
-                backgroundColor: theme.colors.surface,
-                padding: 20,
-                borderTopWidth: 1,
-                borderTopColor: theme.colors.border,
-            }}>
-                <CTAButton
-                    title="Track in My Orders"
-                    onPress={() => navigation.navigate('AppTabs', { screen: 'Orders' } as any)}
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
+                        <Text style={{ fontSize: 14, color: theme.colors.muted }}>Total Amount</Text>
+                        <Text style={{ fontSize: 16, fontWeight: '700', color: theme.colors.text }}>
+                            ₦{total.toLocaleString('en-NG')}
+                        </Text>
+                    </View>
+
+                    <View style={{ 
+                        height: 1, 
+                        backgroundColor: theme.colors.border, 
+                        marginBottom: 16 
+                    }} />
+
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                        <Icon name="clock" size={16} color={theme.colors.muted} />
+                        <Text style={{
+                            fontSize: 14,
+                            color: theme.colors.muted,
+                            marginLeft: 8
+                        }}>
+                            Estimated preparation time: 15-30 minutes
+                        </Text>
+                    </View>
+
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                        <Icon name="map-pin" size={16} color={theme.colors.muted} />
+                        <Text style={{
+                            fontSize: 14,
+                            color: theme.colors.muted,
+                            marginLeft: 8
+                        }}>
+                            We'll notify you when your order is ready
+                        </Text>
+                    </View>
+
+                    {/* Share button */}
+                    <Pressable
+                        onPress={handleShareOrder}
+                        style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            paddingVertical: 8,
+                            paddingHorizontal: 12,
+                            borderRadius: 8,
+                            backgroundColor: theme.colors.primary + '15',
+                            marginTop: 8
+                        }}
+                    >
+                        <Icon name="share" size={16} color={theme.colors.primary} />
+                        <Text style={{
+                            fontSize: 14,
+                            color: theme.colors.primary,
+                            fontWeight: '600',
+                            marginLeft: 6
+                        }}>
+                            Share Order
+                        </Text>
+                    </Pressable>
+                </View>
+
+                {/* Action Buttons */}
+                <View style={{ gap: 12 }}>
+                    <CTAButton
+                        title="View Order Details"
+                        onPress={handleViewOrder}
+                    />
+                    
+                    <CTAButton
+                        title="Back to Home"
+                        onPress={handleBackToHome}
+                    />
+                </View>
+
+                {/* Alert Modal */}
+                <AlertModal
+                    visible={alert.visible}
+                    title={alert.title}
+                    message={alert.message}
+                    type={alert.type}
+                    onConfirm={alert.onConfirm || hideAlert}
+                    onCancel={alert.onCancel}
+                    confirmText={alert.confirmText}
+                    cancelText={alert.cancelText}
+                    showCancel={alert.showCancel}
                 />
             </View>
         </SafeAreaWrapper>
-    )
+    );
 }

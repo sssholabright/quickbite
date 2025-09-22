@@ -15,7 +15,7 @@ export function VendorCard({ vendor }: VendorCardProps) {
         if (rating >= 4.8) return "₦₦₦";
         if (rating >= 4.5) return "₦₦";
         return "₦";
-    };
+    };    
 
       // Get cuisine tags based on category
     const getCuisineTags = (category: string) => {

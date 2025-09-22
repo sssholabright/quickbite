@@ -13,11 +13,17 @@ export interface CreateOrderRequest {
     };
     specialInstructions?: string | undefined;
 }
-  
+
 export interface OrderItemRequest {
     menuItemId: string;
     quantity: number;
     specialInstructions?: string | undefined;
+    addOns?: OrderItemAddOnRequest[]; // Add support for add-ons
+}
+
+export interface OrderItemAddOnRequest {
+    addOnId: string;
+    quantity: number;
 }
 
 export interface OrderResponse {
@@ -68,7 +74,7 @@ export interface OrderResponse {
     createdAt: Date;
     updatedAt: Date;
 }
-  
+
 export interface OrderItemResponse {
     id: string;
     menuItem: {
@@ -82,15 +88,29 @@ export interface OrderItemResponse {
     unitPrice: number;
     totalPrice: number;
     specialInstructions?: string;
+    addOns?: OrderItemAddOnResponse[]; // Add support for add-ons in response
 }
-  
+
+export interface OrderItemAddOnResponse {
+    id: string;
+    addOn: {
+        id: string;
+        name: string;
+        description?: string;
+        price: number;
+        category: string;
+    };
+    quantity: number;
+    price: number;
+}
+
 export interface OrderStatusUpdate {
     status: OrderStatus;
     riderId?: string | undefined;
     estimatedDeliveryTime?: Date | undefined;
     notes?: string | undefined;
 }
-  
+
 export type OrderStatus = 
     | 'PENDING'
     | 'CONFIRMED'
@@ -100,7 +120,7 @@ export type OrderStatus =
     | 'OUT_FOR_DELIVERY'
     | 'DELIVERED'
     | 'CANCELLED';
-  
+
 export interface OrderFilters {
     status?: OrderStatus | undefined;
     vendorId?: string | undefined;

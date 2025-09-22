@@ -6,6 +6,10 @@ import { Icon } from './Icon'
 export default function MealListCard({ meal, onAddToCart, onRemoveFromCart, quantity }: MealListCardProps) {
     const theme = useTheme()
 
+    const formatNaira = (amount: number): string => {
+        return `₦${amount.toLocaleString('en-NG')}`
+    }
+
     return (
         <View style={{
             backgroundColor: theme.colors.surface,
@@ -18,11 +22,32 @@ export default function MealListCard({ meal, onAddToCart, onRemoveFromCart, quan
             borderColor: theme.colors.border
         }}>
             {/* Left: Meal Image */}
-            <Image
-                source={{ uri: meal.image }}
-                style={{ width: 80, height: 80, borderRadius: 8, marginRight: 12 }}
-                resizeMode="cover"
-            />
+            <View style={{ position: "relative" }}>
+                <Image
+                    source={{ uri: meal.image }}
+                    style={{ width: 80, height: 80, borderRadius: 8, marginRight: 12 }}
+                    resizeMode="cover"
+                />
+                {/* Preparation Time */}
+                {meal.preparationTime && (
+                    <View style={{
+                        position: "absolute",
+                        top: 4,
+                        right: 4,
+                        backgroundColor: 'rgba(0,0,0,0.7)',
+                        paddingHorizontal: 4,
+                        paddingVertical: 2,
+                        borderRadius: 6,
+                        flexDirection: 'row',
+                        alignItems: 'center'
+                    }}>
+                        <Icon name="time" size={8} color="white" />
+                        <Text style={{ color: "white", fontSize: 8, fontWeight: "600", marginLeft: 2 }}>
+                            {meal.preparationTime}m
+                        </Text>
+                    </View>
+                )}
+            </View>
             
             {/* Right: Meal Info */}
             <View style={{ flex: 1 }}>
@@ -69,7 +94,7 @@ export default function MealListCard({ meal, onAddToCart, onRemoveFromCart, quan
                         fontWeight: "700",
                         color: theme.colors.primary
                     }}>
-                        ${meal.price.toFixed(2)}
+                        {formatNaira(meal.price)}
                     </Text>
           
                     {quantity > 0 ? (

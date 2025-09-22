@@ -1,53 +1,60 @@
-import React, { useState, useMemo } from 'react';
-import { View, Text, ScrollView, Pressable, Modal, FlatList } from 'react-native';
+import React, { useMemo } from 'react';
+import { View, Text, Pressable, Modal, FlatList, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../../theme/theme';
 import { Icon } from '../../ui/Icon';
 import { CTAButton } from '../../ui/CTAButton';
-import { mockMeals, mockVendors } from '../../lib/mockData';
+import { useVendors } from '../../hooks/useMenu';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../navigation/types';
-import { CartItem, CartScreenProps } from '../../types/vendor';
+import { useCartStore } from '../../stores/cart';
+import { LinearGradient } from 'expo-linear-gradient';
 
 type CartScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'AppTabs'>;
 
-export default function CartScreen({ 
-    visible, 
-    onClose, 
-    cartItems, 
-    onUpdateQuantity, 
-    onRemoveItem 
-}: CartScreenProps) {
+interface CartScreenProps {
+    visible: boolean;
+    onClose: () => void;
+}
+
+export default function CartScreen({ visible, onClose }: CartScreenProps) {
     const theme = useTheme();
     const insets = useSafeAreaInsets();
     const navigation = useNavigation<CartScreenNavigationProp>();
 
+    // Cart store
+    const { 
+        items: cartItems, 
+        updateQuantity, 
+        removeItem, 
+        getItemsList, 
+        getSubtotal
+    } = useCartStore();
+
+    // Get vendors to resolve cart items
+    const { data: vendors = [] } = useVendors()
+
     const cartItemsList = useMemo(() => {
-        return Object.entries(cartItems).map(([mealId, quantity]) => {
-            const meal = mockMeals.find(m => m.id === mealId);
-            const vendor = mockVendors.find(v => v.id === meal?.vendorId);
-            return meal ? { 
-                ...meal, 
-                quantity, 
-                vendorId: meal.vendorId || 'vendor1', 
-                vendorName: vendor?.name || 'Vendor' 
-            } : null;
-        }).filter((item): item is NonNullable<typeof item> => item !== null);
-    }, [cartItems]);
+        return getItemsList().map(cartItem => {
+            const vendor = vendors.find(v => v.id === cartItem.vendorId);
+            return {
+                ...cartItem,
+                vendorName: vendor?.businessName || 'Vendor',
+            };
+        });
+    }, [cartItems, vendors, getItemsList]);
 
     const subtotal = useMemo(() => {
-        return cartItemsList.reduce((total, item) => {
-            return total + (item ? item.price * item.quantity : 0);
-        }, 0);
-    }, [cartItemsList]);
+        return getSubtotal();
+    }, [cartItems, getSubtotal]);
 
     const deliveryFee = 200;
-    const total = subtotal + deliveryFee;
+    const serviceFee = 50;
+    const total = subtotal + deliveryFee + serviceFee;
 
     const handleProceedToCheckout = () => {
         onClose();
-        // Convert cartItems to items array for checkout
         const items = cartItemsList.map(item => ({
             id: item.id,
             name: item.name,
@@ -62,112 +69,195 @@ export default function CartScreen({
         } as any);
     };
 
-    const renderCartItem = ({ item }: { item: CartItem }) => (
-        <View style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            backgroundColor: theme.colors.surface,
-            borderRadius: 12,
-            padding: 16,
-            marginBottom: 12,
-            borderWidth: 1,
-            borderColor: theme.colors.border,
-        }}>
+    const renderCartItem = ({ item }: { item: typeof cartItemsList[0] }) => {
+        const hasAddOns = Object.values(item.addOns || {}).some(qty => qty > 0)
+        
+        return (
             <View style={{
-                width: 60,
-                height: 60,
-                borderRadius: 8,
                 backgroundColor: theme.colors.background,
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginRight: 12,
+                borderRadius: 16,
+                padding: 16,
+                marginBottom: 12,
+                borderWidth: 1,
+                borderColor: theme.colors.border,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.1,
+                shadowRadius: 8,
+                elevation: 3,
             }}>
-                <Icon name="restaurant" size={24} color={theme.colors.primary} />
-            </View>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                    {/* Image Container */}
+                    <View style={{ position: 'relative', marginRight: 12 }}>
+                        <Image
+                            source={{ uri: item.image || 'https://via.placeholder.com/120' }}
+                            style={{
+                                width: 70,
+                                height: 70,
+                                borderRadius: 12,
+                            }}
+                            resizeMode="cover"
+                        />
+                        {/* Preparation Time Badge */}
+                        {item.preparationTime && (
+                            <View style={{
+                                position: 'absolute',
+                                bottom: -4,
+                                right: -4,
+                                backgroundColor: theme.colors.primary,
+                                paddingHorizontal: 6,
+                                paddingVertical: 2,
+                                borderRadius: 8,
+                                flexDirection: 'row',
+                                alignItems: 'center'
+                            }}>
+                                <Icon name="time" size={10} color="white" />
+                                <Text style={{ color: "white", fontSize: 10, fontWeight: "600", marginLeft: 2 }}>
+                                    {item.preparationTime}m
+                                </Text>
+                            </View>
+                        )}
+                    </View>
 
-            <View style={{ flex: 1 }}>
-                <Text style={{
-                    fontSize: 16,
-                    fontWeight: '600',
-                    color: theme.colors.text,
-                    marginBottom: 4,
-                }}>
-                    {item.name}
-                </Text>
-                <Text style={{
-                    fontSize: 14,
-                    color: theme.colors.muted,
-                    marginBottom: 8,
-                }}>
-                    {item.vendorName}
-                </Text>
-                <Text style={{
-                    fontSize: 16,
-                    fontWeight: '700',
-                    color: theme.colors.primary,
-                }}>
-                    ₦{item.price.toLocaleString()}
-                </Text>
-            </View>
+                    {/* Content */}
+                    <View style={{ flex: 1 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <View style={{ flex: 1, marginRight: 8 }}>
+                                <Text style={{
+                                    fontSize: 16,
+                                    fontWeight: '700',
+                                    color: theme.colors.text,
+                                    marginBottom: 2,
+                                }}>
+                                    {item.name}
+                                </Text>
+                                <Text style={{
+                                    fontSize: 12,
+                                    color: theme.colors.muted,
+                                    marginBottom: 4,
+                                }}>
+                                    {item.vendorName}
+                                </Text>
 
-            <View style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                backgroundColor: theme.colors.background,
-                borderRadius: 20,
-                padding: 4,
-            }}>
-                <Pressable
-                    onPress={() => onUpdateQuantity(item.id, item.quantity - 1)}
-                    style={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: 16,
-                        backgroundColor: theme.colors.surface,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                    }}
-                >
-                    <Icon name="remove" size={16} color={theme.colors.text} />
-                </Pressable>
-                
-                <Text style={{
-                    fontSize: 16,
-                    fontWeight: '600',
-                    color: theme.colors.text,
-                    marginHorizontal: 16,
-                    minWidth: 20,
-                    textAlign: 'center',
-                }}>
-                    {item.quantity}
-                </Text>
-                
-                <Pressable
-                    onPress={() => onUpdateQuantity(item.id, item.quantity + 1)}
-                    style={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: 16,
-                        backgroundColor: theme.colors.primary,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                    }}
-                >
-                    <Icon name="add" size={16} color="white" />
-                </Pressable>
-            </View>
+                                {/* Add-ons */}
+                                {hasAddOns && (
+                                    <View style={{ marginBottom: 8 }}>
+                                        {Object.entries(item.addOns || {})
+                                            .filter(([_, qty]) => qty > 0)
+                                            .map(([addOnId, qty]) => {
+                                                const addOnDetail = item.addOnDetails?.[addOnId]
+                                                return (
+                                                    <View key={addOnId} style={{ 
+                                                        flexDirection: 'row', 
+                                                        alignItems: 'center',
+                                                        marginBottom: 2
+                                                    }}>
+                                                        <View style={{
+                                                            width: 4,
+                                                            height: 4,
+                                                            borderRadius: 2,
+                                                            backgroundColor: theme.colors.primary,
+                                                            marginRight: 6
+                                                        }} />
+                                                        <Text style={{ fontSize: 11, color: theme.colors.muted }}>
+                                                            {qty}x {addOnDetail?.name || `Add-on #${addOnId.slice(-4)}`}
+                                                        </Text>
+                                                    </View>
+                                                )
+                                            })}
+                                    </View>
+                                )}
 
-            <Pressable
-                onPress={() => onRemoveItem(item.id)}
-                style={{
-                    marginLeft: 12,
-                    padding: 8,
-                }}
-            >
-                <Icon name="trash" size={20} color={theme.colors.muted} />
-            </Pressable>
-        </View>
-    );
+                                {/* Price */}
+                                <Text style={{
+                                    fontSize: 16,
+                                    fontWeight: '700',
+                                    color: theme.colors.primary,
+                                }}>
+                                    ₦{item.price.toLocaleString()}
+                                </Text>
+                            </View>
+
+                            {/* Quantity Controls */}
+                            <View style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                backgroundColor: theme.colors.surface,
+                                borderRadius: 12,
+                                padding: 2,
+                                borderWidth: 1,
+                                borderColor: theme.colors.border,
+                            }}>
+                                <Pressable
+                                    onPress={() => updateQuantity(item.id, item.quantity - 1)}
+                                    style={{
+                                        width: 28,
+                                        height: 28,
+                                        borderRadius: 10,
+                                        backgroundColor: theme.colors.background,
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                    }}
+                                >
+                                    <Icon name="minus" size={14} color={theme.colors.muted} />
+                                </Pressable>
+                                
+                                <Text style={{
+                                    fontSize: 14,
+                                    fontWeight: '600',
+                                    color: theme.colors.text,
+                                    marginHorizontal: 12,
+                                    minWidth: 20,
+                                    textAlign: 'center',
+                                }}>
+                                    {item.quantity}
+                                </Text>
+                                
+                                <Pressable
+                                    onPress={() => updateQuantity(item.id, item.quantity + 1)}
+                                    style={{
+                                        width: 28,
+                                        height: 28,
+                                        borderRadius: 10,
+                                        backgroundColor: theme.colors.primary,
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                    }}
+                                >
+                                    <Icon name="plus" size={14} color="white" />
+                                </Pressable>
+                            </View>
+                        </View>
+
+                        {/* Remove Button */}
+                        <Pressable
+                            onPress={() => removeItem(item.id)}
+                            style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                marginTop: 8,
+                                paddingVertical: 4,
+                                paddingHorizontal: 8,
+                                borderRadius: 6,
+                                backgroundColor: theme.colors.danger + '10',
+                                alignSelf: 'flex-start'
+                            }}
+                        >
+                            <Icon name="trash" size={12} color={theme.colors.danger} />
+                            <Text style={{
+                                fontSize: 12,
+                                color: theme.colors.danger,
+                                marginLeft: 4,
+                                fontWeight: '500'
+                            }}>
+                                Remove
+                            </Text>
+                        </Pressable>
+                    </View>
+                </View>
+            </View>
+        );
+    };
 
     const renderEmptyState = () => (
         <View style={{
@@ -176,20 +266,36 @@ export default function CartScreen({
             alignItems: 'center',
             paddingHorizontal: 32,
         }}>
-            <Icon name="cart-outline" size={64} color={theme.colors.muted} />
+            <View style={{
+                width: 120,
+                height: 120,
+                borderRadius: 60,
+                backgroundColor: theme.colors.surface,
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: 24,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.1,
+                shadowRadius: 12,
+                elevation: 4,
+            }}>
+                <Icon name="shopping-cart" size={48} color={theme.colors.muted} />
+            </View>
             <Text style={{
-                fontSize: 18,
-                fontWeight: '600',
+                fontSize: 20,
+                fontWeight: '700',
                 color: theme.colors.text,
-                marginTop: 16,
                 marginBottom: 8,
+                textAlign: 'center',
             }}>
                 Your cart is empty
             </Text>
             <Text style={{
-                fontSize: 14,
+                fontSize: 16,
                 color: theme.colors.muted,
                 textAlign: 'center',
+                lineHeight: 24,
             }}>
                 Add some delicious meals to get started
             </Text>
@@ -200,140 +306,226 @@ export default function CartScreen({
         <Modal
             visible={visible}
             animationType="slide"
-            presentationStyle="fullScreen"
+            presentationStyle="overFullScreen"
             onRequestClose={onClose}
+            transparent={true}
         >
-            <View style={{ 
-                flex: 1, 
-                backgroundColor: theme.colors.background,
-                paddingTop: insets.top,
-            }}>
-                {/* Header */}
-                <View style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    paddingHorizontal: 20,
-                    paddingVertical: 16,
-                    borderBottomWidth: 1,
-                    borderBottomColor: theme.colors.border,
+            <Pressable 
+                style={{
+                    flex: 1,
+                    backgroundColor: 'rgba(0,0,0,0.5)',
+                    justifyContent: 'flex-end',
+                }}
+                onPress={onClose}
+            >
+                <Pressable style={{ 
+                    flex: 1, 
+                    backgroundColor: theme.colors.background,
+                    borderTopLeftRadius: 20,
+                    borderTopRightRadius: 20,
+                    marginTop: 100,
                 }}>
-                    <Text style={{
-                        fontSize: 24,
-                        fontWeight: '700',
-                        color: theme.colors.text,
-                    }}>
-                        Cart
-                    </Text>
-                    <Pressable
-                        onPress={onClose}
+                    {/* Header with Gradient */}
+                    <LinearGradient
+                        colors={[theme.colors.primary, theme.colors.primary + 'DD']}
                         style={{
-                            width: 40,
-                            height: 40,
-                            borderRadius: 20,
-                            backgroundColor: theme.colors.surface,
-                            alignItems: 'center',
-                            justifyContent: 'center',
+                            paddingTop: 20, // Reduced padding since we have marginTop
+                            paddingBottom: 20,
+                            paddingHorizontal: 20,
+                            borderTopLeftRadius: 20,
+                            borderTopRightRadius: 20,
                         }}
                     >
-                        <Icon name="close" size={20} color={theme.colors.text} />
-                    </Pressable>
-                </View>
-
-                {cartItemsList.length > 0 ? (
-                    <>
-                        {/* Cart Items */}
-                        <FlatList
-                            data={cartItemsList}
-                            renderItem={renderCartItem}
-                            keyExtractor={(item) => item.id}
-                            style={{ flex: 1 }}
-                            contentContainerStyle={{ padding: 20 }}
-                            showsVerticalScrollIndicator={false}
-                        />
-
-                        {/* Price Summary */}
                         <View style={{
-                            backgroundColor: theme.colors.surface,
-                            padding: 20,
-                            borderTopWidth: 1,
-                            borderTopColor: theme.colors.border,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            marginBottom: 16,
+                        }}>
+                            <View>
+                                <Text style={{
+                                    fontSize: 24,
+                                    fontWeight: '800',
+                                    color: 'white',
+                                    marginBottom: 4,
+                                }}>
+                                    Your Cart
+                                </Text>
+                                <Text style={{
+                                    fontSize: 14,
+                                    color: 'rgba(255,255,255,0.8)',
+                                }}>
+                                    {cartItemsList.length} {cartItemsList.length === 1 ? 'item' : 'items'}
+                                </Text>
+                            </View>
+                            <Pressable
+                                onPress={onClose}
+                                style={{
+                                    width: 40,
+                                    height: 40,
+                                    borderRadius: 20,
+                                    backgroundColor: 'rgba(255,255,255,0.2)',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                }}
+                            >
+                                <Icon name="close" size={20} color="white" />
+                            </Pressable>
+                        </View>
+
+                        {/* Cart Summary Card */}
+                        <View style={{
+                            backgroundColor: 'rgba(255,255,255,0.2)',
+                            borderRadius: 16,
+                            padding: 16,
                         }}>
                             <View style={{
                                 flexDirection: 'row',
                                 justifyContent: 'space-between',
-                                marginBottom: 8,
+                                alignItems: 'center',
                             }}>
-                                <Text style={{
-                                    fontSize: 16,
-                                    color: theme.colors.text,
+                                <View>
+                                    <Text style={{
+                                        fontSize: 12,
+                                        color: 'rgba(255,255,255,0.8)',
+                                        marginBottom: 2,
+                                    }}>
+                                        Total Amount
+                                    </Text>
+                                    <Text style={{
+                                        fontSize: 24,
+                                        fontWeight: '800',
+                                        color: 'white',
+                                    }}>
+                                        ₦{total.toLocaleString()}
+                                    </Text>
+                                </View>
+                                <View style={{
+                                    backgroundColor: 'rgba(255,255,255,0.2)',
+                                    paddingHorizontal: 12,
+                                    paddingVertical: 6,
+                                    borderRadius: 20,
                                 }}>
-                                    Subtotal
-                                </Text>
-                                <Text style={{
-                                    fontSize: 16,
-                                    color: theme.colors.text,
-                                }}>
-                                    ₦{subtotal.toLocaleString()}
-                                </Text>
+                                    <Text style={{
+                                        fontSize: 12,
+                                        color: 'white',
+                                        fontWeight: '600',
+                                    }}>
+                                        Ready in ~15 mins
+                                    </Text>
+                                </View>
                             </View>
-
-                            <View style={{
-                                flexDirection: 'row',
-                                justifyContent: 'space-between',
-                                marginBottom: 16,
-                            }}>
-                                <Text style={{
-                                    fontSize: 16,
-                                    color: theme.colors.text,
-                                }}>
-                                    Delivery Fee
-                                </Text>
-                                <Text style={{
-                                    fontSize: 16,
-                                    color: theme.colors.text,
-                                }}>
-                                    ₦{deliveryFee.toLocaleString()}
-                                </Text>
-                            </View>
-
-                            <View style={{
-                                height: 1,
-                                backgroundColor: theme.colors.border,
-                                marginBottom: 16,
-                            }} />
-
-                            <View style={{
-                                flexDirection: 'row',
-                                justifyContent: 'space-between',
-                                marginBottom: 20,
-                            }}>
-                                <Text style={{
-                                    fontSize: 20,
-                                    fontWeight: '700',
-                                    color: theme.colors.text,
-                                }}>
-                                    Total
-                                </Text>
-                                <Text style={{
-                                    fontSize: 20,
-                                    fontWeight: '700',
-                                    color: theme.colors.primary,
-                                }}>
-                                    ₦{total.toLocaleString()}
-                                </Text>
-                            </View>
-
-                            <CTAButton
-                                title="Proceed to Checkout"
-                                onPress={handleProceedToCheckout}
-                            />
                         </View>
-                    </>
-                ) : (
-                    renderEmptyState()
-                )}
-            </View>
+                    </LinearGradient>
+
+                    {cartItemsList.length > 0 ? (
+                        <>
+                            {/* Cart Items */}
+                            <FlatList
+                                data={cartItemsList}
+                                renderItem={renderCartItem}
+                                keyExtractor={(item) => item.id}
+                                style={{ flex: 1 }}
+                                contentContainerStyle={{ 
+                                    padding: 20,
+                                    paddingBottom: 100
+                                }}
+                                showsVerticalScrollIndicator={false}
+                            />
+
+                            {/* Fixed Bottom Summary */}
+                            <View style={{
+                                position: 'absolute',
+                                bottom: 0,
+                                left: 0,
+                                right: 0,
+                                backgroundColor: theme.colors.background,
+                                borderTopWidth: 1,
+                                borderTopColor: theme.colors.border,
+                                paddingTop: 20,
+                                paddingBottom: insets.bottom,
+                                paddingHorizontal: 20,
+                            }}>
+                                {/* Price Breakdown */}
+                                <View style={{ marginBottom: 20 }}>
+                                    <View style={{
+                                        flexDirection: 'row',
+                                        justifyContent: 'space-between',
+                                        marginBottom: 8,
+                                    }}>
+                                        <Text style={{ fontSize: 14, color: theme.colors.muted }}>
+                                            Subtotal
+                                        </Text>
+                                        <Text style={{ fontSize: 14, color: theme.colors.text }}>
+                                            ₦{subtotal.toLocaleString()}
+                                        </Text>
+                                    </View>
+                                    <View style={{
+                                        flexDirection: 'row',
+                                        justifyContent: 'space-between',
+                                        marginBottom: 8,
+                                    }}>
+                                        <Text style={{ fontSize: 14, color: theme.colors.muted }}>
+                                            Delivery Fee
+                                        </Text>
+                                        <Text style={{ fontSize: 14, color: theme.colors.text }}>
+                                            ₦{deliveryFee.toLocaleString()}
+                                        </Text>
+                                    </View>
+                                    <View style={{
+                                        flexDirection: 'row',
+                                        justifyContent: 'space-between',
+                                        marginBottom: 12,
+                                    }}>
+                                        <Text style={{ fontSize: 14, color: theme.colors.muted }}>
+                                            Service Fee
+                                        </Text>
+                                        <Text style={{ fontSize: 14, color: theme.colors.text }}>
+                                            ₦{serviceFee.toLocaleString()}
+                                        </Text>
+                                    </View>
+                                    <View style={{
+                                        height: 1,
+                                        backgroundColor: theme.colors.border,
+                                        marginBottom: 12,
+                                    }} />
+                                    <View style={{
+                                        flexDirection: 'row',
+                                        justifyContent: 'space-between',
+                                    }}>
+                                        <Text style={{
+                                            fontSize: 18,
+                                            fontWeight: '700',
+                                            color: theme.colors.text,
+                                        }}>
+                                            Total
+                                        </Text>
+                                        <Text style={{
+                                            fontSize: 18,
+                                            fontWeight: '700',
+                                            color: theme.colors.primary,
+                                        }}>
+                                            ₦{total.toLocaleString()}
+                                        </Text>
+                                    </View>
+                                </View>
+
+                                {/* Checkout Button */}
+                                <CTAButton
+                                    title="Proceed to Checkout"
+                                    onPress={handleProceedToCheckout}
+                                    style={{
+                                        borderRadius: 12,
+                                        paddingVertical: 16,
+                                    }}
+                                />
+                            </View>
+                        </>
+                    ) : (
+                        renderEmptyState()
+                    )}
+                </Pressable>
+            </Pressable>
         </Modal>
     );
 }
