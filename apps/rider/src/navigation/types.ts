@@ -12,14 +12,20 @@ export type AuthStackParamList = {
 export type AppTabParamList = {
     Home: undefined;
     Earnings: undefined;
-    Orders: undefined;
+    History: undefined; // Move this here
     Profile: undefined;
 }
 
 export type RootStackParamList = {
     AuthStack: NavigatorScreenParams<AuthStackParamList>;
     AppTabs: NavigatorScreenParams<AppTabParamList>;
-    OrderDetail: { order: RiderAvailableOrder };
+    Home: undefined;
+    OrderDetail: {
+        order: RiderAvailableOrder;
+        orderStatus: 'going_to_pickup' | 'picked_up' | 'delivering' | 'delivered';
+        onStatusChange?: (status: 'picked_up' | 'delivered' | 'cancelled') => void;
+    };
+    OrderHistoryDetail: { orderId: string };
     // Profile screens
     EditProfile: undefined;
     ChangePassword: undefined;

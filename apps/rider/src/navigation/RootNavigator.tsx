@@ -24,6 +24,8 @@ import ChangePasswordScreen from '../profile/ChangePassword';
 import SettingsScreen from '../profile/SettingsScreen';
 import SupportScreen from '../profile/SupportScreen';
 import LegalScreen from '../profile/LegalScreen';
+import HistoryScreen from '../screens/history/HistoryScreen';
+import OrderHistoryDetailScreen from '../screens/history/OrderHistoryDetailScreen';
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
@@ -92,6 +94,7 @@ function AppTabs() {
 					tabBarIcon: ({ color, size, focused }) => {
 						if (route.name === "Home") return <Icon set='ion' name={focused ? "home" : "home-outline"} color={color} size={size} />
 						if (route.name === "Earnings") return <Icon set="ion" name={focused ? "cash" : "cash-outline"} color={color} size={size} />
+						if (route.name === "History") return <Icon set="ion" name={focused ? "time" : "time-outline"} color={color} size={size} />
 						if (route.name === "Profile") return <Icon set="ion" name={focused ? "person" : "person-outline"} color={color} size={size} />
 						return <Icon set="ion" name="home" color={color} size={size} />
 					}
@@ -99,6 +102,7 @@ function AppTabs() {
 			>
 				<Tab.Screen name="Home" component={HomeScreen} />
 				<Tab.Screen name="Earnings" component={EarningsScreen} />
+				<Tab.Screen name="History" component={HistoryScreen} />
 				<Tab.Screen name="Profile" component={ProfileScreen} />
 			</Tab.Navigator>
 		</>
@@ -163,6 +167,13 @@ export default function RootNavigator() {
 				<RootStack.Screen 
 					name="Legal" 
 					component={LegalScreen} 
+					options={{ headerShown: false }} 
+				/>
+
+				{/* History Screens */}
+				<RootStack.Screen 
+					name="OrderHistoryDetail" 
+					component={OrderHistoryDetailScreen} 
 					options={{ headerShown: false }} 
 				/>
 			</RootStack.Navigator>

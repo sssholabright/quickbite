@@ -21,7 +21,7 @@ export class SocketService {
             cors: {
                 origin: env.NODE_ENV === 'production' 
                     ? ['https://yourdomain.com'] 
-                    : ['http://localhost:3000', 'http://localhost:3001', 'http://192.168.0.176:8081', 'http://localhost:5173', 'http://10.213.134.234:8081'], 
+                    : ['http://localhost:3000', 'http://localhost:3001', 'http://192.168.0.176:8081', 'http://localhost:5173', 'http://10.213.134.234:8081', 'http://10.213.134.234:8082'], 
                 methods: ['GET', 'POST'],
                 credentials: true
             },

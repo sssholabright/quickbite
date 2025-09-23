@@ -2,6 +2,7 @@ export type RiderOrderItem = {
 	id: string;
 	name: string;
 	quantity: number;
+    price: number; // Add this line
 };
 
 export type RiderAvailableOrder = {
@@ -16,6 +17,7 @@ export type RiderAvailableOrder = {
 	dropoffAddress: string;
     dropoffLat?: number
     dropoffLng?: number
+    customerName?: string;
     customerPhone?: string
 	distanceKm: number;
 	payout: number; // rider payout / delivery fee
