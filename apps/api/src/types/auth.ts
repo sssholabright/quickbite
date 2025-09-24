@@ -16,8 +16,27 @@ export interface AuthResult {
         id: string;
         email: string;
         name: string;
+        phone: string;
+        avatar?: string;
         role: string;
         isActive: boolean;
+        createdAt: string;
+        updatedAt: string;
+        rider?: {
+            id: string;
+            userId: string;
+            vehicleType: string;
+            isOnline: boolean;
+            isAvailable: boolean;
+            currentLat: number | null;
+            currentLng: number | null;
+            bankAccount: string | null;
+            earnings: number;
+            completedOrders: number;
+            rating: number;
+            createdAt: string;
+            updatedAt: string;
+        };
     };
     tokens: {
         accessToken: string;
@@ -29,4 +48,6 @@ export interface UpdateUser {
     name?: string | undefined;
     phone?: string | undefined;
     avatar?: string | undefined;
+    currentLat?: number | undefined;
+    currentLng?: number | undefined;
 }

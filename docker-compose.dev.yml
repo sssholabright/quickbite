@@ -1,0 +1,44 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: quickbite-postgres-dev
+    environment:
+      POSTGRES_DB: quickbite_dev
+      POSTGRES_USER: quickbite
+      POSTGRES_PASSWORD: quickbite123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    networks:
+      - quickbite-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U quickbite -d quickbite_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for caching and sessions
+  redis:
+    image: redis:7-alpine
+    container_name: quickbite-redis-dev
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_dev_data:/data
+    networks:
+      - quickbite-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_dev_data:
+  redis_dev_data:
+
+networks:
+  quickbite-network:
+    driver: bridge

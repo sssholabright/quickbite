@@ -2,7 +2,7 @@ import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 import * as SecureStore from 'expo-secure-store';
 
 // API Configuration
-const API_BASE_URL = 'http://10.213.134.234:5000/api/v1';
+const API_BASE_URL = 'http://192.168.100.234:5000/api/v1';
 //  [
 //   'http://192.168.0.176:5000/api/v1',
 //   'http://10.200.122.234:5000/api/v1'

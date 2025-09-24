@@ -16,15 +16,20 @@
 
         /* Linting */
         "strict": true,
-        "noUnusedLocals": true,
-        "noUnusedParameters": true,
+        "noUnusedLocals": false,
+        "noUnusedParameters": false,
         "noFallthroughCasesInSwitch": true,
 
         /* Path mapping */
         "baseUrl": ".",
         "paths": {
-        "@/*": ["./src/*"]
-        }
+            "@/*": ["./src/*"]
+        },
+
+        /* Additional options to fix React type issues */
+        "allowSyntheticDefaultImports": true,
+        "esModuleInterop": true,
+        "forceConsistentCasingInFileNames": true
     },
     "include": ["src"],
     "references": [{ "path": "./tsconfig.node.json" }]

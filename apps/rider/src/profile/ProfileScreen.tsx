@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { View, Text, ScrollView, Pressable, Alert } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -12,17 +12,21 @@ type ProfileNav = NativeStackNavigationProp<RootStackParamList>;
 
 export default function ProfileScreen() {
 	const theme = useTheme();
+	const { user } = useAuthStore();
 	const navigation = useNavigation<ProfileNav>();
 	const logout = useAuthStore((s) => s.logout);
 
-	// Mock rider data
+	useEffect(() => {
+		console.log(JSON.stringify(user, null, 2));
+	}, [user]);
+
+	// Rider data
 	const [riderData] = useState({
-		name: "John Rider",
-		phone: "+2348012345678",
-		email: "rider@example.com",
-		riderId: "RID-001",
-		status: "Active" as "Active" | "Suspended",
-		photo: null,
+		name: user?.name || "John Rider",
+		phone: user?.phone || "+2348012345678",
+		email: user?.email || "rider@example.com",
+		status: user?.isActive ? "Active" : "Suspended",
+		// photo: user?.avatar || null,
 	});
 
 	const renderProfileItem = (
@@ -113,7 +117,7 @@ export default function ProfileScreen() {
 							fontSize: 14,
 							color: theme.colors.muted,
 						}}>
-							Rider ID: {riderData.riderId}
+							Rider Phone: {riderData.phone}
 						</Text>
 						<View style={{
 							flexDirection: "row",

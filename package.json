@@ -1,9 +1,13 @@
 {
-  "dependencies": {
-    "pnpm": "^10.17.0"
-  },
-  "devDependencies": {
-    "turbo": "^2.5.6",
-    "typescript": "^5.9.2"
+  "scripts": {
+    "docker:dev": "docker-compose -f docker-compose.dev.yml up -d",
+    "docker:dev:down": "docker-compose -f docker-compose.dev.yml down",
+    "docker:all": "docker-compose up -d",
+    "docker:all:down": "docker-compose down",
+    "docker:prod": "docker-compose -f docker-compose.prod.yml up -d",
+    "docker:prod:down": "docker-compose -f docker-compose.prod.yml down",
+    "docker:build": "docker-compose build",
+    "docker:logs": "docker-compose logs -f",
+    "docker:clean": "docker-compose down -v && docker system prune -f"
   }
 }

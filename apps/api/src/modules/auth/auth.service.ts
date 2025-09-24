@@ -63,7 +63,8 @@ export class AuthService {
                         data: {
                             email: data.email,
                             password: hashedPassword,
-                            name: data.phone,
+                            name: data.name,
+                            phone: data.phone,
                             role: 'RIDER',
                             rider: {
                                 create: {
@@ -116,8 +117,15 @@ export class AuthService {
                     id: user.id,
                     email: user.email,
                     name: user.name,
-                    role: user.role,
-                    isActive: true
+                    phone: user.phone || '',
+                    avatar: user.avatar || '',
+                    role: user.role || '',
+                    isActive: true,
+                    createdAt: user.createdAt.toISOString(),
+                    updatedAt: user.updatedAt.toISOString(),
+                    ...((user as any).rider && { rider: (user as any).rider }),
+                    ...((user as any).customer && { customer: (user as any).customer }),
+                    ...((user as any).vendor && { vendor: (user as any).vendor })
                 },
                 tokens
             };
@@ -184,14 +192,21 @@ export class AuthService {
 
             return {
                 user: {
-                id: user.id,
-                email: user.email,
-                name: user.name,
-                role: user.role,
-                isActive
-            },
-            tokens
-        };
+                    id: user.id,
+                    email: user.email,
+                    name: user.name,
+                    phone: user.phone || '',
+                    avatar: user.avatar || '',
+                    role: user.role || '',
+                    isActive,
+                    createdAt: user.createdAt.toISOString(),
+                    updatedAt: user.updatedAt.toISOString(),
+                    ...((user as any).rider && { rider: (user as any).rider }),
+                    ...((user as any).customer && { customer: (user as any).customer }),
+                    ...((user as any).vendor && { vendor: (user as any).vendor })
+                },
+                tokens
+            };
         } catch (error) {
             logger.error({ error }, 'Login error');
             if (error instanceof CustomError) {
@@ -328,12 +343,22 @@ export class AuthService {
             }
 
             // Update user profile
+            console.log(updateData)
             const updatedUser = await prisma.user.update({
                 where: { id: userId },
                 data: {
                     ...(updateData.name && { name: updateData.name }),
                     ...(updateData.phone && { phone: updateData.phone }),
                     ...(updateData.avatar && { avatar: updateData.avatar }),
+                    // Handle rider location updates - combine both lat and lng in one update
+                    ...((updateData.currentLat !== undefined || updateData.currentLng !== undefined) && {
+                        rider: {
+                            update: {
+                                ...(updateData.currentLat !== undefined && { currentLat: updateData.currentLat }),
+                                ...(updateData.currentLng !== undefined && { currentLng: updateData.currentLng })
+                            }
+                        }
+                    })
                 },
                 include: {
                     customer: true,

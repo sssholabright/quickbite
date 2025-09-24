@@ -7,7 +7,7 @@ export const Input = forwardRef<TextInput, TextInputProps & { label?: string; er
 		const theme = useTheme();
 		return (
 			<View style={{ gap:6 }}>
-				{label && <Text style={{ color: theme.colors.muted }}>{label}</Text>}
+				{label && <Text style={{ color: theme.colors.muted, fontWeight: "500" }}>{label}</Text>}
 				<TextInput
 					ref={ref}
 					placeholderTextColor={theme.mode === "dark" ? "#64748b" : "#94a3b8"}
@@ -19,7 +19,7 @@ export const Input = forwardRef<TextInput, TextInputProps & { label?: string; er
 					}, style]}
 					{...p}
 				/>
-				{!!error && <Text style={{ color: theme.colors.danger }}>{error}</Text>}
+				{!!error && <Text style={{ color: theme.colors.danger, fontSize: 12 }}>{error}</Text>}
 			</View>
 		);
 	}

@@ -4,24 +4,25 @@ import { Server as SocketIOServer, Socket } from 'socket.io';
 import { Server as HTTPServer } from 'http';
 import { env } from './env.js';
 import jwt from 'jsonwebtoken';
-
 interface AuthenticatedSocket extends Socket {
     userId?: string;
     userRole?: string;
     vendorId?: string;
     customerId?: string;
+    riderId?: string;
 }
 
 export class SocketService {
     private io: SocketIOServer;
     private connectedUsers: Map<string, string[]> = new Map(); // userId -> socketIds[]
+    private connectedRiders: Map<string, string[]> = new Map(); // riderId -> socketIds[]
 
     constructor(server: HTTPServer) {
         this.io = new SocketIOServer(server, {
             cors: {
                 origin: env.NODE_ENV === 'production' 
                     ? ['https://yourdomain.com'] 
-                    : ['http://localhost:3000', 'http://localhost:3001', 'http://192.168.0.176:8081', 'http://localhost:5173', 'http://10.213.134.234:8081', 'http://10.213.134.234:8082'], 
+                    : ['http://localhost:3000', 'http://localhost:3001', 'http://192.168.0.176:8081', 'http://localhost:5173', 'http://10.213.134.234:8081', 'http://10.213.134.234:8082', 'http://192.168.100.234:8081'], 
                 methods: ['GET', 'POST'],
                 credentials: true
             },
@@ -56,9 +57,11 @@ export class SocketService {
 
                 // Set role-specific IDs
                 if (decoded.role === 'VENDOR') {
-                    socket.vendorId = decoded.userId; // Use userId instead of vendorId
+                    socket.vendorId = decoded.userId;
                 } else if (decoded.role === 'CUSTOMER') {
-                    socket.customerId = decoded.userId; // Use userId instead of customerId
+                    socket.customerId = decoded.userId;
+                } else if (decoded.role === 'RIDER') {
+                    socket.riderId = decoded.userId;
                 }
 
                 next();
@@ -80,8 +83,15 @@ export class SocketService {
                 socket.join('vendors');
             } else if (socket.userRole === 'CUSTOMER' && socket.customerId) {
                 socket.join(`customer:${socket.customerId}`);
-            } else if (socket.userRole === 'RIDER') {
+            } else if (socket.userRole === 'RIDER' && socket.riderId) {
+                socket.join(`rider:${socket.riderId}`);
                 socket.join('riders');
+                
+                // Track connected riders
+                if (!this.connectedRiders.has(socket.riderId)) {
+                    this.connectedRiders.set(socket.riderId, []);
+                }
+                this.connectedRiders.get(socket.riderId)!.push(socket.id);
             } else if (socket.userRole === 'ADMIN') {
                 socket.join('admins');
             }
@@ -93,6 +103,7 @@ export class SocketService {
                 }
                 this.connectedUsers.get(socket.userId)!.push(socket.id);
             }
+
 
             // Handle disconnect
             socket.on('disconnect', () => {
@@ -106,6 +117,19 @@ export class SocketService {
                             userSockets.splice(index, 1);
                             if (userSockets.length === 0) {
                                 this.connectedUsers.delete(socket.userId);
+                            }
+                        }
+                    }
+                }
+
+                if (socket.riderId) {
+                    const riderSockets = this.connectedRiders.get(socket.riderId);
+                    if (riderSockets) {
+                        const index = riderSockets.indexOf(socket.id);
+                        if (index > -1) {
+                            riderSockets.splice(index, 1);
+                            if (riderSockets.length === 0) {
+                                this.connectedRiders.delete(socket.riderId);
                             }
                         }
                     }
@@ -143,53 +167,104 @@ export class SocketService {
         });
     }
 
-    // Emit order updates to relevant parties
-    public emitOrderUpdate(orderId: string, orderData: any) {
-        this.io.to(`order:${orderId}`).emit('order_updated', {
-            orderId,
-            order: orderData,
+    // CORE WEBSOCKET METHODS - Use these consistently throughout the app
+
+    /**
+     * Emit to all riders
+     */
+    public emitToAllRiders(event: string, data: any): void {
+        this.io.to('riders').emit(event, {
+            ...data,
             timestamp: new Date().toISOString()
         });
     }
 
-    // Emit new order to vendors
-    public emitNewOrder(orderData: any) {
-        this.io.to('vendors').emit('new_order', {
-            order: orderData,
+    /**
+     * Emit to specific rider
+     */
+    public emitToRider(riderId: string, event: string, data: any): void {
+        this.io.to(`rider:${riderId}`).emit(event, {
+            ...data,
             timestamp: new Date().toISOString()
         });
     }
 
-    // Emit order status update to customer
-    public emitOrderStatusUpdate(orderId: string, customerId: string, status: string) {
-        this.io.to(`customer:${customerId}`).emit('order_status_update', {
-            orderId,
-            status,
+    /**
+     * Emit to specific customer
+     */
+    public emitToCustomer(customerId: string, event: string, data: any): void {
+        this.io.to(`customer:${customerId}`).emit(event, {
+            ...data,
             timestamp: new Date().toISOString()
         });
     }
 
-    // Emit order cancellation
-    public emitOrderCancellation(orderId: string, orderData: any) {
-        this.io.to(`order:${orderId}`).emit('order_cancelled', {
-            orderId,
-            order: orderData,
+    /**
+     * Emit to specific vendor
+     */
+    public emitToVendor(vendorId: string, event: string, data: any): void {
+        this.io.to(`vendor:${vendorId}`).emit(event, {
+            ...data,
             timestamp: new Date().toISOString()
         });
     }
 
-    // Emit delivery updates to customer
-    public emitDeliveryUpdate(orderId: string, customerId: string, riderData: any) {
-        this.io.to(`customer:${customerId}`).emit('delivery_update', {
-            orderId,
-            rider: riderData,
+    /**
+     * Emit to order room (all participants)
+     */
+    public emitToOrder(orderId: string, event: string, data: any): void {
+        this.io.to(`order:${orderId}`).emit(event, {
+            ...data,
             timestamp: new Date().toISOString()
         });
+    }
+
+    // LEGACY METHODS - Keep for backward compatibility but mark as deprecated
+    // These will be removed in future versions
+
+    /**
+     * @deprecated Use emitToOrder instead
+     */
+    public emitOrderUpdate(orderId: string, orderData: any): void {
+        this.emitToOrder(orderId, 'order_updated', { orderId, order: orderData });
+    }
+
+    /**
+     * @deprecated Use emitToAllRiders instead
+     */
+    public emitNewOrder(orderData: any): void {
+        this.emitToAllRiders('new_order', { order: orderData });
+    }
+
+    /**
+     * @deprecated Use emitToCustomer instead
+     */
+    public emitOrderStatusUpdate(orderId: string, customerId: string, status: string): void {
+        this.emitToCustomer(customerId, 'order_status_update', { orderId, status });
+    }
+
+    /**
+     * @deprecated Use emitToOrder instead
+     */
+    public emitOrderCancellation(orderId: string, orderData: any): void {
+        this.emitToOrder(orderId, 'order_cancelled', { orderId, order: orderData });
+    }
+
+    /**
+     * @deprecated Use emitToCustomer instead
+     */
+    public emitDeliveryUpdate(orderId: string, customerId: string, riderData: any): void {
+        this.emitToCustomer(customerId, 'delivery_update', { orderId, rider: riderData });
     }
 
     // Get connected users count
     public getConnectedUsersCount(): number {
         return this.connectedUsers.size;
+    }
+
+    // NEW: Get connected riders count
+    public getConnectedRidersCount(): number {
+        return this.connectedRiders.size;
     }
 
     // Get connected vendors count

@@ -7,11 +7,13 @@ import { logger } from './utils/logger.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 import { notFoundHandler } from './middlewares/notFoundHandler.js';
 import { authRateLimit, generalRateLimit } from './middlewares/rateLimiter.js';
+import { redisService } from './config/redis.js';
 
 // Import route modules
 import authRoutes from './modules/auth/auth.routes.js';
 import orderRoutes from './modules/orders/order.routes.js';
 import menuRoutes from './modules/menu/menu.routes.js';
+import riderRoutes from './modules/riders/rider.routes.js';
 // import userRoutes from './modules/users/routes.js';
 // import vendorRoutes from './modules/vendors/routes.js';
 // import riderRoutes from './modules/riders/routes.js';
@@ -60,7 +62,8 @@ app.get('/health', (req, res) => {
         timestamp: new Date().toISOString(),
         uptime: process.uptime(),
         environment: env.NODE_ENV,
-        version: process.env.npm_package_version || '1.0.0'
+        version: process.env.npm_package_version || '1.0.0',
+        redis: redisService.isRedisConnected()
     });
 });
 
@@ -68,9 +71,9 @@ app.get('/health', (req, res) => {
 app.use('/api/v1/auth', authRateLimit, authRoutes);
 app.use('/api/v1/orders', orderRoutes);
 app.use('/api/v1/menu', menuRoutes);
+app.use('/api/v1/riders', riderRoutes);
 // app.use('/api/v1/users', userRoutes);
 // app.use('/api/v1/vendors', vendorRoutes);
-// app.use('/api/v1/riders', riderRoutes);
 // app.use('/api/v1/payments', paymentRoutes);
 
 // 404 handler

@@ -3,6 +3,8 @@ import { CustomError } from './../../middlewares/errorHandler.js';
 import { prisma } from './../../config/db.js';
 import { CreateOrderRequest, OrderFilters, OrderResponse, OrderStatusUpdate } from './../../types/order.js';
 import { getSocketManager } from '../../config/socket.js';
+import { DeliveryJobData } from '../../types/queue.js';
+import { queueService } from '../queues/queue.service.js';
 
 export class OrderService {
     // Create new order
@@ -159,8 +161,8 @@ export class OrderService {
             // Emit WebSocket events
             try {
                 const socketManager = getSocketManager();
-                socketManager.emitNewOrder(formattedOrder);
-                socketManager.emitOrderUpdate(order.id, formattedOrder);
+                socketManager.emitToAllRiders('new_order', { order: formattedOrder });
+                socketManager.emitToOrder(order.id, 'order_updated', { order: formattedOrder });
             } catch (socketError) {
                 logger.error({ error: socketError }, 'Failed to emit socket events');
             }
@@ -311,13 +313,27 @@ export class OrderService {
 
             const formattedOrder = this.formatOrderResponse(updatedOrder);
 
+            // Trigger delivery job broadcasting when order is ready for pickup
+            if (statusUpdate.status === 'READY_FOR_PICKUP') {
+                try {
+                    await this.triggerDeliveryJobBroadcast(updatedOrder);
+                    logger.info(`Delivery job triggered for order ${orderId}`);
+                } catch (deliveryError) {
+                    logger.error({ error: deliveryError, orderId }, 'Failed to trigger delivery job broadcast');
+                    // Don't throw error, continue with other operations
+                }
+            }
+
             // Emit WebSocket events
             try {
                 const socketManager = getSocketManager();
-                socketManager.emitOrderUpdate(orderId, formattedOrder);
+                socketManager.emitToOrder(orderId, 'order_updated', { order: formattedOrder });
                 
-                // Emit status update to customer using userId instead of customer.id
-                socketManager.emitOrderStatusUpdate(orderId, updatedOrder.customer.userId, statusUpdate.status);
+                // Emit status update to customer using consistent method
+                socketManager.emitToCustomer(updatedOrder.customer.userId, 'order_status_update', { 
+                    orderId, 
+                    status: statusUpdate.status 
+                });
                 
                 // Emit delivery updates if rider is assigned
                 if (statusUpdate.riderId && ['PICKED_UP', 'OUT_FOR_DELIVERY', 'DELIVERED'].includes(statusUpdate.status)) {
@@ -326,10 +342,13 @@ export class OrderService {
                         include: { user: true }
                     });
                     if (rider) {
-                        socketManager.emitDeliveryUpdate(orderId, updatedOrder.customer.id, {
-                            id: rider.id,
-                            name: rider.user.name,
-                            phone: rider.user.phone
+                        socketManager.emitToCustomer(updatedOrder.customer.id, 'delivery_update', {
+                            orderId,
+                            rider: {
+                                id: rider.id,
+                                name: rider.user.name,
+                                phone: rider.user.phone
+                            }
                         });
                     }
                 }
@@ -463,8 +482,11 @@ export class OrderService {
             // Emit WebSocket events
             try {
                 const socketManager = getSocketManager();
-                socketManager.emitOrderCancellation(orderId, formattedOrder);
-                socketManager.emitOrderStatusUpdate(orderId, cancelledOrder.customer.id, 'CANCELLED');
+                socketManager.emitToOrder(orderId, 'order_cancelled', { order: formattedOrder });
+                socketManager.emitToCustomer(cancelledOrder.customer.id, 'order_status_update', { 
+                    orderId, 
+                    status: 'CANCELLED' 
+                });
             } catch (socketError) {
                 logger.error({ error: socketError }, 'Failed to emit socket events');
             }
@@ -586,6 +608,43 @@ export class OrderService {
             createdAt: order.createdAt,
             updatedAt: order.updatedAt
         };
+    }
+
+    /**
+     * 🚀 NEW METHOD: Trigger delivery job broadcast when order is ready for pickup
+     * Real-world: When vendor clicks "Order Ready", this automatically finds riders and sends them the job
+     */
+    private static async triggerDeliveryJobBroadcast(order: any): Promise<void> {
+        try {
+            // Create delivery job data
+            const deliveryJobData: DeliveryJobData = {
+                orderId: order.id,
+                vendorId: order.vendorId,
+                customerId: order.customerId,
+                customerName: order.customer.user.name,
+                vendorName: order.vendor.businessName,
+                pickupAddress: order.vendor.address,
+                deliveryAddress: JSON.stringify(order.deliveryAddress),
+                deliveryFee: order.deliveryFee,
+                distance: 0, // Will be calculated by the delivery service
+                items: order.items.map((item: any) => ({
+                    id: item.id,
+                    name: item.menuItem.name,
+                    quantity: item.quantity,
+                    price: item.unitPrice
+                })),
+                createdAt: order.createdAt,
+                expiresAt: new Date(Date.now() + 5 * 60 * 1000), // 5 minutes from now
+            };
+
+            // Add delivery job to queue
+            await queueService.addDeliveryJob(deliveryJobData);
+
+            logger.info(`Delivery job triggered for order ${order.id}`);
+        } catch (error) {
+            logger.error({ error }, 'Failed to trigger delivery job broadcast');
+            throw new CustomError('Failed to trigger delivery job broadcast', 500);
+        }
     }
 
     private static canUserViewOrder(order: any, userId: string, userRole: string): boolean {

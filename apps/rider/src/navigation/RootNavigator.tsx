@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { DefaultTheme, DarkTheme, NavigationContainer, Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -26,6 +26,10 @@ import SupportScreen from '../profile/SupportScreen';
 import LegalScreen from '../profile/LegalScreen';
 import HistoryScreen from '../screens/history/HistoryScreen';
 import OrderHistoryDetailScreen from '../screens/history/OrderHistoryDetailScreen';
+import LocationPermissionScreen from '../screens/auth/LocationPermissionScreen';
+import * as Location from 'expo-location';
+import { useLocationStore } from '../stores/location';
+import { useIsLocationReady } from '../stores/location';
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
@@ -49,9 +53,8 @@ function AuthStackNavigator() {
 			}}
 		>
 			<AuthStack.Screen name="Onboarding" component={OnboardingScreen} options={{ headerShown: false }} />
-			<AuthStack.Screen name="Login" component={LoginScreen} options={{ title: "Login" }} />
-			<AuthStack.Screen name="Register" component={RegisterScreen} options={{ title: "Register" }} />
-			<AuthStack.Screen name="ForgotPassword" component={ForgotPasswordScreen} options={{ title: "Forgot Password" }} />
+			<AuthStack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
+			<AuthStack.Screen name="ForgotPassword" component={ForgotPasswordScreen} options={{ headerShown: false }} />
 		</AuthStack.Navigator>
 	);
 }
@@ -110,10 +113,13 @@ function AppTabs() {
 }
 
 export default function RootNavigator() {
-	const { token, hydrated, hydrate } = useAuthStore();
+	const { tokens, user, hydrated, hydrate } = useAuthStore();
+	const isLocationReady = useIsLocationReady(); // Use the selector
 	const appTheme = useTheme();
 
-	useEffect(() => { void hydrate(); }, [hydrate]);
+	useEffect(() => { 
+		void hydrate();
+	}, [hydrate]);
 
 	if (!hydrated) {
 		return (
@@ -130,8 +136,13 @@ export default function RootNavigator() {
 	return (
 		<NavigationContainer theme={navTheme}>
 			<RootStack.Navigator id={undefined} screenOptions={{ headerShown: false }}>
-				{token ? (
-					<RootStack.Screen name="AppTabs" component={AppTabs} />
+				{tokens.accessToken ? (
+					// Use location store instead of user data
+					isLocationReady ? (
+						<RootStack.Screen name="AppTabs" component={AppTabs} />
+					) : (
+						<RootStack.Screen name="LocationPermission" component={LocationPermissionScreen} />
+					)
 				) : (
 					<RootStack.Screen name="AuthStack" component={AuthStackNavigator} />
 				)}

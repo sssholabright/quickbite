@@ -24,8 +24,8 @@ const envSchema = z.object({
     CLOUDINARY_API_KEY: z.string().min(1, 'Cloudinary API key is required'),
     CLOUDINARY_API_SECRET: z.string().min(1, 'Cloudinary API secret is required'),
 
-    // Redis (for caching and sessions)
-    REDIS_URL: z.string().optional(),
+    // Redis (for caching, sessions, and queues)
+    REDIS_URL: z.string().default('redis://localhost:6379'),
 
     // Email (for notifications)
     SMTP_HOST: z.string().optional(),

@@ -11,6 +11,11 @@ import { mockAvailableOrders } from "../../lib/mockOrders";
 import { RootStackParamList } from "../../navigation/types";
 import MapCompat from "../../components/maps/MapCompact";
 import type { RouteProp } from "@react-navigation/native";
+import { LocationStatusIndicator } from '../../components/LocationStatusIndicator';
+import { useLocation } from '../../hooks/useLocation';
+import { useLocationStatus } from '../../hooks/useLocationStatus';
+import { useRiderStore } from '../../stores/rider';
+import { useAuthStore } from '../../stores/auth';
 
 // Mock rider data
 const mockRider = {
@@ -90,9 +95,35 @@ const CountdownTimer = ({ seconds, onComplete }: { seconds: number; onComplete: 
 export default function HomeScreen() {
     const theme = useTheme();
     const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+    const { 
+        status, 
+        message, 
+        color, 
+        icon, 
+        isLocationReady, 
+        currentLocation,
+        lastChecked,
+        actions 
+    } = useLocationStatus();
     
+    const { user } = useAuthStore();
+    const { 
+        isOnline, 
+        isAvailable, 
+        isLoading, 
+        setOnlineStatus, 
+        setAvailability 
+    } = useRiderStore();
+
+    // Initialize rider status from user data
+    useEffect(() => {
+        if (user?.rider) {
+            // You might want to sync the store with the user data
+            // or fetch the latest status from the API
+        }
+    }, [user]);
+
     // Core state
-    const [isOnline, setIsOnline] = useState(false);
     const [orders, setOrders] = useState<RiderAvailableOrder[]>(() => mockAvailableOrders);
     const [refreshing, setRefreshing] = useState(false);
     const [activeOrder, setActiveOrder] = useState<RiderAvailableOrder | null>(null);
@@ -243,23 +274,22 @@ export default function HomeScreen() {
     }, []);
 
     // Toggle online status
-    const toggleOnlineStatus = useCallback((value: boolean) => {
-        setIsOnline(value);
-        if (!value && activeOrder) {
-            Alert.alert(
-                "Going Offline",
-                "You have an active order. Complete it before going offline.",
-                [
-                    { text: "Cancel", onPress: () => setIsOnline(true) },
-                    { text: "Force Offline", onPress: () => {
-                        setIsOnline(false);
-                        setActiveOrder(null);
-                        setOrderStatus('going_to_pickup');
-                    }}
-                ]
-            );
+    const handleToggleOnline = async () => {
+        try {
+            await setOnlineStatus(!isOnline);
+        } catch (error) {
+            console.error('Failed to toggle online status:', error);
         }
-    }, [activeOrder]);
+    };
+
+    // Toggle availability
+    const handleToggleAvailability = async () => {
+        try {
+            await setAvailability(!isAvailable);
+        } catch (error) {
+            console.error('Failed to toggle availability:', error);
+        }
+    };
 
     // Calculate distances for incoming order
     const calculateOrderDistances = useCallback((order: RiderAvailableOrder) => {
@@ -393,7 +423,7 @@ export default function HomeScreen() {
                         </Text>
                         <Switch
                             value={isOnline}
-                            onValueChange={toggleOnlineStatus}
+                            onValueChange={handleToggleOnline}
                             trackColor={{ false: theme.colors.border, true: '#10b981' }}
                             thumbColor={isOnline ? "white" : theme.colors.muted}
                             style={{ transform: [{ scaleX: 1.2 }, { scaleY: 1.2 }] }}

@@ -4,6 +4,7 @@ import { env } from './config/env.js';
 import { prisma } from './config/db.js';
 import { logger } from './utils/logger.js';
 import { initializeSocket } from './config/socket.js';
+import { redisService } from './config/redis.js';
 
 // Create HTTP server
 const server = createServer(app);
@@ -18,6 +19,10 @@ const gracefulShutdown = async (signal: string) => {
     server.close(async () => {
         logger.info('HTTP server closed');
         
+        // Close queue service
+        await redisService.disconnect();
+        logger.info('Redis connection closed');
+        
         await prisma.$disconnect();
         logger.info('Database connection closed');
         
@@ -30,13 +35,22 @@ process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // Start server
-const PORT = Number(env.PORT); // Convert to number
+const PORT = Number(env.PORT);
 
-server.listen(PORT, () => {
-    logger.info(`🚀 Server running on port ${PORT}`);
-    logger.info(`�� Environment: ${env.NODE_ENV}`);
-    logger.info(`🔗 API URL: http://localhost:${PORT}/api/v1`);
-    logger.info(`�� Socket.IO enabled`);
+server.listen(PORT, async () => {
+    try {
+        // Initialize Redis connection
+        await redisService.connect();
+        logger.info('🔴 Redis connected successfully');
+        
+        logger.info(`🚀 Server running on port ${PORT}`);
+        logger.info(`🌍 Environment: ${env.NODE_ENV}`);
+        logger.info(`🔗 API URL: http://localhost:${PORT}/api/v1`);
+        logger.info(`🔌 Socket.IO enabled`);
+    } catch (error) {
+        logger.error({ error }, 'Failed to start server');
+        process.exit(1);
+    }
 }).on('error', (err: any) => {
     if (err.code === 'EADDRINUSE') {
         logger.error(`Port ${PORT} is already in use. Trying port ${PORT + 1}...`);
