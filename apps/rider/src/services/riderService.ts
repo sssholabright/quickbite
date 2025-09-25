@@ -111,6 +111,18 @@ const riderService = {
         }
     },
 
+    // 🚀 NEW: Cancel order (for already accepted orders)
+    async cancelOrder(orderId: string, reason?: string): Promise<any> {
+        try {
+            const response = await apiClient.patch<ApiResponse<any>>(`/orders/${orderId}/cancel`, {
+                reason: reason || 'Rider cancelled order'
+            });
+            return response.data.data;
+        } catch (error: any) {
+            throw new Error(error.response?.data?.message || 'Failed to cancel order');
+        }
+    },
+
     // 🚀 UPDATED: Get rider's assigned orders with proper filtering
     async getRiderOrders(): Promise<any> {
         try {

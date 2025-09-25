@@ -8,7 +8,7 @@ import { Icon } from "../ui/Icon";
 import { SafeAreaWrapper } from "../ui/SafeAreaWrapper";
 import { CTAButton } from "../ui/CTAButton";
 import { Input } from "../ui/Input";
-// import AlertModal from "../ui/AlertModal";
+import AlertModal from "../ui/AlertModal";
 import { useAuthStore } from "../stores/auth";
 
 type EditProfileNav = NativeStackNavigationProp<RootStackParamList, 'EditProfile'>;
@@ -251,7 +251,7 @@ export default function EditProfileScreen() {
 			</ScrollView>
 
 			{/* Confirmation Modal */}
-			{/* <AlertModal
+			<AlertModal
 				visible={showConfirmModal}
 				title="Confirm Changes"
 				message="Are you sure you want to update your profile information?"
@@ -261,25 +261,25 @@ export default function EditProfileScreen() {
 				confirmText="Yes, Update"
 				cancelText="Cancel"
 				showCancel={true}
-			/> */}
+			/>
 
 			{/* Success Modal */}
-			{/* <AlertModal
+			<AlertModal
 				visible={showSuccessModal}
 				title="Profile Updated! 🎉"
 				message="Your profile has been updated successfully."
 				type="success"
 				onConfirm={handleSuccessConfirm}
-			/> */}
+			/>
 
 			{/* Error Modal */}
-			{/* <AlertModal
+			<AlertModal
 				visible={showErrorModal}
 				title="Update Failed"
 				message={errorMessage}
 				type="error"
 				onConfirm={handleErrorConfirm}
-			/> */}
+			/>
 		</SafeAreaWrapper>
 	);
 }

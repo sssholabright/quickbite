@@ -170,7 +170,8 @@ export class OrderService {
             return formattedOrder;
 
         } catch (error) {
-            logger.error({ error }, 'Error creating order');
+            console.error("Error creating order: ", error);
+            // logger.error({ error }, 'Error creating order');
             if (error instanceof CustomError) {
                 throw error;
             }
@@ -223,7 +224,8 @@ export class OrderService {
 
             return this.formatOrderResponse(order);
         } catch (error) {
-            logger.error({ error }, 'Error getting order');
+            console.error("Error getting order: ", error);
+            // logger.error({ error }, 'Error getting order');
             if (error instanceof CustomError) {
                 throw error;
             }
@@ -356,9 +358,42 @@ export class OrderService {
                 logger.error({ error: socketError }, 'Failed to emit socket events');
             }
 
+            if (statusUpdate.status === 'DELIVERED') {
+                // 🚀 NEW: Mark rider as available again when order is delivered
+                if (statusUpdate.riderId) {
+                    await prisma.rider.update({
+                        where: { id: statusUpdate.riderId },
+                        data: { isOnline: true }
+                    });
+                    
+                    logger.info(`✅ Rider ${statusUpdate.riderId} marked as available (order ${orderId} delivered)`);
+                    
+                    // Check for waiting orders
+                    try {
+                        const { DeliveryJobService } = await import('../delivery/deliveryJob.service.js');
+                        await DeliveryJobService.checkWaitingOrders();
+                    } catch (error) {
+                        logger.warn({ error }, 'Failed to check waiting orders after delivery');
+                    }
+                }
+            }
+
+            if (statusUpdate.status === 'PICKED_UP') {
+                // Rider is now unavailable (has active order)
+                if (statusUpdate.riderId) {
+                    await prisma.rider.update({
+                        where: { id: statusUpdate.riderId },
+                        data: { isAvailable: false }
+                    });
+                    
+                    logger.info(`🚫 Rider ${statusUpdate.riderId} marked as unavailable (order ${orderId} picked up)`);
+                }
+            }
+
             return formattedOrder;
         } catch (error) {
-            logger.error({ error }, 'Error updating order status');
+            console.error("Error updating order status: ", error);
+            // logger.error({ error }, 'Error updating order status');
             if (error instanceof CustomError) {
                 throw error;
             }
@@ -417,7 +452,8 @@ export class OrderService {
                 limit: filters.limit || 10
             };
         } catch (error) {
-            logger.error({ error }, 'Error getting orders');
+            console.error("Error getting orders: ", error);
+            // logger.error({ error }, 'Error getting orders');
             throw new CustomError('Failed to get orders', 500);
         }
     }
@@ -443,6 +479,16 @@ export class OrderService {
                         include: {
                             user: true
                         }
+                    },
+                    items: { // 🚀 ADD: Include items
+                        include: {
+                            menuItem: true,
+                            addOns: {
+                                include: {
+                                    addOn: true
+                                }
+                            }
+                        }
                     }
                 }
             });
@@ -461,58 +507,113 @@ export class OrderService {
                 throw new CustomError('Access denied', 403);
             }
 
-            const cancelledOrder = await prisma.order.update({
-                where: { id: orderId },
-                data: {
-                    status: 'CANCELLED',
-                    cancelledAt: new Date(),
-                    cancellationReason: reason || null
-                },
-                include: {
-                    vendor: {
-                        include: {
-                            user: true
-                        }
+            let updatedOrder;
+
+            // 🚀 NEW: Handle rider cancellations differently
+            if (userRole === 'RIDER') {
+                // For rider cancellations, set back to READY_FOR_PICKUP and remove rider assignment
+                updatedOrder = await prisma.order.update({
+                    where: { id: orderId },
+                    data: {
+                        status: 'READY_FOR_PICKUP',
+                        riderId: null, // Remove rider assignment
+                        cancelledAt: new Date(),
+                        cancellationReason: reason || 'Rider cancelled order'
                     },
-                    customer: {
-                        include: {
-                            user: true
-                        }
-                    },
-                    rider: {
-                        include: {
-                            user: true
-                        }
-                    },
-                    items: {
-                        include: {
-                            menuItem: true,
-                            addOns: {
-                                include: {
-                                    addOn: true
+                    include: {
+                        vendor: {
+                            include: {
+                                user: true
+                            }
+                        },
+                        customer: {
+                            include: {
+                                user: true
+                            }
+                        },
+                        rider: {
+                            include: {
+                                user: true
+                            }
+                        },
+                        items: { // 🚀 ADD: Include items
+                            include: {
+                                menuItem: true,
+                                addOns: {
+                                    include: {
+                                        addOn: true
+                                    }
                                 }
                             }
                         }
                     }
+                });
+
+                // 🚀 NEW: Make rider available again
+                if (order.riderId) {
+                    await prisma.rider.update({
+                        where: { id: order.riderId },
+                        data: { isAvailable: true }
+                    });
                 }
-            });
 
-            const formattedOrder = this.formatOrderResponse(cancelledOrder);
-
-            // Emit WebSocket events
-            try {
+                // 🚀 NEW: Trigger broadcast to other riders
                 const socketManager = getSocketManager();
+                socketManager.emitToAllRiders('order_available_for_pickup', {
+                    orderId: orderId,
+                    message: 'Order is now available for pickup',
+                    reason: 'rider_cancelled'
+                });
+
+                logger.info(`🔄 Order ${orderId} set back to READY_FOR_PICKUP after rider cancellation`);
+
+            } else {
+                // For other cancellations (customer, vendor, admin), mark as CANCELLED
+                updatedOrder = await prisma.order.update({
+                    where: { id: orderId },
+                    data: {
+                        status: 'CANCELLED',
+                        cancelledAt: new Date(),
+                        cancellationReason: reason || null
+                    },
+                    include: {
+                        vendor: {
+                            include: {
+                                user: true
+                            }
+                        },
+                        customer: {
+                            include: {
+                                user: true
+                            }
+                        },
+                        rider: {
+                            include: {
+                                user: true
+                            }
+                        }
+                    }
+                });
+            }
+
+            const formattedOrder = this.formatOrderResponse(updatedOrder);
+
+            // Emit socket event for order cancellation
+            const socketManager = getSocketManager();
+            if (socketManager) {
                 socketManager.emitOrderCancellation(orderId, formattedOrder, reason);
-            } catch (socketError) {
-                logger.error({ error: socketError }, 'Failed to emit socket events');
             }
 
             return formattedOrder;
-        } catch (error) {
-            logger.error({ error }, 'Error cancelling order');
+
+        } catch (error: any) {
+            console.error("Error cancelling order: ", error);
+            // logger.error({ error }, 'Error cancelling order');
+            
             if (error instanceof CustomError) {
                 throw error;
             }
+            
             throw new CustomError('Failed to cancel order', 500);
         }
     }
@@ -533,14 +634,12 @@ export class OrderService {
         try {
             logger.info('🔍 Starting broadcast of existing READY_FOR_PICKUP orders');
 
-            // Find all orders with READY_FOR_PICKUP status that don't have a rider assigned
+            // 🚀 FIX: Remove the 24-hour filter and other restrictions
             const readyOrders = await prisma.order.findMany({
                 where: {
                     status: 'READY_FOR_PICKUP',
                     riderId: null, // Only unassigned orders
-                    createdAt: {
-                        gte: new Date(Date.now() - 24 * 60 * 60 * 1000) // Only orders from last 24 hours
-                    }
+                    // 🚀 REMOVED: createdAt filter to get ALL ready orders
                 },
                 include: {
                     vendor: {
@@ -596,10 +695,24 @@ export class OrderService {
                     await this.triggerDeliveryJobBroadcast(order);
                     ordersBroadcasted++;
                     logger.info(`✅ Successfully broadcasted order ${order.orderNumber}`);
+                    
+                    // 🚀 FIX: Add delay between broadcasts to prevent bombarding
+                    if (ordersBroadcasted < readyOrders.length) {
+                        console.log(`⏳ Waiting 10 seconds before next broadcast...`);
+                        await new Promise(resolve => setTimeout(resolve, 40000)); // 40 second delay
+                    }
                 } catch (error) {
-                    const errorMessage = `Failed to broadcast order ${order.orderNumber}: ${error instanceof Error ? error.message : 'Unknown error'}`;
-                    errors.push(errorMessage);
-                    logger.error({ error, orderId: order.id }, errorMessage);
+                    // 🚀 FIXED: Better error handling
+                    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                    const errorDetails = {
+                        orderId: order.id,
+                        orderNumber: order.orderNumber,
+                        error: errorMessage,
+                        stack: error instanceof Error ? error.stack : undefined
+                    };
+                    
+                    errors.push(`Failed to broadcast order ${order.orderNumber}: ${errorMessage}`);
+                    logger.error(errorDetails, `Failed to broadcast order ${order.orderNumber}`);
                 }
             }
 
@@ -614,7 +727,8 @@ export class OrderService {
             logger.info(`🎯 Broadcast complete: ${JSON.stringify(result)}`);
             return result;
         } catch (error) {
-            logger.error({ error }, 'Error broadcasting existing ready orders');
+            console.error("Error broadcasting existing ready orders: ", error);
+            // logger.error({ error }, 'Error broadcasting existing ready orders');
             return {
                 success: false,
                 message: `Failed to broadcast existing orders: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -671,7 +785,8 @@ export class OrderService {
                 unassignedReadyOrders
             };
         } catch (error) {
-            logger.error({ error }, 'Error getting order status stats');
+            console.error("Error getting order status stats: ", error);
+            // logger.error({ error }, 'Error getting order status stats');
             throw new CustomError('Failed to get order status stats', 500);
         }
     }
@@ -746,7 +861,7 @@ export class OrderService {
                 phone: order.rider.user.phone,
                 vehicleType: order.rider.vehicleType,
             } : undefined,
-            items: order.items.map((item: any) => ({
+            items: order.items?.map((item: any) => ({ // 🚀 FIXED: Add optional chaining
                 id: item.id,
                 menuItem: {
                     id: item.menuItem.id,
@@ -759,7 +874,7 @@ export class OrderService {
                 unitPrice: item.unitPrice,
                 totalPrice: item.totalPrice,
                 specialInstructions: item.specialInstructions,
-                addOns: item.addOns && item.addOns.length > 0 ? item.addOns.map((addOn: any) => ({
+                addOns: item.addOns?.map((addOn: any) => ({ // 🚀 FIXED: Add optional chaining
                     id: addOn.id,
                     addOn: {
                         id: addOn.addOn.id,
@@ -770,8 +885,8 @@ export class OrderService {
                     },
                     quantity: addOn.quantity,
                     price: addOn.price
-                })) : undefined
-            })),
+                })) || [] // 🚀 FIXED: Provide default empty array
+            })) || [], // 🚀 FIXED: Provide default empty array
             deliveryAddress: order.deliveryAddress,
             pricing: {
                 subtotal: order.subtotal,
@@ -792,17 +907,61 @@ export class OrderService {
      */
     private static async triggerDeliveryJobBroadcast(order: any): Promise<void> {
         try {
-            // Create delivery job data
+            // 🚀 STEP 1: Check if any riders are available BEFORE creating job
+            let socketManager;
+            let ridersRoom;
+            let availableRidersCount = 0;
+            
+            try {
+                socketManager = getSocketManager();
+                const io = socketManager.getIO();
+                ridersRoom = io.sockets.adapter.rooms.get('riders');
+                
+                // Check database for available riders
+                availableRidersCount = await prisma.rider.count({
+                    where: {
+                        isOnline: true,
+                        isAvailable: true,
+                        currentLat: { not: null },
+                        currentLng: { not: null }
+                    }
+                });
+            } catch (socketError) {
+                // If socket manager is not available, just check database
+                console.log('⚠️ Socket manager not available, checking database only');
+                availableRidersCount = await prisma.rider.count({
+                    where: {
+                        isOnline: true,
+                        isAvailable: true,
+                        currentLat: { not: null },
+                        currentLng: { not: null }
+                    }
+                });
+            }
+            
+            if (availableRidersCount === 0) {
+                console.log(`🚫 No available riders found. Order ${order.id} will be queued for later broadcast.`);
+                // Don't return, still create the job for when riders come online
+            } else {
+                console.log(`✅ Found ${availableRidersCount} available riders. Proceeding with delivery job creation.`);
+            }
+            
+            // 🚀 STEP 2: Create delivery job only if riders are available
             const deliveryJobData: DeliveryJobData = {
                 orderId: order.id,
                 vendorId: order.vendorId,
                 customerId: order.customerId,
                 customerName: order.customer.user.name,
                 vendorName: order.vendor.businessName,
-                pickupAddress: order.vendor.businessAddress || 'Vendor Address', // Fixed: was order.vendor.address
+                pickupAddress: order.vendor.businessAddress || 'Vendor Address',
                 deliveryAddress: JSON.stringify(order.deliveryAddress),
                 deliveryFee: order.deliveryFee,
-                distance: 0, // Will be calculated by the delivery service
+                distance: this.calculateDistance(
+                    order.vendor.latitude, 
+                    order.vendor.longitude,
+                    order.deliveryAddress.coordinates?.lat || 0,
+                    order.deliveryAddress.coordinates?.lng || 0
+                ),
                 items: order.items.map((item: any) => ({
                     id: item.id,
                     name: item.menuItem.name,
@@ -813,14 +972,50 @@ export class OrderService {
                 expiresAt: new Date(Date.now() + 5 * 60 * 1000), // 5 minutes from now
             };
 
+            console.log(`📋 Adding delivery job to queue for order ${order.id}`);
             // Add delivery job to queue
             await queueService.addDeliveryJob(deliveryJobData);
+            console.log(`✅ Delivery job added to queue for order ${order.id}`);
 
             logger.info(`Delivery job triggered for order ${order.id}`);
         } catch (error) {
-            logger.error({ error }, 'Failed to trigger delivery job broadcast');
-            throw new CustomError('Failed to trigger delivery job broadcast', 500);
+            // 🚀 FIXED: Better error logging
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            const errorStack = error instanceof Error ? error.stack : 'No stack trace';
+            
+            console.error(`❌ ERROR triggering delivery job broadcast for order ${order.id}:`, {
+                message: errorMessage,
+                stack: errorStack,
+                error: error
+            });
+            
+            logger.error({ 
+                error: errorMessage, 
+                stack: errorStack,
+                orderId: order.id 
+            }, 'Failed to trigger delivery job broadcast');
+            
+            // Don't throw error, continue with other operations
         }
+    }
+
+    private static calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+        const R = 6371; // Earth's radius in kilometers
+        const dLat = this.toRadians(lat2 - lat1);
+        const dLon = this.toRadians(lon2 - lon1);
+        
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                  Math.cos(this.toRadians(lat1)) * Math.cos(this.toRadians(lat2)) *
+                  Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        const distance = R * c;
+        
+        return distance;
+    }
+
+    private static toRadians(degrees: number): number {
+        return degrees * (Math.PI / 180);
     }
 
     private static canUserViewOrder(order: any, userId: string, userRole: string): boolean {
@@ -861,20 +1056,24 @@ export class OrderService {
                 case 'VENDOR':
                     // 🚀 FIXED: Check if vendor user ID matches and order can be cancelled
                     return order.vendor?.user?.id === userId && ['PENDING', 'CONFIRMED', 'PREPARING'].includes(order.status);
+                case 'RIDER':
+                    // 🚀 NEW: Allow riders to cancel assigned orders (only before pickup)
+                    return order.rider?.user?.id === userId && ['ASSIGNED'].includes(order.status);
                 case 'ADMIN':
                     return true;
                 default:
                     return false;
             }
         } catch (error) {
-            logger.error({ error, orderId: order.id, userId, userRole }, 'Error checking user cancel permission');
+            console.error("Error checking user cancel permission: ", error);
+            //  logger.error({ error, orderId: order.id, userId, userRole }, 'Error checking user cancel permission');
             return false;
         }
     }
 
     private static canOrderBeCancelled(status: string): boolean {
         // 🚀 IMPROVED: More comprehensive status check
-        const cancellableStatuses = ['PENDING', 'CONFIRMED', 'PREPARING'];
+        const cancellableStatuses = ['PENDING', 'CONFIRMED', 'PREPARING', 'ASSIGNED']; // 🚀 ADD: ASSIGNED for riders
         return cancellableStatuses.includes(status);
     }
 

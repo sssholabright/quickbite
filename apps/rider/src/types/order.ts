@@ -10,6 +10,7 @@ export type RiderAvailableOrder = {
 	vendor: {
 		id: string;
 		name: string;
+		phone?: string;
 		pickupLocation: string;
         lat?: number
         lng?: number

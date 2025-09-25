@@ -234,6 +234,16 @@ export const useSocket = () => {
             setConnectionStatus('connected');
             reconnectAttempts.current = 0; // Reset on successful connection
             reconnectDelay.current = 1000; // Reset delay
+            
+            // 🚀 NEW: Emit rider_online event when connected
+            const { user } = useAuthStore.getState();
+            if (user?.id) {
+                socketInstance.emit('rider_online', {
+                    riderId: user.id,
+                    isOnline: useRiderStore.getState().isOnline, // 🚀 Use current status instead of hardcoded true
+                });
+                console.log(`📡 Emitted rider_online event with status: ${useRiderStore.getState().isOnline}`);
+            }
         });
 
         socketInstance.on('disconnect', (reason) => {
@@ -428,12 +438,38 @@ export const useSocket = () => {
             queryClient.invalidateQueries({ queryKey: ['orders'] });
         });
 
+        // 🚀 NEW: Handle delivery job acceptance confirmation
+        socketInstance.on('delivery_job_accepted', (data) => {
+            console.log('✅ Delivery job accepted:', data);
+            
+            // Remove from delivery jobs
+            removeDeliveryJob(data.orderId);
+            
+            // Update rider status to unavailable
+            const { setOnlineStatus } = useRiderStore.getState();
+            setOnlineStatus(false);
+            
+            // Show success message
+            // Alert.alert('Job Accepted', 'You have successfully accepted this delivery job'); // This line was removed from the original file
+        });
+
+        // 🚀 NEW: Handle delivery job rejection confirmation
+        socketInstance.on('delivery_job_rejected', (data) => {
+            console.log('❌ Delivery job rejected:', data);
+            
+            // Remove from delivery jobs
+            removeDeliveryJob(data.orderId);
+            
+            // Show rejection message
+            // Alert.alert('Job Rejected', 'You have rejected this delivery job'); // This line was removed from the original file
+        });
+
         // Add this before the specific event handlers
         socketInstance.onAny((eventName, ...args) => {
             console.log(`🔍 Received event: ${eventName}`, args);
         });
         
-    }, [isOnline, addDeliveryJob, removeDeliveryJob, getValidToken, attemptReconnection, updateOrderStatus, updateOrderRider, updateOrderETA, queryClient]);
+    }, [isOnline, addDeliveryJob, removeDeliveryJob, getValidToken, attemptReconnection, updateOrderStatus, updateOrderRider, updateOrderETA, queryClient, useRiderStore.getState().setSocket]);
 
     // 🚀 CRITICAL FIX: Main effect with proper dependency management
     useEffect(() => {
@@ -522,6 +558,15 @@ export const useSocket = () => {
         }
     }, [socket, isConnected]);
 
+    useEffect(() => {
+        if (socket && isConnected) {
+            // 🚀 NEW: Provide socket reference to rider store
+            const { setSocket } = useRiderStore.getState();
+            setSocket(socket);
+            console.log('📡 Socket reference provided to rider store');
+        }
+    }, [socket, isConnected]);
+
     return {
         socket,
         isConnected,
@@ -530,6 +575,7 @@ export const useSocket = () => {
         leaveOrderRoom,
         sendLocationUpdate,
         markOrderPickedUp,
-        markOrderDelivered
+        markOrderDelivered,
+        setSocket: useRiderStore.getState().setSocket // 🚀 NEW: Expose setSocket
     };
 };

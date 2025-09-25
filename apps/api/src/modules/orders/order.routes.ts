@@ -28,14 +28,15 @@ router.patch('/:orderId/status',
     OrderController.updateOrderStatus
 );
 
-// Cancel order (Customer, Vendor, Admin only)
+// Cancel order (Customer, Vendor, Rider, Admin)
 router.patch('/:orderId/cancel',
-    authGuard({ requiredRoles: ['CUSTOMER', 'VENDOR', 'ADMIN'] }),
+    authGuard({ requiredRoles: ['CUSTOMER', 'VENDOR', 'RIDER', 'ADMIN'] }), // 🚀 ADD: RIDER
     OrderController.cancelOrder
 );
 
 // Add these new routes
 router.post('/broadcast-ready', authGuard, OrderController.broadcastExistingReadyOrders);
 router.get('/stats', authGuard, OrderController.getOrderStats);
+router.post('/test-socket-emission', authGuard, OrderController.testSocketEmission);
 
 export default router;

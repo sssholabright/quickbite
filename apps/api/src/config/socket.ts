@@ -120,9 +120,36 @@ export class SocketService {
                 this.connectedUsers.get(socket.userId)!.push(socket.id);
             }
 
+            // 🚀 NEW: Handle rider status changes
+            socket.on('rider_status_change', async (data) => {
+                try {
+                    if (socket.userRole === 'RIDER' && socket.riderId) {
+                        const { isOnline } = data;
+                        
+                        // If rider goes offline, remove from riders room
+                        if (!isOnline) {
+                            socket.leave('riders');
+                            logger.info(`Rider ${socket.riderId} left 'riders' room due to going offline`);
+                        } else {
+                            // If rider comes back online, rejoin riders room
+                            socket.join('riders');
+                            logger.info(`Rider ${socket.riderId} joined 'riders' room due to coming online`);
+                        }
+                    }
+                } catch (error) {
+                    logger.error({ error }, 'Error handling rider status change');
+                }
+            });
+
             // Handle disconnect
             socket.on('disconnect', () => {
                 logger.info(`Socket disconnected: ${socket.id}`);
+                
+                // 🚀 CRITICAL FIX: Remove rider from 'riders' room on disconnect
+                if (socket.userRole === 'RIDER' && socket.riderId) {
+                    socket.leave('riders');
+                    logger.info(`Rider ${socket.riderId} left 'riders' room due to disconnect`);
+                }
                 
                 if (socket.userId) {
                     const userSockets = this.connectedUsers.get(socket.userId);
@@ -183,20 +210,15 @@ export class SocketService {
             // 🚀 NEW: When rider comes online, automatically broadcast existing ready orders
             socket.on('rider_online', async (data) => {
                 try {
-                    logger.info(`Rider ${socket.riderId} came online, checking for existing ready orders`);
+                    logger.info(`Rider ${socket.riderId} came online, checking for waiting orders`);
                     
                     // Import here to avoid circular dependencies
-                    const { OrderService } = await import('../modules/orders/order.service.js');
+                    const { DeliveryJobService } = await import('../modules/delivery/deliveryJob.service.js');
+                    await DeliveryJobService.checkWaitingOrders();
                     
-                    // Broadcast existing ready orders
-                    const result = await OrderService.broadcastExistingReadyOrders();
-                    
-                    if (result.ordersBroadcasted > 0) {
-                        logger.info(`Broadcasted ${result.ordersBroadcasted} existing orders to rider ${socket.riderId}`);
-                    }
-                    
+                    logger.info(`✅ Checked for waiting orders after rider ${socket.riderId} came online`);
                 } catch (error) {
-                    logger.error({ error, riderId: socket.riderId }, 'Error broadcasting existing orders when rider came online');
+                    logger.error({ error, riderId: socket.riderId }, 'Error checking waiting orders on rider online');
                 }
             });
         });

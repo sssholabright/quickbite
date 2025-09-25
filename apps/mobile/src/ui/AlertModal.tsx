@@ -91,10 +91,10 @@ export default function AlertModal({
 
                 {/* Buttons */}
                 <View style={styles.buttonRow}>
-                    {showCancel && onCancel && (
+                    {showCancel && (
                         <TouchableOpacity 
                             style={[styles.button, styles.cancel, { borderColor: theme.colors.border }]} 
-                            onPress={onCancel}
+                            onPress={onCancel || (() => {})}
                         >
                             <Text style={[styles.cancelText, { color: theme.colors.muted }]}>
                                 {cancelText}

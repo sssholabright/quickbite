@@ -61,7 +61,7 @@ export class QueueService {
         this.deliveryWorker = new Worker<DeliveryJobData>(
             'delivery-jobs',
             async (job: Job<DeliveryJobData>) => {
-                logger.info(`🔄 Processing delivery job for order ${job.data.orderId} (attempt ${job.attemptsMade + 1})`);
+                console.log(`🔄 WORKER: Processing delivery job for order ${job.data.orderId} (attempt ${job.attemptsMade + 1})`);
 
                 try {
                     // Import here to avoid circular dependencies
@@ -72,16 +72,20 @@ export class QueueService {
                     try {
                         const { getSocketManager } = await import('../../config/socket.js');
                         socketManager = getSocketManager();
+                        console.log(`🔌 WORKER: Socket manager obtained successfully`);
                     } catch (error) {
+                        console.error(`❌ WORKER: Socket manager not available: ${error}`);
                         logger.warn('Socket manager not available in worker context, skipping WebSocket broadcast');
                     }
                     
                     // Pass the socket manager to the delivery service (can be null)
                     await DeliveryJobService.broadcastDeliveryJob(job.data, socketManager);
                     
+                    console.log(`✅ WORKER: Successfully processed delivery job for order ${job.data.orderId}`);
                     logger.info(`✅ Successfully processed delivery job for order ${job.data.orderId}`);
                     
                 } catch (error) {
+                    console.error(`❌ WORKER: Error processing delivery job: ${error}`);
                     logger.error({ error, orderId: job.data.orderId, attempt: job.attemptsMade + 1 }, 'Error processing delivery job');
                     throw error;
                 }
@@ -154,25 +158,18 @@ export class QueueService {
     // Queue management methods
     public async addDeliveryJob(jobData: DeliveryJobData): Promise<void> {
         try {
-            // Check if job already exists
-            const existingJobs = await this.deliveryQueue.getJobs(['waiting', 'active', 'delayed']);
-            const duplicateJob = existingJobs.find(job => job.data.orderId === jobData.orderId);
+            console.log(`📋 Adding delivery job to queue: ${jobData.orderId}`);
             
-            if (duplicateJob) {
-                logger.warn(`⚠️ Job already exists for order ${jobData.orderId}, skipping duplicate`);
-                return;
-            }
-
-            await this.deliveryQueue.add('delivery-job', jobData, {
-                jobId: `delivery-${jobData.orderId}`, // Unique job ID
-                removeOnComplete: 5,
-                removeOnFail: 3,
-                attempts: 1, // Only try once
+            const job = await this.deliveryQueue.add('broadcast-delivery-job', jobData, {
+                delay: 0, // Process immediately
+                priority: 1, // High priority
             });
             
-            logger.info(`📋 Added delivery job to queue for order ${jobData.orderId}`);
+            console.log(`✅ Delivery job added to queue with ID: ${job.id}`);
+            logger.info(`Delivery job added to queue for order ${jobData.orderId}`);
         } catch (error) {
-            logger.error({ error, orderId: jobData.orderId }, 'Error adding delivery job to queue');
+            console.error(`❌ ERROR adding delivery job to queue: ${error}`);
+            logger.error({ error, orderId: jobData.orderId }, 'Failed to add delivery job to queue');
             throw new CustomError('Failed to add delivery job to queue', 500);
         }
     }

@@ -7,13 +7,14 @@ export interface DeliveryJob {
         id: string;
         name: string;
         address: string;
+        phone?: string;
         lat: number;
         lng: number;
     };
     customer: {
         id: string;
         name: string;
-        phone: string;
+        phone?: string; 
         address: string;
         lat: number;
         lng: number;

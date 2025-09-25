@@ -249,4 +249,53 @@ export class OrderController {
             next(error);
         }
     }
+
+    /**
+     * 🧪 TEST ENDPOINT: Test socket emission to riders
+     * POST /api/v1/orders/test-socket-emission
+     */
+    static async testSocketEmission(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { getSocketManager } = await import('../../config/socket.js');
+            const socketManager = getSocketManager();
+            
+            const testData = {
+                orderId: 'test-order-123',
+                vendorId: 'test-vendor',
+                vendorName: 'Test Vendor',
+                customerId: 'test-customer',
+                customerName: 'Test Customer',
+                pickupAddress: 'Test Pickup Address',
+                deliveryAddress: JSON.stringify({
+                    address: 'Test Delivery Address',
+                    coordinates: { lat: 6.5244, lng: 3.3792 }
+                }),
+                deliveryFee: 200,
+                distance: 5,
+                items: [{ 
+                    id: '1', 
+                    name: 'Test Item', 
+                    quantity: 1, 
+                    price: 100 
+                }],
+                expiresAt: new Date(Date.now() + 300000),
+                timer: 30,
+                retryCount: 0
+            };
+            
+            console.log('🧪 Testing socket emission to riders...');
+            console.log('🧪 Test data:', JSON.stringify(testData, null, 2));
+            
+            // Test emission
+            socketManager.emitToAllRiders('new_delivery_job', testData);
+            
+            res.status(200).json({
+                success: true,
+                message: 'Test socket emission sent to all riders',
+                data: testData
+            });
+        } catch (error) {
+            next(error);
+        }
+    }
 }
