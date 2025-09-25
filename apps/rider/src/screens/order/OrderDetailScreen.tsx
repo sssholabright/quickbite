@@ -9,6 +9,10 @@ import { CTAButton } from "../../ui/CTAButton";
 import { RiderAvailableOrder } from "../../types/order";
 import type { RootStackParamList } from "../../navigation/types";
 import type { RouteProp } from "@react-navigation/native";
+// 🚀 NEW: Import services and hooks
+import riderService from "../../services/riderService";
+import { useSocket } from "../../hooks/useSocket";
+import { useOrderStore } from "../../stores/order"; // 🚀 NEW: Order store
 
 type OrderDetailRouteProp = RouteProp<RootStackParamList, 'OrderDetail'>;
 type OrderDetailNavigationProp = NativeStackNavigationProp<RootStackParamList, 'OrderDetail'>;
@@ -25,45 +29,64 @@ export default function OrderDetailScreen() {
     const route = useRoute<OrderDetailRouteProp>();
     const { order, orderStatus, onStatusChange } = route.params || {};
     
+    // 🚀 NEW: Get order state from store
+    const { activeOrder, orderStatus: storeOrderStatus, setOrderStatus, clearActiveOrder } = useOrderStore();
+    
+    // Use store order if available, otherwise use route params
+    const currentOrder = activeOrder || order;
     const [currentStatus, setCurrentStatus] = useState<'going_to_pickup' | 'picked_up' | 'delivering' | 'delivered'>(
-        orderStatus || 'going_to_pickup'
-    );
+        storeOrderStatus || orderStatus || 'going_to_pickup'
+    );  
+    const [isLoading, setIsLoading] = useState(false);
+
+    // 🚀 NEW: Get socket for real-time updates
+    const { socket, joinOrderRoom, leaveOrderRoom } = useSocket();
+
+    // 🚀 NEW: Join order room for real-time updates
+    useEffect(() => {
+        if (currentOrder?.id && socket) {
+            joinOrderRoom(currentOrder.id);
+            return () => {
+                leaveOrderRoom(currentOrder.id);
+            };
+        }
+    }, [currentOrder?.id, socket, joinOrderRoom, leaveOrderRoom]);
 
     // Mock vendor phone - in real app, get from order data
     const vendorPhone = "+234 801 234 5678";
 
     // Navigation functions
     const navigateToVendor = useCallback(() => {
-        if (!order?.vendor.lat || !order?.vendor.lng) {
+        if (!currentOrder?.vendor.lat || !currentOrder?.vendor.lng) {
             Alert.alert("Location Error", "Vendor location not available");
             return;
         }
         
         const url = Platform.select({
-            ios: `http://maps.apple.com/?ll=${order.vendor.lat},${order.vendor.lng}&q=${encodeURIComponent(order.vendor.name)}`,
-            android: `google.navigation:q=${order.vendor.lat},${order.vendor.lng}&mode=d`
+            ios: `http://maps.apple.com/?ll=${currentOrder.vendor.lat},${currentOrder.vendor.lng}&q=${encodeURIComponent(currentOrder.vendor.name)}`,
+            android: `google.navigation:q=${currentOrder.vendor.lat},${currentOrder.vendor.lng}&mode=d`
         });
         
         if (url) {
             Linking.openURL(url).catch(() => Alert.alert("Unable to open navigation"));
         }
-    }, [order]);
+    }, [currentOrder]);
 
     const navigateToCustomer = useCallback(() => {
-        if (!order?.dropoffLat || !order?.dropoffLng) {
+        if (!currentOrder?.dropoffLat || !currentOrder?.dropoffLng) {
             Alert.alert("Location Error", "Customer location not available");
             return;
         }
         
         const url = Platform.select({
-            ios: `http://maps.apple.com/?ll=${order.dropoffLat},${order.dropoffLng}&q=${encodeURIComponent('Delivery Address')}`,
-            android: `google.navigation:q=${order.dropoffLat},${order.dropoffLng}&mode=d`
+            ios: `http://maps.apple.com/?ll=${currentOrder.dropoffLat},${currentOrder.dropoffLng}&q=${encodeURIComponent('Delivery Address')}`,
+            android: `google.navigation:q=${currentOrder.dropoffLat},${currentOrder.dropoffLng}&mode=d`
         });
         
         if (url) {
             Linking.openURL(url).catch(() => Alert.alert("Unable to open navigation"));
         }
-    }, [order]);
+    }, [currentOrder]);
 
     const callVendor = useCallback(() => {
         const url = `tel:${vendorPhone}`;
@@ -71,15 +94,18 @@ export default function OrderDetailScreen() {
     }, [vendorPhone]);
 
     const callCustomer = useCallback(() => {
-        if (!order?.customerPhone) {
+        if (!currentOrder?.customerPhone) {
             Alert.alert("No Phone", "Customer phone number not available");
             return;
         }
-        const url = `tel:${order.customerPhone}`;
+        const url = `tel:${currentOrder.customerPhone}`;
         Linking.openURL(url).catch(() => Alert.alert("Unable to start call"));
-    }, [order]);
+    }, [currentOrder]);
 
-    const markAsPickedUp = useCallback(() => {
+    // 🚀 UPDATED: Mark as picked up with API call and store update
+    const markAsPickedUp = useCallback(async () => {
+        if (!currentOrder?.id) return;
+
         Alert.alert(
             "Mark as Picked Up",
             "Confirm you have collected the order from the vendor?",
@@ -87,17 +113,35 @@ export default function OrderDetailScreen() {
                 { text: "Cancel", style: "cancel" },
                 { 
                     text: "Confirm", 
-                    onPress: () => {
-                        setCurrentStatus('picked_up');
-                        onStatusChange?.('picked_up');
-                        Alert.alert("Order Collected", "Navigate to customer for delivery.");
+                    onPress: async () => {
+                        try {
+                            setIsLoading(true);
+                            
+                            // Update order status to PICKED_UP
+                            await riderService.markOrderPickedUp(currentOrder.id);
+                            
+                            // Update store and local state
+                            setOrderStatus('picked_up');
+                            setCurrentStatus('picked_up');
+                            onStatusChange?.('picked_up');
+                            
+                            Alert.alert("Order Collected", "Navigate to customer for delivery.");
+                        } catch (error: any) {
+                            console.error('Failed to mark order as picked up:', error);
+                            Alert.alert("Error", error.message || "Failed to update order status");
+                        } finally {
+                            setIsLoading(false);
+                        }
                     }
                 }
             ]
         );
-    }, [onStatusChange]);
+    }, [currentOrder?.id, onStatusChange, setOrderStatus]);
 
-    const markAsDelivered = useCallback(() => {
+    // 🚀 UPDATED: Mark as delivered with API call and store update
+    const markAsDelivered = useCallback(async () => {
+        if (!currentOrder?.id) return;
+
         Alert.alert(
             "Mark as Delivered",
             "Confirm you have delivered the order to the customer?",
@@ -105,22 +149,41 @@ export default function OrderDetailScreen() {
                 { text: "Cancel", style: "cancel" },
                 { 
                     text: "Confirm", 
-                    onPress: () => {
-                        setCurrentStatus('delivered');
-                        onStatusChange?.('delivered');
-                        Alert.alert("Order Delivered", "Order completed successfully!");
-                        
-                        // Navigate back to home after completion
-                        setTimeout(() => {
-                            navigation.goBack();
-                        }, 1500);
+                    onPress: async () => {
+                        try {
+                            setIsLoading(true);
+                            
+                            // Update order status to DELIVERED
+                            await riderService.markOrderDelivered(currentOrder.id);
+                            
+                            // Update store and local state
+                            setOrderStatus('delivered');
+                            setCurrentStatus('delivered');
+                            onStatusChange?.('delivered');
+                            
+                            Alert.alert("Order Delivered", "Order completed successfully!");
+                            
+                            // Clear active order and navigate back
+                            clearActiveOrder();
+                            setTimeout(() => {
+                                navigation.goBack();
+                            }, 1500);
+                        } catch (error: any) {
+                            console.error('Failed to mark order as delivered:', error);
+                            Alert.alert("Error", error.message || "Failed to update order status");
+                        } finally {
+                            setIsLoading(false);
+                        }
                     }
                 }
             ]
         );
-    }, [onStatusChange, navigation]);
+    }, [currentOrder?.id, onStatusChange, setOrderStatus, clearActiveOrder, navigation]);
 
-    const cancelOrder = useCallback(() => {
+    // 🚀 UPDATED: Cancel order with API call and store update
+    const cancelOrder = useCallback(async () => {
+        if (!currentOrder?.id) return;
+
         if (currentStatus !== 'going_to_pickup') {
             Alert.alert(
                 "Cannot Cancel", 
@@ -137,15 +200,29 @@ export default function OrderDetailScreen() {
                 { 
                     text: "Cancel Order", 
                     style: "destructive",
-                    onPress: () => {
-                        onStatusChange?.('cancelled');
-                        Alert.alert("Order Cancelled", "Order has been cancelled and reassigned.");
-                        navigation.goBack();
+                    onPress: async () => {
+                        try {
+                            setIsLoading(true);
+                            
+                            // Reject the delivery job
+                            await riderService.rejectDeliveryJob(currentOrder.id);
+                            
+                            // Clear active order and update state
+                            clearActiveOrder();
+                            onStatusChange?.('cancelled');
+                            Alert.alert("Order Cancelled", "Order has been cancelled and reassigned.");
+                            navigation.goBack();
+                        } catch (error: any) {
+                            console.error('Failed to cancel order:', error);
+                            Alert.alert("Error", error.message || "Failed to cancel order");
+                        } finally {
+                            setIsLoading(false);
+                        }
                     }
                 }
             ]
         );
-    }, [navigation, currentStatus, onStatusChange]);
+    }, [currentOrder?.id, navigation, currentStatus, onStatusChange, clearActiveOrder]);
 
     // Progress steps
     const progressSteps = [
@@ -154,7 +231,7 @@ export default function OrderDetailScreen() {
         { key: 'delivered', label: 'Delivered', completed: currentStatus === 'delivered' }
     ];
 
-    if (!order) {
+    if (!currentOrder) {
         return (
             <SafeAreaWrapper>
                 <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -191,7 +268,7 @@ export default function OrderDetailScreen() {
 
                     <View style={{ alignItems: "center", flex: 1 }}>
                         <Text style={{ fontSize: 12, color: theme.colors.muted }}>
-                            Order #{order.id.slice(-6)}
+                            Order #{currentOrder.id.slice(-6)}
                         </Text>
                         <Text style={{ fontSize: 16, fontWeight: "700", color: theme.colors.text }}>
                             {currentStatus === 'going_to_pickup' ? 'Go to Vendor' :
@@ -202,7 +279,7 @@ export default function OrderDetailScreen() {
 
                     <Pressable 
                         onPress={currentStatus === 'going_to_pickup' ? cancelOrder : undefined} 
-                        disabled={currentStatus !== 'going_to_pickup'}
+                        disabled={currentStatus !== 'going_to_pickup' || isLoading}
                         style={{
                             width: 40,
                             height: 40,
@@ -210,10 +287,10 @@ export default function OrderDetailScreen() {
                             backgroundColor: theme.colors.background,
                             alignItems: "center",
                             justifyContent: "center",
-                            opacity: currentStatus === 'going_to_pickup' ? 1 : 0.3
+                            opacity: currentStatus === 'going_to_pickup' && !isLoading ? 1 : 0.3
                         }}
                     >
-                        <Icon name="close" size={20} color={currentStatus === 'going_to_pickup' ? theme.colors.muted : theme.colors.border} />
+                        <Icon name="close" size={20} color={currentStatus === 'going_to_pickup' && !isLoading ? theme.colors.muted : theme.colors.border} />
                     </Pressable>
                 </View>
 
@@ -311,7 +388,7 @@ export default function OrderDetailScreen() {
                             </View>
                             <View style={{ flex: 1 }}>
                                 <Text style={{ fontSize: 18, fontWeight: "700", color: theme.colors.text }}>
-                                    {order.vendor.name}
+                                    {currentOrder.vendor.name}
                                 </Text>
                                 <Text style={{ fontSize: 14, color: theme.colors.muted }}>
                                     Pickup Location
@@ -324,7 +401,7 @@ export default function OrderDetailScreen() {
                                 📍 Address
                             </Text>
                             <Text style={{ fontSize: 16, color: theme.colors.text, lineHeight: 22 }}>
-                                {order.vendor.pickupLocation}
+                                {currentOrder.vendor.pickupLocation}
                             </Text>
                         </View>
 
@@ -400,7 +477,7 @@ export default function OrderDetailScreen() {
                             </View>
                             <View style={{ flex: 1 }}>
                                 <Text style={{ fontSize: 18, fontWeight: "700", color: theme.colors.text }}>
-                                    {order.customerName || 'Customer'}
+                                    {currentOrder.customerName || 'Customer'}
                                 </Text>
                                 <Text style={{ fontSize: 14, color: theme.colors.muted }}>
                                     Delivery Address
@@ -413,7 +490,7 @@ export default function OrderDetailScreen() {
                                 📍 Address
                             </Text>
                             <Text style={{ fontSize: 16, color: theme.colors.text, lineHeight: 22 }}>
-                                {order.dropoffAddress}
+                                {currentOrder.dropoffAddress}
                             </Text>
                         </View>
 
@@ -481,9 +558,9 @@ export default function OrderDetailScreen() {
                         {/* Items */}
                         <View style={{ marginBottom: 16 }}>
                             <Text style={{ fontSize: 14, color: theme.colors.muted, marginBottom: 8 }}>
-                                Items ({order.items.length})
+                                Items ({currentOrder.items.length})
                             </Text>
-                            {order.items.map((item, index) => (
+                            {currentOrder.items.map((item, index) => (
                                 <View key={index} style={{
                                     flexDirection: "row",
                                     justifyContent: "space-between",
@@ -513,7 +590,7 @@ export default function OrderDetailScreen() {
                                 Cash on Delivery
                             </Text>
                             <Text style={{ fontSize: 20, fontWeight: "800", color: theme.colors.primary, marginTop: 4 }}>
-                                ₦{(order.payout || 0).toLocaleString()}
+                                ₦{(currentOrder.payout || 0).toLocaleString()}
                             </Text>
                         </View>
                     </View>
@@ -535,22 +612,25 @@ export default function OrderDetailScreen() {
                     {currentStatus === 'going_to_pickup' && (
                         <View style={{ gap: 12 }}>
                             <CTAButton
-                                title="Mark as Picked Up"
+                                title={isLoading ? "Updating..." : "Mark as Picked Up"}
                                 onPress={markAsPickedUp}
+                                disabled={isLoading}
                             />
                             <Pressable
                                 onPress={cancelOrder}
+                                disabled={isLoading}
                                 style={{
                                     paddingVertical: 12,
                                     borderRadius: 12,
                                     backgroundColor: theme.colors.background,
                                     borderWidth: 1,
                                     borderColor: '#ef4444',
-                                    alignItems: "center"
+                                    alignItems: "center",
+                                    opacity: isLoading ? 0.5 : 1
                                 }}
                             >
                                 <Text style={{ color: '#ef4444', fontWeight: "600" }}>
-                                    Cancel Order
+                                    {isLoading ? "Cancelling..." : "Cancel Order"}
                                 </Text>
                             </Pressable>
                         </View>
@@ -558,8 +638,9 @@ export default function OrderDetailScreen() {
                     
                     {(currentStatus === 'picked_up' || currentStatus === 'delivering') && (
                         <CTAButton
-                            title="Mark as Delivered"
+                            title={isLoading ? "Updating..." : "Mark as Delivered"}
                             onPress={markAsDelivered}
+                            disabled={isLoading}
                         />
                     )}
                     

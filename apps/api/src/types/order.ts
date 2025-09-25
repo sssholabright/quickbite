@@ -122,12 +122,12 @@ export type OrderStatus =
     | 'CANCELLED';
 
 export interface OrderFilters {
-    status?: OrderStatus | undefined;
-    vendorId?: string | undefined;
-    customerId?: string | undefined;
-    riderId?: string | undefined;
-    dateFrom?: Date | undefined;
-    dateTo?: Date | undefined;
-    page?: number | undefined;
-    limit?: number | undefined;
+    status?: string | string[]; // Allow both string and array
+    vendorId?: string;
+    customerId?: string;
+    riderId?: string;
+    dateFrom?: Date;
+    dateTo?: Date;
+    page?: number;
+    limit?: number;
 }

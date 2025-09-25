@@ -13,11 +13,12 @@ import {
 } from 'react-icons/fa'
 
 interface OrderCardProps {
-    order: Order
-    onAccept?: () => void
-    onReject?: () => void
-    onStatusUpdate?: (status: string) => void
-    isLoading?: boolean
+    order: Order;
+    onAccept: () => Promise<void>;
+    onReject: () => Promise<void>;
+    onStatusUpdate: (status: string) => Promise<void>;
+    onMarkReady?: () => Promise<void>; // Add this line
+    isLoading: boolean;
 }
 
 export default function OrderCard({ 
@@ -25,6 +26,7 @@ export default function OrderCard({
     onAccept, 
     onReject, 
     onStatusUpdate, 
+    onMarkReady,
     isLoading = false 
 }: OrderCardProps) {
     const [isExpanded, setIsExpanded] = useState(false)
@@ -93,14 +95,26 @@ export default function OrderCard({
                 )
             case 'PREPARING':
                 return (
-                    <button
-                        onClick={() => onStatusUpdate?.('READY_FOR_PICKUP')}
-                        disabled={isLoading}
-                        className="flex items-center px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
-                    >
-                        <FaCheck className="w-4 h-4 mr-1" />
-                        Mark Ready
-                    </button>
+                    <div className="flex space-x-2">
+                        {/* <button
+                            onClick={() => onStatusUpdate?.('READY_FOR_PICKUP')}
+                            disabled={isLoading}
+                            className="flex items-center px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+                        >
+                            <FaCheck className="w-4 h-4 mr-1" />
+                            Mark Ready
+                        </button> */}
+                        {onMarkReady && (
+                            <button
+                                onClick={onMarkReady}
+                                disabled={isLoading}
+                                className="flex items-center px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+                            >
+                                <FaCheck className="w-4 h-4 mr-1" />
+                                Mark Ready
+                            </button>
+                        )}
+                    </div>
                 )
             default:
                 return null

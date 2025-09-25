@@ -408,6 +408,8 @@ export class OrderService {
                 prisma.order.count({ where })
             ]);
 
+            console.log('🔍 Orders:', orders);
+
             return {
                 orders: orders.map(order => this.formatOrderResponse(order)),
                 total,
@@ -423,8 +425,26 @@ export class OrderService {
     // Cancel order
     static async cancelOrder(orderId: string, userId: string, userRole: string, reason?: string): Promise<OrderResponse> {
         try {
+            // 🚀 FIXED: Include user relationships to fix the 500 error
             const order = await prisma.order.findUnique({
-                where: { id: orderId }
+                where: { id: orderId },
+                include: {
+                    customer: {
+                        include: {
+                            user: true
+                        }
+                    },
+                    vendor: {
+                        include: {
+                            user: true
+                        }
+                    },
+                    rider: {
+                        include: {
+                            user: true
+                        }
+                    }
+                }
             });
 
             if (!order) {
@@ -482,11 +502,7 @@ export class OrderService {
             // Emit WebSocket events
             try {
                 const socketManager = getSocketManager();
-                socketManager.emitToOrder(orderId, 'order_cancelled', { order: formattedOrder });
-                socketManager.emitToCustomer(cancelledOrder.customer.id, 'order_status_update', { 
-                    orderId, 
-                    status: 'CANCELLED' 
-                });
+                socketManager.emitOrderCancellation(orderId, formattedOrder, reason);
             } catch (socketError) {
                 logger.error({ error: socketError }, 'Failed to emit socket events');
             }
@@ -500,6 +516,166 @@ export class OrderService {
             throw new CustomError('Failed to cancel order', 500);
         }
     }
+
+    
+    /**
+     * 🚀 NEW METHOD: Find and broadcast existing orders with "READY_FOR_PICKUP" status
+     * Real-world: When riders come online, this ensures they see all available delivery jobs
+     * This works without tampering with existing functionality
+    */
+    static async broadcastExistingReadyOrders(): Promise<{
+        success: boolean;
+        message: string;
+        ordersFound: number; 
+        ordersBroadcasted: number;
+        errors: string[];
+    }> {
+        try {
+            logger.info('🔍 Starting broadcast of existing READY_FOR_PICKUP orders');
+
+            // Find all orders with READY_FOR_PICKUP status that don't have a rider assigned
+            const readyOrders = await prisma.order.findMany({
+                where: {
+                    status: 'READY_FOR_PICKUP',
+                    riderId: null, // Only unassigned orders
+                    createdAt: {
+                        gte: new Date(Date.now() - 24 * 60 * 60 * 1000) // Only orders from last 24 hours
+                    }
+                },
+                include: {
+                    vendor: {
+                        include: {
+                            user: true
+                        }
+                    },
+                    customer: {
+                        include: {
+                            user: true
+                        }
+                    },
+                    rider: {
+                        include: {
+                            user: true
+                        }
+                    },
+                    items: {
+                        include: {
+                            menuItem: true,
+                            addOns: {
+                                include: {
+                                    addOn: true
+                                }
+                            }
+                        }
+                    }
+                },
+                orderBy: {
+                    createdAt: 'asc' // Oldest orders first
+                }
+            });
+
+            logger.info(`🔍 Found ${readyOrders.length} orders with READY_FOR_PICKUP status`);
+
+            if (readyOrders.length === 0) {
+                return {
+                    success: true,
+                    message: 'No orders with READY_FOR_PICKUP status found',
+                    ordersFound: 0,
+                    ordersBroadcasted: 0,
+                    errors: []
+                };
+            }
+
+            let ordersBroadcasted = 0;
+            const errors: string[] = [];
+
+            // Broadcast each order
+            for (const order of readyOrders) {
+                try {
+                    // Use the existing triggerDeliveryJobBroadcast method
+                    await this.triggerDeliveryJobBroadcast(order);
+                    ordersBroadcasted++;
+                    logger.info(`✅ Successfully broadcasted order ${order.orderNumber}`);
+                } catch (error) {
+                    const errorMessage = `Failed to broadcast order ${order.orderNumber}: ${error instanceof Error ? error.message : 'Unknown error'}`;
+                    errors.push(errorMessage);
+                    logger.error({ error, orderId: order.id }, errorMessage);
+                }
+            }
+
+            const result = {
+                success: true,
+                message: `Successfully processed ${readyOrders.length} orders. ${ordersBroadcasted} broadcasted successfully.`,
+                ordersFound: readyOrders.length,
+                ordersBroadcasted,
+                errors
+            };
+
+            logger.info(`🎯 Broadcast complete: ${JSON.stringify(result)}`);
+            return result;
+        } catch (error) {
+            logger.error({ error }, 'Error broadcasting existing ready orders');
+            return {
+                success: false,
+                message: `Failed to broadcast existing orders: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                ordersFound: 0,
+                ordersBroadcasted: 0,
+                errors: [error instanceof Error ? error.message : 'Unknown error']
+            };
+        }
+    }
+
+    /**
+     * 🚀 NEW METHOD: Get statistics of orders by status
+     * Real-world: Dashboard view of order statuses for monitoring
+     */
+     static async getOrderStatusStats(): Promise<{
+        total: number;
+        byStatus: Record<string, number>;
+        readyForPickup: number;
+        unassignedReadyOrders: number;
+    }> {
+        try {
+            // Get total count
+            const total = await prisma.order.count();
+
+            // Get counts by status
+            const statusCounts = await prisma.order.groupBy({
+                by: ['status'],
+                _count: {
+                    status: true
+                }
+            });
+
+            // Convert to object
+            const byStatus = statusCounts.reduce((acc, item) => {
+                acc[item.status] = item._count.status;
+                return acc;
+            }, {} as Record<string, number>);
+
+            // Get ready for pickup count
+            const readyForPickup = byStatus['READY_FOR_PICKUP'] || 0;
+
+            // Get unassigned ready orders count
+            const unassignedReadyOrders = await prisma.order.count({
+                where: {
+                    status: 'READY_FOR_PICKUP',
+                    riderId: null
+                }
+            });
+
+            return {
+                total,
+                byStatus,
+                readyForPickup,
+                unassignedReadyOrders
+            };
+        } catch (error) {
+            logger.error({ error }, 'Error getting order status stats');
+            throw new CustomError('Failed to get order status stats', 500);
+        }
+    }
+
 
     // Helper methods
     private static calculateOrderPricing(items: any[], menuItems: any[]) {
@@ -623,7 +799,7 @@ export class OrderService {
                 customerId: order.customerId,
                 customerName: order.customer.user.name,
                 vendorName: order.vendor.businessName,
-                pickupAddress: order.vendor.address,
+                pickupAddress: order.vendor.businessAddress || 'Vendor Address', // Fixed: was order.vendor.address
                 deliveryAddress: JSON.stringify(order.deliveryAddress),
                 deliveryFee: order.deliveryFee,
                 distance: 0, // Will be calculated by the delivery service
@@ -677,35 +853,52 @@ export class OrderService {
     }
     
     private static canUserCancelOrder(order: any, userId: string, userRole: string): boolean {
-        switch (userRole) {
-            case 'CUSTOMER':
-                return order.customer.userId === userId && ['PENDING', 'CONFIRMED'].includes(order.status);
-            case 'VENDOR':
-                return order.vendor.userId === userId && ['PENDING', 'CONFIRMED', 'PREPARING'].includes(order.status);
-            case 'ADMIN':
-                return true;
-            default:
-                return false;
+        try {
+            switch (userRole) {
+                case 'CUSTOMER':
+                    // 🚀 FIXED: Check if customer user ID matches and order can be cancelled
+                    return order.customer?.user?.id === userId && ['PENDING', 'CONFIRMED'].includes(order.status);
+                case 'VENDOR':
+                    // 🚀 FIXED: Check if vendor user ID matches and order can be cancelled
+                    return order.vendor?.user?.id === userId && ['PENDING', 'CONFIRMED', 'PREPARING'].includes(order.status);
+                case 'ADMIN':
+                    return true;
+                default:
+                    return false;
+            }
+        } catch (error) {
+            logger.error({ error, orderId: order.id, userId, userRole }, 'Error checking user cancel permission');
+            return false;
         }
     }
 
     private static canOrderBeCancelled(status: string): boolean {
-        return ['PENDING', 'CONFIRMED', 'PREPARING'].includes(status);
+        // 🚀 IMPROVED: More comprehensive status check
+        const cancellableStatuses = ['PENDING', 'CONFIRMED', 'PREPARING'];
+        return cancellableStatuses.includes(status);
     }
 
     private static buildOrderWhereClause(filters: OrderFilters, userId: string, userRole: string) {
         const where: any = {};
-    
+
         if (filters.status) {
-            where.status = filters.status;
+            // Handle both string and array status filters
+            if (Array.isArray(filters.status)) {
+                where.status = { in: filters.status };
+            } else if (typeof filters.status === 'string' && filters.status.includes(',')) {
+                // Handle comma-separated string
+                where.status = { in: filters.status.split(',').map(s => s.trim()) };
+            } else {
+                where.status = filters.status;
+            }
         }
-    
+
         if (filters.dateFrom || filters.dateTo) {
             where.createdAt = {};
             if (filters.dateFrom) where.createdAt.gte = filters.dateFrom;
             if (filters.dateTo) where.createdAt.lte = filters.dateTo;
         }
-    
+
         // Role-based filtering
         switch (userRole) {
             case 'CUSTOMER':

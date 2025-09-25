@@ -5,6 +5,7 @@ import { prisma } from './config/db.js';
 import { logger } from './utils/logger.js';
 import { initializeSocket } from './config/socket.js';
 import { redisService } from './config/redis.js';
+import { QueueService } from './modules/queues/queue.service.js';
 
 // Create HTTP server
 const server = createServer(app);
@@ -42,6 +43,10 @@ server.listen(PORT, async () => {
         // Initialize Redis connection
         await redisService.connect();
         logger.info('🔴 Redis connected successfully');
+        
+        // Initialize Queue Service
+        const queue = QueueService.getInstance();
+        logger.info('📋 Queue service initialized successfully');
         
         logger.info(`🚀 Server running on port ${PORT}`);
         logger.info(`🌍 Environment: ${env.NODE_ENV}`);

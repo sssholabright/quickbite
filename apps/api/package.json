@@ -21,7 +21,8 @@
     "test:queues": "node --loader ts-node/esm src/scripts/testQueues.ts",
     "test:delivery": "node --loader ts-node/esm src/scripts/testDeliveryFlow.ts",
     "test:all": "node --loader ts-node/esm src/scripts/runTests.ts",
-    "db:seed": "node --loader ts-node/esm src/scripts/seed.ts"
+    "db:seed": "node --loader ts-node/esm src/scripts/seed.ts",
+    "script:broadcast-orders": "tsx src/scripts/broadcastExistingOrders.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.16.2",

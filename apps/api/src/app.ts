@@ -31,14 +31,14 @@ app.use(helmet({
 app.use(cors({
     origin: env.NODE_ENV === 'production' 
         ? ['https://yourdomain.com'] 
-        : ['http://localhost:3000', 'http://localhost:3001', 'http://192.168.0.176:8081', 'http://localhost:5173', 'http://10.213.134.234:8081', 'http://10.213.134.234:8082'],
+        : [' http://localhost:3000', 'http://localhost:5173', 'http://192.168.0.176:8081', 'http://10.48.184.234:8081','http://10.48.184.234:8082'], 
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 
 // General rate limiting for all API routes
-app.use('/api/', generalRateLimit);
+// app.use('/api/', generalRateLimit);
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));

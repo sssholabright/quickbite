@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import * as Location from 'expo-location';
 import { Platform } from 'react-native';
+import riderService from '../services/riderService';
 
 interface LocationState {
     isLocationEnabled: boolean;
@@ -13,9 +14,14 @@ interface LocationState {
     error: string | null;
     isMonitoring: boolean;
     
+    // 🚀 IMPROVED: Better tracking for backend updates
+    lastBackendUpdate: number;
+    isUpdatingBackend: boolean;
+    hasInitialLocationSent: boolean; // Track if initial location was sent
+    
     // Actions
     checkLocationStatus: () => Promise<void>;
-    updateLocation: () => Promise<void>;
+    updateLocation: (shouldSendToBackend?: boolean) => Promise<void>;
     setLocationEnabled: (enabled: boolean) => void;
     setLocationPermission: (granted: boolean) => void;
     setCurrentLocation: (lat: number, lng: number) => void;
@@ -23,6 +29,12 @@ interface LocationState {
     startLocationMonitoring: () => void;
     stopLocationMonitoring: () => void;
     requestBackgroundLocation: () => Promise<void>;
+    
+    // 🚀 NEW: Smart location update for delivery
+    updateLocationForDelivery: (orderId: string) => Promise<void>;
+    
+    // 🚀 NEW: Send initial location when rider comes online
+    sendInitialLocation: () => Promise<void>;
     
     // Computed value
     isLocationReady: boolean;
@@ -35,6 +47,9 @@ export const useLocationStore = create<LocationState>((set, get) => ({
     isLoading: false,
     error: null,
     isMonitoring: false,
+    lastBackendUpdate: 0,
+    isUpdatingBackend: false,
+    hasInitialLocationSent: false,
     
     // Computed value
     get isLocationReady() {
@@ -61,9 +76,9 @@ export const useLocationStore = create<LocationState>((set, get) => ({
                 isLoading: false,
             });
             
-            // If both are enabled, get current location
+            // If both are enabled, get current location (local only)
             if (isLocationEnabled && isLocationPermissionGranted) {
-                await get().updateLocation();
+                await get().updateLocation(false); // Don't send to backend on status check
             }
         } catch (error: any) {
             set({
@@ -73,18 +88,25 @@ export const useLocationStore = create<LocationState>((set, get) => ({
         }
     },
 
-    updateLocation: async () => {
+    updateLocation: async (shouldSendToBackend: boolean = false) => {
         try {
-            const { isLocationEnabled, isLocationPermissionGranted } = get();
+            const { isLocationEnabled, isLocationPermissionGranted, isUpdatingBackend } = get();
             
             if (!isLocationEnabled || !isLocationPermissionGranted) {
                 return;
             }
             
+            // 🚀 CRITICAL: Prevent multiple simultaneous backend updates
+            if (shouldSendToBackend && isUpdatingBackend) {
+                console.log('📍 Backend update already in progress, skipping...');
+                return;
+            }
+            
             set({ isLoading: true, error: null });
             
+            // Get current location
             const location = await Location.getCurrentPositionAsync({
-                accuracy: Location.Accuracy.Balanced,
+                accuracy: Location.Accuracy.High,
             });
             
             const { latitude, longitude } = location.coords;
@@ -93,11 +115,139 @@ export const useLocationStore = create<LocationState>((set, get) => ({
                 currentLocation: { latitude, longitude },
                 isLoading: false,
             });
+            
+            //  CRITICAL: Only send to backend when explicitly requested and not recently sent
+            if (shouldSendToBackend) {
+                const now = Date.now();
+                const { lastBackendUpdate } = get();
+                
+                // Only send if it's been more than 30 seconds since last update
+                if (now - lastBackendUpdate > 30000) {
+                    set({ isUpdatingBackend: true });
+                    
+                    try {
+                        console.log('📍 Sending location to backend:', { latitude, longitude });
+                        await riderService.updateRiderLocation({ latitude, longitude });
+                        set({ lastBackendUpdate: now });
+                    } catch (error) {
+                        console.error('❌ Failed to update location on backend:', error);
+                    } finally {
+                        set({ isUpdatingBackend: false });
+                    }
+                } else {
+                    console.log('📍 Location update too frequent, skipping backend update');
+                }
+            } else {
+                console.log('📍 Location updated locally only:', { latitude, longitude });
+            }
+            
         } catch (error: any) {
             set({
                 error: error.message || 'Failed to get current location',
                 isLoading: false,
+                isUpdatingBackend: false,
             });
+        }
+    },
+
+    // 🚀 NEW: Send initial location when rider comes online (only once)
+    sendInitialLocation: async () => {
+        try {
+            const { 
+                isLocationEnabled, 
+                isLocationPermissionGranted, 
+                isUpdatingBackend, 
+                hasInitialLocationSent,
+                currentLocation 
+            } = get();
+            
+            if (!isLocationEnabled || !isLocationPermissionGranted) {
+                console.log('📍 Location not ready, cannot send initial location');
+                return;
+            }
+            
+            // Only send once per session
+            if (hasInitialLocationSent) {
+                console.log('📍 Initial location already sent this session');
+                return;
+            }
+            
+            // Prevent multiple simultaneous updates
+            if (isUpdatingBackend) {
+                console.log('📍 Backend update already in progress, skipping initial location...');
+                return;
+            }
+            
+            set({ isUpdatingBackend: true });
+            
+            // Get fresh location
+            const location = await Location.getCurrentPositionAsync({
+                accuracy: Location.Accuracy.High,
+            });
+            
+            const { latitude, longitude } = location.coords;
+            
+            // Update local location
+            set({
+                currentLocation: { latitude, longitude },
+            });
+            
+            // Send to backend
+            console.log(' Sending initial location to backend:', { latitude, longitude });
+            await riderService.updateRiderLocation({ latitude, longitude });
+            
+            set({ 
+                lastBackendUpdate: Date.now(),
+                isUpdatingBackend: false,
+                hasInitialLocationSent: true // Mark as sent
+            });
+            
+        } catch (error: any) {
+            console.error('❌ Failed to send initial location:', error);
+            set({ isUpdatingBackend: false });
+        }
+    },
+
+    // 🚀 NEW: Smart location update for delivery orders
+    updateLocationForDelivery: async (orderId: string) => {
+        try {
+            const { isLocationEnabled, isLocationPermissionGranted, isUpdatingBackend } = get();
+            
+            if (!isLocationEnabled || !isLocationPermissionGranted) {
+                return;
+            }
+            
+            // Prevent multiple simultaneous updates
+            if (isUpdatingBackend) {
+                console.log('📍 Backend update already in progress, skipping...');
+                return;
+            }
+            
+            set({ isUpdatingBackend: true });
+            
+            const location = await Location.getCurrentPositionAsync({
+                accuracy: Location.Accuracy.High,
+            });
+            
+            const { latitude, longitude } = location.coords;
+            
+            // Update local location
+            set({
+                currentLocation: { latitude, longitude },
+            });
+            
+            // Send to backend with order context
+            console.log(`📍 Sending location update for order ${orderId}:`, { latitude, longitude });
+            await riderService.updateRiderLocation({ latitude, longitude });
+            
+            set({ 
+                lastBackendUpdate: Date.now(),
+                isUpdatingBackend: false 
+            });
+            
+        } catch (error: any) {
+            console.error('❌ Failed to update location for delivery:', error);
+            set({ isUpdatingBackend: false });
         }
     },
 
@@ -118,6 +268,9 @@ export const useLocationStore = create<LocationState>((set, get) => ({
             currentLocation: null,
             isLocationEnabled: false,
             isLocationPermissionGranted: false,
+            lastBackendUpdate: 0,
+            isUpdatingBackend: false,
+            hasInitialLocationSent: false, // Reset when clearing location
         });
     },
 
@@ -130,9 +283,9 @@ export const useLocationStore = create<LocationState>((set, get) => ({
         // Start watching for location changes
         const watchId = Location.watchPositionAsync(
             {
-                accuracy: Location.Accuracy.Balanced,
-                timeInterval: 10000, // Check every 10 seconds
-                distanceInterval: 100, // Update if moved 100 meters
+                accuracy: Location.Accuracy.High,
+                timeInterval: 15000, // Check every 15 seconds
+                distanceInterval: 100, // Update every 100 meters
             },
             (location) => {
                 const { latitude, longitude } = location.coords;
@@ -141,11 +294,13 @@ export const useLocationStore = create<LocationState>((set, get) => ({
                     isLocationEnabled: true,
                     error: null 
                 });
+                // 🚀 CRITICAL: Don't send to backend automatically during monitoring
+                console.log('📍 Location updated locally via monitoring:', { latitude, longitude });
             },
             (error) => {
                 console.log('Location monitoring error:', error);
                 set({ 
-                    error: error, // Remove .message since error is already a string
+                    error: error,
                     isLocationEnabled: false,
                     currentLocation: null 
                 });
@@ -178,7 +333,7 @@ export const useLocationStore = create<LocationState>((set, get) => ({
         };
 
         // Check location status periodically
-        const intervalId = setInterval(checkLocationStatus, 5000); // Check every 5 seconds
+        const intervalId = setInterval(checkLocationStatus, 60000); // Check every 60 seconds
 
         // Store cleanup function
         set({ 

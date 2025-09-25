@@ -7,6 +7,11 @@ interface UpdateRiderStatusData {
     isAvailable?: boolean | undefined;
 }
 
+interface UpdateRiderLocationData {
+    latitude: number;
+    longitude: number;
+}
+
 export class RiderService {
     // Update rider status
     static async updateRiderStatus(userId: string, updateData: UpdateRiderStatusData): Promise<any> {
@@ -69,6 +74,70 @@ export class RiderService {
                 throw error;
             }
             throw new CustomError('Failed to update rider status', 500);
+        }
+    }
+
+    // 🚀 NEW: Update rider location
+    static async updateRiderLocation(riderId: string, latitude: number, longitude: number): Promise<any> {
+        try {
+            // Check if rider exists
+            const existingRider = await prisma.rider.findUnique({
+                where: { id: riderId },
+                include: { user: true }
+            });
+
+            if (!existingRider) {
+                throw new CustomError('Rider not found', 404);
+            }
+
+            // Update rider location
+            const updatedRider = await prisma.rider.update({
+                where: { id: riderId },
+                data: {
+                    currentLat: latitude,
+                    currentLng: longitude,
+                },
+                include: {
+                    user: {
+                        select: {
+                            id: true,
+                            email: true,
+                            name: true,
+                            phone: true,
+                            avatar: true,
+                            role: true,
+                            isActive: true,
+                            createdAt: true,
+                            updatedAt: true,
+                        }
+                    }
+                }
+            });
+
+            logger.info(`Rider location updated: ${updatedRider.user.email} - Lat: ${latitude}, Lng: ${longitude}`);
+
+            return {
+                id: updatedRider.id,
+                userId: updatedRider.userId,
+                vehicleType: updatedRider.vehicleType,
+                isOnline: updatedRider.isOnline,
+                isAvailable: updatedRider.isAvailable,
+                currentLat: updatedRider.currentLat,
+                currentLng: updatedRider.currentLng,
+                bankAccount: updatedRider.bankAccount,
+                earnings: updatedRider.earnings,
+                completedOrders: updatedRider.completedOrders,
+                rating: updatedRider.rating,
+                createdAt: updatedRider.createdAt,
+                updatedAt: updatedRider.updatedAt,
+                user: updatedRider.user
+            };
+        } catch (error: any) {
+            logger.error({ error }, 'Update rider location error');
+            if (error instanceof CustomError) {
+                throw error;
+            }
+            throw new CustomError('Failed to update rider location', 500);
         }
     }
 

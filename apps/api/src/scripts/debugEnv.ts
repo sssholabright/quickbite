@@ -1,8 +1,17 @@
-import { config } from 'dotenv';
-import { z } from 'zod';
+import { config } from "dotenv";
+import { z } from "zod";
 
 // Load environment variables
 config();
+
+console.log('Environment variables loaded:');
+console.log('NODE_ENV:', process.env.NODE_ENV);
+console.log('PORT:', process.env.PORT);
+console.log('FRONTEND_URL:', process.env.FRONTEND_URL);
+console.log('DATABASE_URL:', process.env.DATABASE_URL ? 'SET' : 'NOT SET');
+console.log('JWT_SECRET length:', process.env.JWT_SECRET?.length || 0);
+console.log('REFRESH_TOKEN_SECRET length:', process.env.REFRESH_TOKEN_SECRET?.length || 0);
+console.log('REDIS_URL:', process.env.REDIS_URL);
 
 // Define environment schema for validation
 const envSchema = z.object({
@@ -19,10 +28,10 @@ const envSchema = z.object({
     REFRESH_TOKEN_SECRET: z.string().min(32, 'Refresh token secret must be at least 32 characters'),
     REFRESH_TOKEN_EXPIRES_IN: z.string().default('30d'),
 
-    // Cloudinary
-    CLOUDINARY_CLOUD_NAME: z.string().min(1, 'Cloudinary cloud name is required'),
-    CLOUDINARY_API_KEY: z.string().min(1, 'Cloudinary API key is required'),
-    CLOUDINARY_API_SECRET: z.string().min(1, 'Cloudinary API secret is required'),
+    // Cloudinary (make optional for development)
+    CLOUDINARY_CLOUD_NAME: z.string().optional(),
+    CLOUDINARY_API_KEY: z.string().optional(),
+    CLOUDINARY_API_SECRET: z.string().optional(),
 
     // Redis (for caching, sessions, and queues)
     REDIS_URL: z.string().default('redis://localhost:6379'),
@@ -39,13 +48,18 @@ const envSchema = z.object({
 
     // Maps API
     GOOGLE_MAPS_API_KEY: z.string().optional(),
-
-    // 🚀 NEW: Socket configuration
-    SOCKET_CORS_ORIGINS: z.string().optional(),
 });
 
-// Validate and export environment variables
-export const env = envSchema.parse(process.env);
-
-// Type for environment variables
-export type Env = z.infer<typeof envSchema>;
+try {
+    const env = envSchema.parse(process.env);
+    console.log('✅ Environment validation passed!');
+} catch (error) {
+    console.error('❌ Environment validation failed:');
+    if (error instanceof z.ZodError) {
+        error.errors.forEach(err => {
+            console.error(`  - ${err.path.join('.')}: ${err.message}`);
+        });
+    } else {
+        console.error(error);
+    }
+}

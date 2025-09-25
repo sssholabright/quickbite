@@ -52,9 +52,11 @@ export default function OrdersScreen() {
         setAlert(prev => ({ ...prev, visible: false }));
     };
 
-    // Build filters for API
+    // 🚀 UPDATED: Build filters for API with new delivery statuses
     const apiFilters = {
-        ...(filter === 'active' && { status: 'PENDING,CONFIRMED,PREPARING,READY_FOR_PICKUP,PICKED_UP,OUT_FOR_DELIVERY' }),
+        ...(filter === 'active' && { 
+            status: 'PENDING,CONFIRMED,PREPARING,READY_FOR_PICKUP,ASSIGNED,PICKED_UP,OUT_FOR_DELIVERY' 
+        }),
         ...(filter === 'past' && { status: 'DELIVERED,CANCELLED' }),
         page: 1,
         limit: 50
@@ -94,17 +96,60 @@ export default function OrdersScreen() {
         setFilter(newFilter);
     };
 
+    // 🚀 UPDATED: Enhanced status mapping with new delivery statuses
     const getStatusMapping = (backendStatus: string): OrderStatus => {
         switch (backendStatus) {
             case 'PENDING': return 'pending';
             case 'CONFIRMED': return 'confirmed';
             case 'PREPARING': return 'preparing';
             case 'READY_FOR_PICKUP': return 'ready_for_pickup';
-            case 'PICKED_UP': return 'out_for_delivery';
+            case 'ASSIGNED': return 'assigned'; // 🚀 NEW: Rider assigned status
+            case 'PICKED_UP': return 'picked_up'; // 🚀 NEW: Order picked up status
             case 'OUT_FOR_DELIVERY': return 'out_for_delivery';
             case 'DELIVERED': return 'delivered';
             case 'CANCELLED': return 'cancelled';
             default: return 'pending';
+        }
+    };
+
+    // 🚀 NEW: Get status display text with rider info
+    const getStatusDisplayText = (order: any): string => {
+        switch (order.status) {
+            case 'PENDING': return 'Order placed';
+            case 'CONFIRMED': return 'Order confirmed';
+            case 'PREPARING': return 'Preparing your order';
+            case 'READY_FOR_PICKUP': return 'Ready for pickup';
+            case 'ASSIGNED': 
+                return order.rider 
+                    ? `Rider ${order.rider.user?.name || 'assigned'} is on the way`
+                    : 'Rider assigned';
+            case 'PICKED_UP': 
+                return order.rider 
+                    ? `${order.rider.user?.name || 'Rider'} picked up your order`
+                    : 'Order picked up';
+            case 'OUT_FOR_DELIVERY': 
+                return order.rider 
+                    ? `${order.rider.user?.name || 'Rider'} is delivering`
+                    : 'Out for delivery';
+            case 'DELIVERED': return 'Delivered';
+            case 'CANCELLED': return 'Cancelled';
+            default: return 'Processing';
+        }
+    };
+
+    // 🚀 NEW: Get status color
+    const getStatusColor = (status: string): string => {
+        switch (status) {
+            case 'PENDING': return '#f59e0b'; // Use hex color instead of theme.colors.warning
+            case 'CONFIRMED': return theme.colors.primary;
+            case 'PREPARING': return theme.colors.primary;
+            case 'READY_FOR_PICKUP': return '#10b981';
+            case 'ASSIGNED': return '#3b82f6';
+            case 'PICKED_UP': return '#8b5cf6';
+            case 'OUT_FOR_DELIVERY': return '#f59e0b';
+            case 'DELIVERED': return '#10b981';
+            case 'CANCELLED': return theme.colors.danger;
+            default: return theme.colors.muted;
         }
     };
 
@@ -117,15 +162,21 @@ export default function OrdersScreen() {
                     id: item.vendor.id,
                     name: item.vendor.businessName,
                     logo: undefined,
-                    location: item.vendor.address || 'Address not available' // Handle null case
+                    location: item.vendor.address || 'Address not available'
                 },
+                // 🚀 NEW: Include rider info if available
+                rider: item.rider ? {
+                    id: item.rider.id,
+                    name: item.rider.user?.name || 'Rider',
+                    phone: item.rider.user?.phone || '',
+                    vehicleType: item.rider.vehicleType || 'bike'
+                } : undefined,
                 items: item.items.map((orderItem: any) => ({
                     id: orderItem.id,
                     name: orderItem.menuItem.name,
                     price: orderItem.unitPrice,
                     quantity: orderItem.quantity,
                     image: orderItem.menuItem.image,
-                    // Match web structure for addOns
                     addOns: orderItem.addOns?.map((addOn: any) => ({
                         id: addOn.id,
                         addOn: {
@@ -140,6 +191,9 @@ export default function OrdersScreen() {
                     })) || []
                 })),
                 status: getStatusMapping(item.status),
+                //  NEW: Enhanced status display
+                statusText: getStatusDisplayText(item),
+                statusColor: getStatusColor(item.status),
                 total: item.pricing.total,
                 subtotal: item.pricing.subtotal,
                 fees: item.pricing.deliveryFee + item.pricing.serviceFee,
@@ -148,7 +202,10 @@ export default function OrdersScreen() {
                 notes: item.specialInstructions,
                 pickupTime: 'asap',
                 placedAt: new Date(item.createdAt),
-                estimatedReadyAt: item.estimatedDeliveryTime ? new Date(item.estimatedDeliveryTime) : undefined
+                estimatedReadyAt: item.estimatedDeliveryTime ? new Date(item.estimatedDeliveryTime) : undefined,
+                // 🚀 NEW: Real-time tracking info
+                isLiveTracking: ['ASSIGNED', 'PICKED_UP', 'OUT_FOR_DELIVERY'].includes(item.status),
+                estimatedDeliveryTime: item.estimatedDeliveryTime ? new Date(item.estimatedDeliveryTime) : undefined
             }}
             onPress={() => handleOrderPress(item.id)}
         />
@@ -180,6 +237,8 @@ export default function OrdersScreen() {
             }}>
                 {filter === 'active' 
                     ? "You don't have any active orders at the moment."
+                    : filter === 'past'
+                    ? "You haven't completed any orders yet."
                     : "You haven't placed any orders yet."
                 }
             </Text>
@@ -273,7 +332,7 @@ export default function OrdersScreen() {
                         My Orders
                     </Text>
                     
-                    {/* Connection status indicator */}
+                    {/* 🚀 ENHANCED: Connection status indicator */}
                     <View style={{
                         flexDirection: 'row',
                         alignItems: 'center',
@@ -301,7 +360,7 @@ export default function OrdersScreen() {
                     </View>
                 </View>
 
-                {/* Filter Tabs */}
+                {/*  ENHANCED: Filter Tabs with better labels */}
                 <View style={{ 
                     flexDirection: 'row', 
                     paddingHorizontal: 16, 
@@ -309,27 +368,30 @@ export default function OrdersScreen() {
                     borderBottomWidth: 1,
                     borderBottomColor: theme.colors.border
                 }}>
-                    {(['all', 'active', 'past'] as const).map((tab) => (
+                    {([
+                        { key: 'all', label: 'All Orders' },
+                        { key: 'active', label: 'Active' },
+                        { key: 'past', label: 'Past' }
+                    ] as const).map((tab) => (
                         <Pressable
-                            key={tab}
-                            onPress={() => handleFilterChange(tab)}
+                            key={tab.key}
+                            onPress={() => handleFilterChange(tab.key)}
                             style={{
                                 flex: 1,
                                 paddingVertical: 8,
                                 paddingHorizontal: 16,
                                 borderRadius: 20,
-                                backgroundColor: filter === tab ? theme.colors.primary : 'transparent',
+                                backgroundColor: filter === tab.key ? theme.colors.primary : 'transparent',
                                 marginHorizontal: 4
                             }}
                         >
                             <Text style={{
                                 fontSize: 14,
                                 fontWeight: '600',
-                                color: filter === tab ? 'white' : theme.colors.muted,
-                                textAlign: 'center',
-                                textTransform: 'capitalize'
+                                color: filter === tab.key ? 'white' : theme.colors.muted,
+                                textAlign: 'center'
                             }}>
-                                {tab}
+                                {tab.label}
                             </Text>
                         </Pressable>
                     ))}

@@ -3,7 +3,7 @@ import { env } from './env.js'
 
 // Create Prisma client instance
 export const prisma = new PrismaClient({
-    log: env.NODE_ENV === 'development' ? ['query', 'info', 'warn', 'error'] : ['error'],
+    log: env.NODE_ENV !== 'development' ? ['query', 'info', 'warn', 'error'] : ['error'],
     datasources: {
         db: {
             url: env.DATABASE_URL,

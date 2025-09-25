@@ -2,6 +2,7 @@ import { Queue, Worker, Job } from 'bullmq';
 import { DeliveryJobData, ETAUpdateJobData, LocationUpdateJobData, OrderTimeoutJobData } from './../../types/queue.js';
 import { env } from './../../config/env.js';
 import { logger } from './../../utils/logger.js';
+import { CustomError } from '../../middlewares/errorHandler.js';
 
 export class QueueService {
     private static instance: QueueService;
@@ -23,7 +24,18 @@ export class QueueService {
         };
 
         // Initialize queues
-        this.deliveryQueue = new Queue<DeliveryJobData>('delivery-jobs', { connection });
+        this.deliveryQueue = new Queue<DeliveryJobData>('delivery-jobs', {
+            connection,
+            defaultJobOptions: {
+                removeOnComplete: 10,
+                removeOnFail: 5,
+                attempts: 1, // Only try once
+                backoff: {
+                    type: 'exponential',
+                    delay: 2000,
+                },
+            }
+        });
         this.locationQueue = new Queue<LocationUpdateJobData>('location-updates', { connection });
         this.etaQueue = new Queue<ETAUpdateJobData>('eta-updates', { connection });
         this.timeoutQueue = new Queue<OrderTimeoutJobData>('timeout-jobs', { connection });
@@ -49,13 +61,37 @@ export class QueueService {
         this.deliveryWorker = new Worker<DeliveryJobData>(
             'delivery-jobs',
             async (job: Job<DeliveryJobData>) => {
-                logger.info(`Processing delivery job for order ${job.data.orderId}`);
+                logger.info(`🔄 Processing delivery job for order ${job.data.orderId} (attempt ${job.attemptsMade + 1})`);
 
-                // Import here to avoid circular dependencies
-                const { DeliveryJobService } = await import('../delivery/deliveryJob.service.js');
-                await DeliveryJobService.broadcastDeliveryJob(job.data);
+                try {
+                    // Import here to avoid circular dependencies
+                    const { DeliveryJobService } = await import('../delivery/deliveryJob.service.js');
+                    
+                    // Try to get the socket manager, but don't fail if it's not available
+                    let socketManager = null;
+                    try {
+                        const { getSocketManager } = await import('../../config/socket.js');
+                        socketManager = getSocketManager();
+                    } catch (error) {
+                        logger.warn('Socket manager not available in worker context, skipping WebSocket broadcast');
+                    }
+                    
+                    // Pass the socket manager to the delivery service (can be null)
+                    await DeliveryJobService.broadcastDeliveryJob(job.data, socketManager);
+                    
+                    logger.info(`✅ Successfully processed delivery job for order ${job.data.orderId}`);
+                    
+                } catch (error) {
+                    logger.error({ error, orderId: job.data.orderId, attempt: job.attemptsMade + 1 }, 'Error processing delivery job');
+                    throw error;
+                }
             },
-            { connection }
+            { 
+                connection,
+                concurrency: 1, // Process only one job at a time
+                removeOnComplete: { count: 5 }, // Keep only 5 completed jobs
+                removeOnFail: { count: 3 } // Keep only 3 failed jobs
+            }
         );
 
         // Location update worker - processes rider location updates
@@ -116,16 +152,29 @@ export class QueueService {
     }
 
     // Queue management methods
-    public async addDeliveryJob(data: DeliveryJobData, options?: any): Promise<Job<DeliveryJobData>> {
-        return await this.deliveryQueue.add('broadcast-delivery', data, {
-            delay: 0, // process immediately
-            attempts: 3, // retry 3 times if failed
-            backoff: {
-                type: 'exponential', // exponential backoff: first retry after 1s, second after 2s, third after 4s, etc.
-                delay: 2000 // 2 second delay between retries
-            }, 
-            ...options
-        });
+    public async addDeliveryJob(jobData: DeliveryJobData): Promise<void> {
+        try {
+            // Check if job already exists
+            const existingJobs = await this.deliveryQueue.getJobs(['waiting', 'active', 'delayed']);
+            const duplicateJob = existingJobs.find(job => job.data.orderId === jobData.orderId);
+            
+            if (duplicateJob) {
+                logger.warn(`⚠️ Job already exists for order ${jobData.orderId}, skipping duplicate`);
+                return;
+            }
+
+            await this.deliveryQueue.add('delivery-job', jobData, {
+                jobId: `delivery-${jobData.orderId}`, // Unique job ID
+                removeOnComplete: 5,
+                removeOnFail: 3,
+                attempts: 1, // Only try once
+            });
+            
+            logger.info(`📋 Added delivery job to queue for order ${jobData.orderId}`);
+        } catch (error) {
+            logger.error({ error, orderId: jobData.orderId }, 'Error adding delivery job to queue');
+            throw new CustomError('Failed to add delivery job to queue', 500);
+        }
     }
 
     public async addLocationUpdate(data: LocationUpdateJobData): Promise<Job<LocationUpdateJobData>> {
@@ -198,6 +247,22 @@ export class QueueService {
             this.timeoutQueue.close(),
         ]);
         logger.info('All queues and workers closed');
+    }
+
+    async cancelOrderTimeout(orderId: string): Promise<void> {
+        try {
+            // Cancel any pending timeout jobs for this order
+            const jobs = await this.timeoutQueue.getJobs(['delayed', 'waiting']);
+            for (const job of jobs) {
+                if (job.data.orderId === orderId) {
+                    await job.remove();
+                    logger.info(`Cancelled timeout job for order ${orderId}`);
+                }
+            }
+        } catch (error) {
+            logger.error({ error, orderId }, 'Error cancelling order timeout');
+            throw error;
+        }
     }
 }
 

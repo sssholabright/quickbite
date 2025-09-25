@@ -4,7 +4,7 @@ import { JWTPayload, TokenPair } from "../types/jwt.js";
 import { logger } from './logger.js';
 
 export class JWTService {
-    private static readonly ACCESS_TOKEN_EXPIRY = '15m';
+    private static readonly ACCESS_TOKEN_EXPIRY = '60m';
     private static readonly REFRESH_TOKEN_EXPIRY = '7d';
 
     // Generate access token

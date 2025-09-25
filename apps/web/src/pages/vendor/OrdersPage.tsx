@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Order, OrderFilters as OrderFiltersType } from '../../types/order'
 import VendorLayout from '../../components/layout/VendorLayout'
 import OrderCard from '../../components/orders/OrderCard'
-import { FaSync, FaFilter, FaClipboardList, FaWifi } from 'react-icons/fa'
+import { FaSync, FaFilter, FaClipboardList, FaWifi, FaMotorcycle, FaExclamationTriangle } from 'react-icons/fa'
 import OrderStats from '../../components/orders/OrderStats'
 import OrderFilters from '../../components/orders/OrderFilters'
 import { useOrderStats, useUpdateOrderStatus, useCancelOrder } from '../../hooks/useOrders'
@@ -35,18 +35,16 @@ export default function OrdersPage() {
     const orders = ordersData?.orders || []
 
     // Auto-refresh functionality
-    useEffect(() => {
-        if (!autoRefresh) return
+    // useEffect(() => {
+    //     if (!autoRefresh) return
 
-        const interval = setInterval(() => {
-            refetchOrders()
-            refetchStats()
-        }, 30000)
+    //     const interval = setInterval(() => {
+    //         refetchOrders()
+    //         refetchStats()
+    //     }, 30000)
 
-        return () => clearInterval(interval)
-    }, [autoRefresh, refetchOrders, refetchStats])
-
-    // Remove the entire WebSocket useEffect block since it's now handled globally
+    //     return () => clearInterval(interval)
+    // }, [autoRefresh, refetchOrders, refetchStats])
 
     const handleFilterChange = (newFilters: OrderFiltersType) => {
         setFilters(newFilters)
@@ -124,12 +122,36 @@ export default function OrdersPage() {
         }
     }
 
+    // 🚀 NEW: Handle marking order as ready for pickup
+    const handleMarkReady = async (orderId: string) => {
+        const result = await showConfirm(
+            'Mark Order Ready',
+            `Mark this order as ready for pickup? This will notify available riders.`,
+            'Yes, mark ready',
+            'Cancel'
+        )
+
+        if (result) {
+            try {
+                await updateOrderStatusMutation.mutateAsync({
+                    orderId,
+                    statusUpdate: { status: 'READY_FOR_PICKUP' }
+                })
+                showSuccess('Order Ready', 'Order has been marked as ready for pickup. Riders will be notified.')
+            } catch (error) {
+                console.error('Failed to mark order as ready:', error)
+                showError('Error', 'Failed to mark order as ready. Please try again.')
+            }
+        }
+    }
+
     const getStatusText = (status: string) => {
         switch (status) {
             case 'PENDING': return 'Pending'
             case 'CONFIRMED': return 'Confirmed'
             case 'PREPARING': return 'Preparing'
-            case 'READY_FOR_PICKUP': return 'Ready'
+            case 'READY_FOR_PICKUP': return 'Ready for Pickup'
+            case 'ASSIGNED': return 'Assigned to Rider'
             case 'PICKED_UP': return 'Picked Up'
             case 'OUT_FOR_DELIVERY': return 'Out for Delivery'
             case 'DELIVERED': return 'Delivered'
@@ -144,6 +166,8 @@ export default function OrdersPage() {
         confirmed: orders.filter(order => order.status === 'CONFIRMED'),
         preparing: orders.filter(order => order.status === 'PREPARING'),
         ready: orders.filter(order => order.status === 'READY_FOR_PICKUP'),
+        assigned: orders.filter(order => order.status === 'ASSIGNED'),
+        pickedUp: orders.filter(order => order.status === 'PICKED_UP'),
         delivered: orders.filter(order => order.status === 'DELIVERED'),
         cancelled: orders.filter(order => order.status === 'CANCELLED')
     }
@@ -174,7 +198,7 @@ export default function OrdersPage() {
                     
                     <div className="flex items-center space-x-3">
                         {/* Auto-refresh toggle */}
-                        <label className="flex items-center">
+                        {/* <label className="flex items-center">
                             <input
                                 type="checkbox"
                                 checked={autoRefresh}
@@ -182,17 +206,17 @@ export default function OrdersPage() {
                                 className="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500"
                             />
                             <span className="ml-2 text-sm text-gray-600">Auto-refresh</span>
-                        </label>
+                        </label> */}
                         
                         {/* Manual refresh */}
-                        <button
+                        {/* <button
                             onClick={handleRefresh}
                             disabled={isLoading}
                             className="flex items-center px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
                         >
                             <FaSync className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
                             Refresh
-                        </button>
+                        </button> */}
                         
                         {/* Filters toggle */}
                         <button
@@ -284,6 +308,7 @@ export default function OrdersPage() {
                                         onAccept={() => handleAcceptOrder(order.id)}
                                         onReject={() => handleRejectOrder(order.id)}
                                         onStatusUpdate={(status) => handleStatusUpdate(order.id, status)}
+                                        onMarkReady={() => handleMarkReady(order.id)}
                                         isLoading={updateOrderStatusMutation.isPending || cancelOrderMutation.isPending}
                                     />
                                 ))}
@@ -291,15 +316,60 @@ export default function OrdersPage() {
                         </div>
                     )}
 
-                    {/* Ready Orders */}
+                    {/* Ready for Pickup Orders */}
                     {groupedOrders.ready.length > 0 && (
                         <div>
                             <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
                                 <span className="w-3 h-3 bg-green-500 rounded-full mr-3"></span>
                                 Ready for Pickup ({groupedOrders.ready.length})
+                                <span className="ml-2 text-sm text-gray-500">• Broadcasting to riders</span>
                             </h2>
                             <div className="space-y-4">
                                 {groupedOrders.ready.map(order => (
+                                    <OrderCard 
+                                        key={order.id} 
+                                        order={order as Order}
+                                        onAccept={() => handleAcceptOrder(order.id)}
+                                        onReject={() => handleRejectOrder(order.id)}
+                                        onStatusUpdate={(status) => handleStatusUpdate(order.id, status)}
+                                        isLoading={updateOrderStatusMutation.isPending || cancelOrderMutation.isPending}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Assigned Orders */}
+                    {groupedOrders.assigned.length > 0 && (
+                        <div>
+                            <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
+                                <FaMotorcycle className="w-5 h-5 text-blue-600 mr-3" />
+                                Assigned to Riders ({groupedOrders.assigned.length})
+                            </h2>
+                            <div className="space-y-4">
+                                {groupedOrders.assigned.map(order => (
+                                    <OrderCard 
+                                        key={order.id} 
+                                        order={order as Order}
+                                        onAccept={() => handleAcceptOrder(order.id)}
+                                        onReject={() => handleRejectOrder(order.id)}
+                                        onStatusUpdate={(status) => handleStatusUpdate(order.id, status)}
+                                        isLoading={updateOrderStatusMutation.isPending || cancelOrderMutation.isPending}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Picked Up Orders */}
+                    {groupedOrders.pickedUp.length > 0 && (
+                        <div>
+                            <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
+                                <span className="w-3 h-3 bg-purple-500 rounded-full mr-3"></span>
+                                Picked Up ({groupedOrders.pickedUp.length})
+                            </h2>
+                            <div className="space-y-4">
+                                {groupedOrders.pickedUp.map(order => (
                                     <OrderCard 
                                         key={order.id} 
                                         order={order as Order}

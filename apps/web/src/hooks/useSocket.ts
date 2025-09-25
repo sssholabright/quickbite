@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../stores/authStore';
 import { useRealtimeStore } from '../stores/realtimeStore';
-import { useQueryClient } from '@tanstack/react-query';
+import Swal from 'sweetalert2';
 
+// Socket event interfaces
 interface SocketEvents {
-    order_updated: (data: { orderId: string; order: any; timestamp: string }) => void;
-    new_order: (data: { order: any; timestamp: string }) => void;
     order_status_update: (data: { orderId: string; status: string; timestamp: string }) => void;
-    order_cancelled: (data: { orderId: string; order: any; timestamp: string }) => void;
+    order_updated: (data: { orderId: string; order: any; timestamp: string }) => void;
+    order_cancelled: (data: { orderId: string; reason: string; timestamp: string }) => void;
+    rider_assigned: (data: { orderId: string; rider: any; timestamp: string }) => void;
+    no_riders_available: (data: { orderId: string; message: string; timestamp: string }) => void;
     delivery_update: (data: { orderId: string; rider: any; timestamp: string }) => void;
-    user_typing: (data: { userId: string; userName: string; isTyping: boolean }) => void;
 }
 
 interface SocketEmitEvents {
@@ -40,39 +42,44 @@ export const useSocket = () => {
         const accessToken = localStorage.getItem('accessToken');
         if (!accessToken) return;
 
-        const socketInstance = io(import.meta.env.VITE_SOCKET_API_URL || 'http://localhost:5000', {
+        // 🚀 FIXED: Consistent socket URL
+        const socketInstance = io(import.meta.env.VITE_SOCKET_API_URL || 'http://192.168.0.176:5000', {
             auth: {
                 token: accessToken
             },
-            transports: ['websocket', 'polling']
+            transports: ['websocket', 'polling'],
+            timeout: 10000,
+            reconnection: true,
+            reconnectionAttempts: 5,
+            reconnectionDelay: 1000,
         });
 
         socketInstance.on('connect', () => {
-            console.log('Socket connected:', socketInstance.id);
+            console.log('🌐 Web Socket connected:', socketInstance.id);
             setIsConnected(true);
             setConnectionStatus('connected');
         });
 
-        socketInstance.on('disconnect', () => {
-            console.log('Socket disconnected');
+        socketInstance.on('disconnect', (reason) => {
+            console.log('🌐 Web Socket disconnected:', reason);
             setIsConnected(false);
             setConnectionStatus('disconnected');
         });
 
         socketInstance.on('connect_error', (error) => {
-            console.error('Socket connection error:', error);
+            console.error('🌐 Web Socket connection error:', error);
             setIsConnected(false);
             setConnectionStatus('disconnected');
         });
 
         // Enhanced WebSocket event handlers with real-time store updates
         socketInstance.on('order_status_update', (data) => {
-            console.log('Order status updated:', data);
+            console.log('🌐 Order status updated:', data);
             
-            // 1. Update real-time store for instant UI updates
+            // Update real-time store
             updateOrderStatus(data.orderId, data.status);
             
-            // 2. Update React Query cache to keep it in sync
+            // Update React Query cache
             queryClient.setQueryData(['order', data.orderId], (oldData: any) => {
                 if (oldData) {
                     return { ...oldData, status: data.status };
@@ -80,27 +87,11 @@ export const useSocket = () => {
                 return oldData;
             });
             
-            // 3. Invalidate orders list to refetch in background
             queryClient.invalidateQueries({ queryKey: ['orders'] });
         });
 
-        socketInstance.on('delivery_update', (data) => {
-            console.log('Delivery update:', data);
-            
-            // 1. Update real-time store with rider info
-            updateOrderRider(data.orderId, data.rider);
-            
-            // 2. Update React Query cache
-            queryClient.setQueryData(['order', data.orderId], (oldData: any) => {
-                if (oldData) {
-                    return { ...oldData, rider: data.rider };
-                }
-                return oldData;
-            });
-        });
-
         socketInstance.on('order_updated', (data) => {
-            console.log('Order updated:', data);
+            console.log('🌐 Order updated:', data);
             
             // Handle comprehensive order updates
             const { order } = data;
@@ -122,7 +113,7 @@ export const useSocket = () => {
         });
 
         socketInstance.on('order_cancelled', (data) => {
-            console.log('Order cancelled:', data);
+            console.log('🌐 Order cancelled:', data);
             
             // Update status to cancelled
             updateOrderStatus(data.orderId, 'CANCELLED');
@@ -138,11 +129,75 @@ export const useSocket = () => {
             queryClient.invalidateQueries({ queryKey: ['orders'] });
         });
 
-        socketInstance.on('new_order', (data) => {
-            console.log('New order received:', data);
-            // Invalidate and refetch orders
+        // Handle rider assignment
+        socketInstance.on('rider_assigned', (data) => {
+            console.log('🌐 Rider assigned to order:', data);
+            
+            // Update order status to ASSIGNED
+            updateOrderStatus(data.orderId, 'ASSIGNED');
+            
+            // Update rider info
+            updateOrderRider(data.orderId, data.rider);
+            
+            // Update React Query cache
+            queryClient.setQueryData(['order', data.orderId], (oldData: any) => {
+                if (oldData) {
+                    return { 
+                        ...oldData, 
+                        status: 'ASSIGNED',
+                        rider: data.rider
+                    };
+                }
+                return oldData;
+            });
+            
+            // Show success notification
+            if (typeof window !== 'undefined' && Swal) {
+                Swal.fire({
+                    title: 'Rider Assigned!',
+                    text: `${data.rider.name} has been assigned to your order`,
+                    icon: 'success',
+                    timer: 3000,
+                    showConfirmButton: false
+                });
+            }
+            
             queryClient.invalidateQueries({ queryKey: ['orders'] });
-            queryClient.invalidateQueries({ queryKey: ['orders', 'stats'] });
+        });
+
+        // Handle no riders available
+        socketInstance.on('no_riders_available', (data) => {
+            console.log('🌐 No riders available for order:', data);
+            
+            // Show warning notification
+            if (typeof window !== 'undefined' && Swal) {
+                Swal.fire({
+                    title: 'No Riders Available',
+                    text: data.message,
+                    icon: 'warning',
+                    timer: 5000,
+                    showConfirmButton: true
+                });
+            }
+            
+            // Invalidate orders to refresh the list
+            queryClient.invalidateQueries({ queryKey: ['orders'] });
+        });
+
+        // Handle delivery updates
+        socketInstance.on('delivery_update', (data) => {
+            console.log('🌐 Delivery update:', data);
+            
+            // Update rider info
+            updateOrderRider(data.orderId, data.rider);
+            
+            // Update React Query cache
+            queryClient.setQueryData(['order', data.orderId], (oldData: any) => {
+                if (oldData) {
+                    return { ...oldData, rider: data.rider };
+                }
+                return oldData;
+            });
         });
 
         setSocket(socketInstance);
@@ -154,25 +209,27 @@ export const useSocket = () => {
     }, [user, updateOrderStatus, updateOrderRider, updateOrderETA, setConnectionStatus, queryClient]);
 
     const joinOrderRoom = (orderId: string) => {
-        if (socket) {
+        if (socket && isConnected) {
+            console.log(`🌐 Joining order room: ${orderId}`);
             socket.emit('join_order', orderId);
         }
     };
 
     const leaveOrderRoom = (orderId: string) => {
-        if (socket) {
+        if (socket && isConnected) {
+            console.log(`🌐 Leaving order room: ${orderId}`);
             socket.emit('leave_order', orderId);
         }
     };
 
-    const emitTypingStart = (orderId: string, userName: string) => {
-        if (socket) {
+    const startTyping = (orderId: string, userName: string) => {
+        if (socket && isConnected) {
             socket.emit('typing_start', { orderId, userName });
         }
     };
 
-    const emitTypingStop = (orderId: string, userName: string) => {
-        if (socket) {
+    const stopTyping = (orderId: string, userName: string) => {
+        if (socket && isConnected) {
             socket.emit('typing_stop', { orderId, userName });
         }
     };
@@ -182,7 +239,7 @@ export const useSocket = () => {
         isConnected,
         joinOrderRoom,
         leaveOrderRoom,
-        emitTypingStart,
-        emitTypingStop
+        startTyping,
+        stopTyping
     };
 };

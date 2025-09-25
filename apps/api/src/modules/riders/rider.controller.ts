@@ -1,3 +1,4 @@
+import { queueService } from '../queues/queue.service.js';
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { logger } from '../../utils/logger.js';
@@ -129,6 +130,95 @@ export class RiderController {
             
         } catch (error) {
             logger.error({ error, orderId: req.params.orderId, userId: req.user?.userId }, 'Failed to reject delivery job');
+            next(error);
+        }
+    }
+
+    // 🚀 NEW: Update rider location
+    static async updateLocation(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+        try {
+            const userId = req.user?.userId;
+
+            if (!userId) {
+                ResponseHandler.unauthorized(res as any, 'User not authenticated');
+                return;
+            }
+
+            // Validate request body
+            const updateLocationSchema = z.object({
+                latitude: z.number().min(-90, 'Latitude must be between -90 and 90').max(90, 'Latitude must be between -90 and 90'),
+                longitude: z.number().min(-180, 'Longitude must be between -180 and 180').max(180, 'Longitude must be between -180 and 180'),
+                orderId: z.string().optional(), // Optional - for active deliveries
+            });
+
+            const { latitude, longitude, orderId } = updateLocationSchema.parse(req.body);
+
+            // Get rider ID from user ID
+            const rider = await RiderService.getRiderStatus(userId);
+
+            // Update rider location in database
+            await RiderService.updateRiderLocation(rider.id, latitude, longitude);
+
+            // If rider is on an active delivery, queue location update for real-time broadcasting
+            if (orderId) {
+                await queueService.addLocationUpdate({
+                    riderId: rider.id, 
+                    orderId: orderId, 
+                    latitude: latitude, 
+                    longitude: longitude,
+                    timestamp: new Date()
+                });
+            }
+
+            ResponseHandler.success(res as any, { 
+                riderId: rider.id, 
+                location: { latitude, longitude },
+                timestamp: new Date()
+            }, 'Location updated successfully');
+            
+        } catch (error) {
+            if (error instanceof z.ZodError) {
+                const errorMessage = error.issues.map(err => `${err.path.join('.')}: ${err.message}`).join(', ');
+                ResponseHandler.validationError(res as any, 'Validation failed', errorMessage);
+                return;
+            }
+
+            logger.error({ error, userId: req.user?.userId }, 'Failed to update rider location');
+            next(error);
+        }
+    }
+
+    // 🚀 NEW: Get rider's current location
+    static async getCurrentLocation(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+        try {
+            const userId = req.user?.userId;
+            
+            if (!userId) {
+                ResponseHandler.unauthorized(res as any, 'User not authenticated');
+                return;
+            }
+
+            // Get rider status (includes current location)
+            const rider = await RiderService.getRiderStatus(userId);
+
+            if (!rider.currentLat || !rider.currentLng) {
+                ResponseHandler.notFound(res as any, 'Current location not found');
+                return;
+            }
+
+            // Get rider's current location
+            ResponseHandler.success(res as any, {
+                riderId: rider.id,
+                location: {
+                    latitude: rider.currentLat,
+                    longitude: rider.currentLng,
+                },
+                isOnline: rider.isOnline,
+                isAvailable: rider.isAvailable
+            }, 'Rider location retrieved successfully');
+            
+        } catch (error) {
+            logger.error({ error, userId: req.user?.userId }, 'Failed to get rider current location');
             next(error);
         }
     }

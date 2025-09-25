@@ -1,6 +1,15 @@
 import { Animated } from "react-native";
 
-export type OrderStatus = 'pending' | 'confirmed' | 'preparing' | 'ready_for_pickup' | 'out_for_delivery' | 'delivered' | 'cancelled';
+export type OrderStatus = 
+    | 'pending'
+    | 'confirmed' 
+    | 'preparing'
+    | 'ready_for_pickup'
+    | 'assigned'        // Add this
+    | 'picked_up'       // Add this
+    | 'out_for_delivery'
+    | 'delivered'
+    | 'cancelled';
 export type FilterType = 'all' | 'active' | 'past';
 
 export interface OrderItem {
@@ -44,6 +53,16 @@ export interface Order {
     placedAt: Date;
     estimatedReadyAt?: Date;
     pickupCode?: string;
+    statusText?: string;  // Add this
+    statusColor?: string; // Add this
+    rider?: {
+        id: string;
+        name: string;
+        phone: string;
+        vehicleType: string;
+    };
+    isLiveTracking?: boolean; // Add this too
+    estimatedDeliveryTime?: Date; // Add this
 }
 
 export interface OrderSummaryProps {

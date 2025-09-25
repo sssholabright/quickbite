@@ -11,17 +11,24 @@ export class DeliveryJobService {
      * Main method: Broadcast delivery job to available riders
      * Real-world: When vendor clicks "Order Ready", this finds nearby riders and sends them the job
      */
-    static async broadcastDeliveryJob(jobData: DeliveryJobData): Promise<void> {
+    static async broadcastDeliveryJob(jobData: DeliveryJobData, SocketManager?: any): Promise<void> {
         try {
             logger.info(`Broadcasting delivery job for order ${jobData.orderId}`);
 
-            // Find available riders within reasonable distance
-            const availableRiders = await this.findAvailableRiders(jobData);
-
+            // 🚀 CRITICAL: Check if there are any available riders first
+            const availableRiders = await DeliveryJobService.findAvailableRiders(jobData);
+            
             if (availableRiders.length === 0) {
-                logger.warn(`No available riders found for order ${jobData.orderId}`);
-                await this.handleNoRidersAvailable(jobData);
-                return;
+                logger.warn(`⚠️ No available riders found for order ${jobData.orderId}. Skipping broadcast.`);
+                
+                // Notify vendor that no riders are available
+                const socketManagerInstance = SocketManager || getSocketManager();
+                socketManagerInstance.emitToVendor(jobData.vendorId, 'no_riders_available', {
+                    orderId: jobData.orderId,
+                    message: 'No riders are currently available for delivery'
+                });
+                
+                return; // Don't broadcast if no riders are available
             }
 
             // Create delivery job broadcast data
@@ -42,7 +49,7 @@ export class DeliveryJobService {
             };
 
             // Broadcast to all available riders via websocket
-            await this.broadcastToRiders(broadcastData, availableRiders);
+            await this.broadcastToRiders(broadcastData, availableRiders, SocketManager);
 
             // Schedule timeout job for rider acceptance
             await queueService.addOrderTimeout({
@@ -65,18 +72,9 @@ export class DeliveryJobService {
      */
     private static async findAvailableRiders(jobData: DeliveryJobData): Promise<any[]> {
         try {
-            // Comment out or remove the vendor location check
-            // const vendor = await prisma.vendor.findUnique({
-            //     where: { id: jobData.vendorId },
-            //     select: { lat: true, lng: true }
-            // });
-
-            // if (!vendor?.lat || !vendor?.lng) {
-            //     logger.warn(`Vendor ${jobData.vendorId} has no location`);
-            //     throw new CustomError('Vendor location not found', 500);
-            //     return [];
-            // }
-
+            // 🚀 DEBUG: Log the query we're about to run
+            logger.info(`🔍 Finding available riders for order ${jobData.orderId}`);
+            
             // For now, just find all available riders without distance filtering
             const riders = await prisma.rider.findMany({
                 where: {
@@ -96,9 +94,19 @@ export class DeliveryJobService {
                 }
             });
 
+            // 🚀 DEBUG: Log what we found
+            logger.info(`🔍 Found ${riders.length} available riders: ${JSON.stringify(riders.map(r => ({
+                id: r.id,
+                name: r.user.name,
+                isOnline: r.isOnline,
+                isAvailable: r.isAvailable,
+                hasLocation: !!(r.currentLat && r.currentLng)
+            })))}`);
+
             // Skip distance calculation for now
             const nearbyRiders = riders.slice(0, 5); // Just take first 5 riders
 
+            logger.info(`🔍 Returning ${nearbyRiders.length} riders for broadcasting`);
             return nearbyRiders;
         } catch (error) {
             logger.error({ error, orderId: jobData.orderId }, 'Error finding available riders');
@@ -111,13 +119,35 @@ export class DeliveryJobService {
      * Broadcast delivery job to riders via WebSocket
      * Real-world: Sends popup notification to rider apps
      */
-    private static async broadcastToRiders(broadcastData: DeliveryJobBroadcastType, riders: any[]): Promise<void> {
+    private static async broadcastToRiders(broadcastData: DeliveryJobBroadcastType, riders: any[], socketManager?: any): Promise<void> {
         try {
-            // Get socket manager
-            const socketManager = getSocketManager();
+            // Get socket manager - either passed in or get from global instance
+            let manager = socketManager;
+            if (!manager) {
+                try {
+                    manager = getSocketManager();
+                } catch (error) {
+                    logger.warn('Socket manager not available, skipping WebSocket broadcast');
+                    return; // Skip WebSocket broadcast but don't fail
+                }
+            }
             
-            // Use consistent method
-            socketManager.emitToAllRiders('new_delivery_job', broadcastData);
+            if (!manager) {
+                logger.warn('No socket manager available, skipping WebSocket broadcast');
+                return; // Skip WebSocket broadcast but don't fail
+            }
+            
+            // 🔍 DEBUG: Check connected riders
+            const connectedRiders = manager.getConnectedRidersCount();
+            logger.info(`🔍 Connected riders: ${connectedRiders}`);
+            
+            // 🔍 DEBUG: Check if we have riders in the 'riders' room
+            const io = manager.getIO();
+            const ridersRoom = io.sockets.adapter.rooms.get('riders');
+            logger.info(`🔍 Riders in 'riders' room: ${ridersRoom ? ridersRoom.size : 0}`);
+            
+            // Use the existing socket manager to broadcast to all riders
+            manager.emitToAllRiders('new_delivery_job', broadcastData);
             
             logger.info(`Delivery job broadcasted to ${riders.length} riders for order ${broadcastData.orderId}`);
         } catch (error) {
@@ -195,16 +225,51 @@ export class DeliveryJobService {
         try {
             logger.info(`Rider ${riderId} accepted delivery job for order ${orderId}`);
 
-            // Update order with assigned rider
-            await prisma.order.update({
-                where: { id: orderId },
+            // 🚀 CRITICAL: Use atomic update with WHERE clause to prevent race conditions
+            const updateResult = await prisma.order.updateMany({
+                where: { 
+                    id: orderId,
+                    status: 'READY_FOR_PICKUP',
+                    riderId: null // Only update if no rider is assigned
+                },
                 data: {
                     riderId: riderId,
                     status: 'ASSIGNED'
                 }
             });
 
-            // Notify customer about assigned rider
+            // Check if the update actually happened
+            if (updateResult.count === 0) {
+                // Order was already assigned or not in correct state
+                logger.warn(`Order ${orderId} was already assigned or not ready for pickup`);
+                
+                // Send removal event to all riders
+                const socketManager = getSocketManager();
+                socketManager.emitToAllRiders('delivery_job_removed', {
+                    orderId: orderId,
+                    reason: 'already_assigned'
+                });
+                
+                throw new CustomError('Order already assigned to another rider', 400);
+            }
+
+            // 🚀 CRITICAL: Send removal event AFTER successful database update
+            const socketManager = getSocketManager();
+            logger.info(`Sending delivery_job_removed event for order ${orderId}`);
+            socketManager.emitToAllRiders('delivery_job_removed', {
+                orderId: orderId,
+                reason: 'accepted_by_another_rider'
+            });
+            logger.info(`delivery_job_removed event sent for order ${orderId}`);
+
+            // 🚀 NEW: Cancel any pending timeout jobs for this order
+            try {
+                await queueService.cancelOrderTimeout(orderId);
+            } catch (timeoutError) {
+                logger.warn({ error: timeoutError, orderId }, 'Failed to cancel order timeout');
+            }
+
+            // Fetch the updated order for notifications
             const order = await prisma.order.findUnique({
                 where: { id: orderId },
                 include: {
@@ -225,31 +290,45 @@ export class DeliveryJobService {
                         }
                     }
                 }
-            })
+            });
 
-            if (order) {
-                const socketManager = getSocketManager();
-
-                // Notify customer
-                socketManager.emitToCustomer(order.customer.userId, 'rider_assigned', {
-                    orderId: orderId,
-                    rider: {
-                        id: order.rider!.id,
-                        name: order.rider!.user.name,
-                        phone: order.rider!.user.phone
-                    }
-                });
-
-                // Notify vendor
-                socketManager.emitToVendor(order.vendorId, 'rider_assigned', {
-                    orderId: orderId,
-                    rider: {
-                        id: order.rider!.id,
-                        name: order.rider!.user.name,
-                        phone: order.rider!.user.phone
-                    }
-                });
+            if (!order) {
+                throw new CustomError('Order not found after update', 404);
             }
+
+            // Notify customer
+            socketManager.emitToCustomer(order.customer.userId, 'rider_assigned', {
+                orderId: orderId,
+                rider: {
+                    id: riderId,
+                    name: order.customer.user.name,
+                    phone: order.customer.user.phone
+                }
+            });
+
+            // Notify vendor
+            socketManager.emitToVendor(order.vendorId, 'rider_assigned', {
+                orderId: orderId,
+                rider: {
+                    id: riderId,
+                    name: order.customer.user.name,
+                    phone: order.customer.user.phone
+                }
+            });
+
+            // 🚀 NEW: Notify the accepting rider specifically
+            socketManager.emitToRider(riderId, 'delivery_job_accepted', {
+                orderId: orderId,
+                message: 'You have successfully accepted this delivery job'
+            });
+
+            // 🚀 CRITICAL: Remove delivery job from all other riders' screens FIRST
+            logger.info(`Sending delivery_job_removed event for order ${orderId}`);
+            socketManager.emitToAllRiders('delivery_job_removed', {
+                orderId: orderId,
+                reason: 'accepted_by_another_rider'
+            });
+            logger.info(`delivery_job_removed event sent for order ${orderId}`);
 
             logger.info(`Order ${orderId} assigned to rider ${riderId} successfully`);
         } catch (error) {
@@ -312,6 +391,20 @@ export class DeliveryJobService {
         } catch (error) {
             logger.error({ error, orderId: orderId }, 'Error handling rider rejection');
             throw new CustomError('Failed to handle rider rejection', 500);
+        }
+    }
+
+    // Add this method to handle the case where order is already assigned
+    public static async handleAlreadyAssignedOrder(orderId: string): Promise<void> {
+        try {
+            const socketManager = getSocketManager();
+            socketManager.emitToAllRiders('delivery_job_removed', {
+                orderId: orderId,
+                reason: 'already_assigned'
+            });
+            logger.info(`Sent delivery_job_removed for already assigned order ${orderId}`);
+        } catch (error) {
+            logger.error({ error, orderId }, 'Error handling already assigned order');
         }
     }
 }

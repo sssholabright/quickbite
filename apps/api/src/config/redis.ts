@@ -190,6 +190,22 @@ class RedisService {
         const client = this.getClient();
         await client.unsubscribe(channel);
     }
+
+    // Add this method to the RedisService class
+    async lTrim(key: string, start: number, stop: number): Promise<void> {
+        if (!this.client) {
+            throw new Error('Redis client not connected');
+        }
+        await this.client.lTrim(key, start, stop);
+    }
+
+    // Add this method to the RedisService class
+    async lRange(key: string, start: number, stop: number): Promise<string[]> {
+        if (!this.client) {
+            throw new Error('Redis client not connected');
+        }
+        return await this.client.lRange(key, start, stop);
+    }
 }
 
 // Create singleton instance

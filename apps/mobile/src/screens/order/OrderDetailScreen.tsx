@@ -6,7 +6,7 @@ import type { RouteProp } from '@react-navigation/native';
 import { useTheme } from '../../theme/theme';
 import { Icon } from '../../ui/Icon';
 import { CTAButton } from '../../ui/CTAButton';
-import { Order, OrderStatus } from '../../types/order'; // Use Order interface, not OrderResponse
+import { Order, OrderStatus } from '../../types/order';
 import type { RootStackParamList } from '../../navigation/types';
 import StatusStep from '../../components/orders/StatusStep';
 import OrderSummary from '../../components/orders/OrderSummary';
@@ -45,14 +45,15 @@ export default function OrderDetailScreen() {
     const { connectionStatus } = useRealtimeStore();
     const queryClient = useQueryClient();
 
-    // Helper function to map backend status to mobile OrderStatus
+    // 🚀 UPDATED: Enhanced status mapping to include new delivery statuses
     const getStatusMapping = (backendStatus: string): OrderStatus => {
         switch (backendStatus) {
             case 'PENDING': return 'pending';
             case 'CONFIRMED': return 'confirmed';
             case 'PREPARING': return 'preparing';
             case 'READY_FOR_PICKUP': return 'ready_for_pickup';
-            case 'PICKED_UP': return 'out_for_delivery';
+            case 'ASSIGNED': return 'assigned'; // 🚀 NEW: Rider assigned status
+            case 'PICKED_UP': return 'picked_up'; // 🚀 NEW: Order picked up status
             case 'OUT_FOR_DELIVERY': return 'out_for_delivery';
             case 'DELIVERED': return 'delivered';
             case 'CANCELLED': return 'cancelled';
@@ -60,7 +61,48 @@ export default function OrderDetailScreen() {
         }
     };
 
-    // Transform backend data to match UI expectations (same as OrdersScreen)
+    // 🚀 NEW: Get status display text
+    const getStatusDisplayText = (order: any): string => {
+        switch (order.status) {
+            case 'PENDING': return 'Order placed';
+            case 'CONFIRMED': return 'Order confirmed';
+            case 'PREPARING': return 'Preparing your order';
+            case 'READY_FOR_PICKUP': return 'Ready for pickup';
+            case 'ASSIGNED': 
+                return order.rider 
+                    ? `Rider ${order.rider.user?.name || 'assigned'} is on the way`
+                    : 'Rider assigned';
+            case 'PICKED_UP': 
+                return order.rider 
+                    ? `${order.rider.user?.name || 'Rider'} picked up your order`
+                    : 'Order picked up';
+            case 'OUT_FOR_DELIVERY': 
+                return order.rider 
+                    ? `${order.rider.user?.name || 'Rider'} is delivering`
+                    : 'Out for delivery';
+            case 'DELIVERED': return 'Delivered';
+            case 'CANCELLED': return 'Cancelled';
+            default: return 'Processing';
+        }
+    };
+
+    // 🚀 NEW: Get status color
+    const getStatusColor = (status: string): string => {
+        switch (status) {
+            case 'PENDING': return '#f59e0b';
+            case 'CONFIRMED': return theme.colors.primary;
+            case 'PREPARING': return theme.colors.primary;
+            case 'READY_FOR_PICKUP': return '#10b981';
+            case 'ASSIGNED': return '#3b82f6';
+            case 'PICKED_UP': return '#8b5cf6';
+            case 'OUT_FOR_DELIVERY': return '#f59e0b';
+            case 'DELIVERED': return '#10b981';
+            case 'CANCELLED': return theme.colors.danger;
+            default: return theme.colors.muted;
+        }
+    };
+
+    // Transform backend data to match UI expectations
     const orderData: Order | null = backendOrderData ? {
         id: backendOrderData.id,
         orderId: backendOrderData.orderNumber,
@@ -70,6 +112,13 @@ export default function OrderDetailScreen() {
             logo: undefined,
             location: backendOrderData.vendor.address || 'Address not available'
         },
+        // 🚀 NEW: Include rider information
+        rider: backendOrderData.rider ? {
+            id: backendOrderData.rider.id,
+            name: backendOrderData.rider.name || 'Rider',
+            phone: backendOrderData.rider.phone || '',
+            vehicleType: backendOrderData.rider.vehicleType || 'Bicycle'
+        } : undefined,
         items: backendOrderData.items.map((orderItem: any) => ({
             id: orderItem.id,
             name: orderItem.menuItem.name,
@@ -90,6 +139,10 @@ export default function OrderDetailScreen() {
             })) || []
         })),
         status: getStatusMapping(backendOrderData.status),
+        // 🚀 NEW: Enhanced status display
+        statusText: getStatusDisplayText(backendOrderData),
+        statusColor: getStatusColor(backendOrderData.status),
+        isLiveTracking: ['ASSIGNED', 'PICKED_UP', 'OUT_FOR_DELIVERY'].includes(backendOrderData.status),
         total: backendOrderData.pricing.total,
         subtotal: backendOrderData.pricing.subtotal,
         fees: backendOrderData.pricing.deliveryFee + backendOrderData.pricing.serviceFee,
@@ -98,8 +151,11 @@ export default function OrderDetailScreen() {
         notes: backendOrderData.specialInstructions,
         pickupTime: 'asap',
         placedAt: new Date(backendOrderData.createdAt),
-        estimatedReadyAt: backendOrderData.estimatedDeliveryTime ? new Date(backendOrderData.estimatedDeliveryTime) : undefined
+        estimatedReadyAt: backendOrderData.estimatedDeliveryTime ? new Date(backendOrderData.estimatedDeliveryTime) : undefined,
+        estimatedDeliveryTime: backendOrderData.estimatedDeliveryTime ? new Date(backendOrderData.estimatedDeliveryTime) : undefined
     } : null;
+
+  
 
     // ALL useEffect hooks together
     useEffect(() => {
@@ -149,8 +205,13 @@ export default function OrderDetailScreen() {
                         message: 'Your food is ready for pickup.',
                         type: 'info' as const
                     },
+                    'ASSIGNED': {
+                        title: 'Rider Assigned ✅',
+                        message: `Rider ${data.rider?.name || 'assigned'} is on the way to pick up your order.`,
+                        type: 'success' as const
+                    },
                     'PICKED_UP': {
-                        title: 'Picked Up 🚴',
+                        title: 'Picked Up ✅',
                         message: 'Your rider has picked up your order. On the way!',
                         type: 'info' as const
                     },
@@ -183,10 +244,6 @@ export default function OrderDetailScreen() {
             }
         };
 
-        // The original code had socket listeners here, but socket is no longer imported.
-        // Assuming these listeners are no longer relevant or will be re-added if socket is re-introduced.
-        // For now, removing the socket listeners as per the new_code.
-
         return () => {
             // No socket listeners to off here as socket is removed.
         };
@@ -196,7 +253,7 @@ export default function OrderDetailScreen() {
         setAlert(prev => ({ ...prev, visible: false }));
     };
 
-    // Add this helper function after the existing helper functions (around line 57)
+    // Add this helper function after the existing helper functions
     const getRelativeTime = (timestamp: string) => {
         const now = new Date();
         const time = new Date(timestamp);
@@ -237,7 +294,7 @@ export default function OrderDetailScreen() {
         );
     }
 
-    // Map backend status to customer-friendly status steps
+    // 🚀 UPDATED: Enhanced status steps to include new delivery statuses
     const getStatusSteps = (currentBackendStatus: string) => {
         const steps = [
             { 
@@ -252,40 +309,50 @@ export default function OrderDetailScreen() {
                 key: 'confirmed', 
                 label: 'Confirmed', 
                 icon: 'checkmark-circle', 
-                time: ['CONFIRMED', 'PREPARING', 'READY_FOR_PICKUP', 'PICKED_UP', 'OUT_FOR_DELIVERY', 'DELIVERED'].includes(currentBackendStatus) 
+                time: ['CONFIRMED', 'PREPARING', 'READY_FOR_PICKUP', 'ASSIGNED', 'PICKED_UP', 'OUT_FOR_DELIVERY', 'DELIVERED'].includes(currentBackendStatus) 
                     ? (backendOrderData?.updatedAt ? getRelativeTime(backendOrderData.updatedAt.toString()) : '') 
                     : '',
                 description: `Order confirmed by ${orderData.vendor.name}.`,
-                active: ['CONFIRMED', 'PREPARING', 'READY_FOR_PICKUP', 'PICKED_UP', 'OUT_FOR_DELIVERY', 'DELIVERED'].includes(currentBackendStatus)
+                active: ['CONFIRMED', 'PREPARING', 'READY_FOR_PICKUP', 'ASSIGNED', 'PICKED_UP', 'OUT_FOR_DELIVERY', 'DELIVERED'].includes(currentBackendStatus)
             },
             { 
                 key: 'preparing', 
                 label: 'Preparing', 
                 icon: 'restaurant', 
-                time: ['PREPARING', 'READY_FOR_PICKUP', 'PICKED_UP', 'OUT_FOR_DELIVERY', 'DELIVERED'].includes(currentBackendStatus)
+                time: ['PREPARING', 'READY_FOR_PICKUP', 'ASSIGNED', 'PICKED_UP', 'OUT_FOR_DELIVERY', 'DELIVERED'].includes(currentBackendStatus)
                     ? (backendOrderData?.updatedAt ? getRelativeTime(backendOrderData.updatedAt.toString()) : '')
                     : '',
                 description: `${orderData.vendor.name} is preparing your food.`,
-                active: ['PREPARING', 'READY_FOR_PICKUP', 'PICKED_UP', 'OUT_FOR_DELIVERY', 'DELIVERED'].includes(currentBackendStatus)
+                active: ['PREPARING', 'READY_FOR_PICKUP', 'ASSIGNED', 'PICKED_UP', 'OUT_FOR_DELIVERY', 'DELIVERED'].includes(currentBackendStatus)
             },
             { 
                 key: 'ready_for_pickup',
                 label: 'Ready for Pickup', 
                 icon: 'bag', 
-                time: ['READY_FOR_PICKUP', 'PICKED_UP', 'OUT_FOR_DELIVERY', 'DELIVERED'].includes(currentBackendStatus)
+                time: ['READY_FOR_PICKUP', 'ASSIGNED', 'PICKED_UP', 'OUT_FOR_DELIVERY', 'DELIVERED'].includes(currentBackendStatus)
                     ? (backendOrderData?.updatedAt ? getRelativeTime(backendOrderData.updatedAt.toString()) : '')
                     : '',
                 description: 'Your food is ready for pickup.',
-                active: ['READY_FOR_PICKUP', 'PICKED_UP', 'OUT_FOR_DELIVERY', 'DELIVERED'].includes(currentBackendStatus)
+                active: ['READY_FOR_PICKUP', 'ASSIGNED', 'PICKED_UP', 'OUT_FOR_DELIVERY', 'DELIVERED'].includes(currentBackendStatus)
             },
             { 
-                key: 'out_for_delivery',
+                key: 'assigned',
+                label: 'Rider Assigned', 
+                icon: 'person', 
+                time: ['ASSIGNED', 'PICKED_UP', 'OUT_FOR_DELIVERY', 'DELIVERED'].includes(currentBackendStatus)
+                    ? (backendOrderData?.updatedAt ? getRelativeTime(backendOrderData.updatedAt.toString()) : '')
+                    : '',
+                description: backendOrderData?.rider ? `Rider ${backendOrderData.rider.name || 'assigned'} is on the way` : 'Rider assigned to your order.',
+                active: ['ASSIGNED', 'PICKED_UP', 'OUT_FOR_DELIVERY', 'DELIVERED'].includes(currentBackendStatus)
+            },
+            { 
+                key: 'picked_up',
                 label: 'Picked Up', 
                 icon: 'bicycle', 
                 time: ['PICKED_UP', 'OUT_FOR_DELIVERY', 'DELIVERED'].includes(currentBackendStatus)
                     ? (backendOrderData?.updatedAt ? getRelativeTime(backendOrderData.updatedAt.toString()) : '')
                     : '',
-                description: backendOrderData?.rider ? `Your rider ${backendOrderData.rider.name} has picked up your order. On the way!` : 'Order picked up for delivery.',
+                description: backendOrderData?.rider ? `Your rider ${backendOrderData.rider.name || 'assigned'} has picked up your order. On the way!` : 'Order picked up for delivery.',
                 active: ['PICKED_UP', 'OUT_FOR_DELIVERY', 'DELIVERED'].includes(currentBackendStatus)
             },
             { 
@@ -315,11 +382,11 @@ export default function OrderDetailScreen() {
         return steps;
     };
 
-    const statusSteps = getStatusSteps(backendOrderData?.status || 'PENDING'); // Use backend status for steps
+    const statusSteps = getStatusSteps(backendOrderData?.status || 'PENDING');
     const currentStep = statusSteps.find(step => step.active);
 
     const getActionButton = () => {
-        switch (backendOrderData?.status) { // Use backend status for actions
+        switch (backendOrderData?.status) {
             case 'PENDING':
                 return (
                     <CTAButton
@@ -334,6 +401,7 @@ export default function OrderDetailScreen() {
                         }}
                     />
                 );
+            case 'ASSIGNED':
             case 'PICKED_UP':
             case 'OUT_FOR_DELIVERY':
                 return (
@@ -354,6 +422,7 @@ export default function OrderDetailScreen() {
         }
     };
 
+    //  ENHANCED: Improved rider info display
     const renderDriverInfo = () => (
         <View style={{
             backgroundColor: theme.colors.surface,
@@ -397,13 +466,13 @@ export default function OrderDetailScreen() {
                                 color: theme.colors.text,
                                 marginBottom: 2,
                             }}>
-                                {backendOrderData.rider.name}
+                                {backendOrderData.rider.name || 'Rider'}
                             </Text>
                             <Text style={{
                                 fontSize: 14,
                                 color: theme.colors.muted,
                             }}>
-                                {backendOrderData.rider.vehicleType} • Rider
+                                {backendOrderData.rider.vehicleType || 'Bicycle'} • Rider
                             </Text>
                         </View>
                         <Pressable
@@ -502,25 +571,42 @@ export default function OrderDetailScreen() {
                 contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 80 }}
                 showsVerticalScrollIndicator={false}
             >
-                {/* Current Status Banner */}
+                {/*  ENHANCED: Current Status Banner with live tracking indicator */}
                 <View style={{
-                    backgroundColor: theme.colors.primary + '15',
+                    backgroundColor: orderData.isLiveTracking ? '#3b82f6' + '15' : theme.colors.primary + '15',
                     borderRadius: 12,
                     padding: 16,
                     marginBottom: 20,
                     borderWidth: 1,
-                    borderColor: theme.colors.primary + '30',
+                    borderColor: orderData.isLiveTracking ? '#3b82f6' + '30' : theme.colors.primary + '30',
                 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                        <Icon name={currentStep?.icon || 'time'} size={24} color={theme.colors.primary} />
+                        <Icon name={currentStep?.icon || 'time'} size={24} color={orderData.isLiveTracking ? '#3b82f6' : theme.colors.primary} />
                         <Text style={{
                             fontSize: 18,
                             fontWeight: '600',
-                            color: theme.colors.primary,
+                            color: orderData.isLiveTracking ? '#3b82f6' : theme.colors.primary,
                             marginLeft: 12,
                         }}>
                             {currentStep?.label}
                         </Text>
+                        {orderData.isLiveTracking && (
+                            <View style={{
+                                backgroundColor: '#3b82f6',
+                                paddingHorizontal: 6,
+                                paddingVertical: 2,
+                                borderRadius: 8,
+                                marginLeft: 8,
+                            }}>
+                                <Text style={{
+                                    fontSize: 10,
+                                    fontWeight: '600',
+                                    color: 'white',
+                                }}>
+                                    LIVE
+                                </Text>
+                            </View>
+                        )}
                     </View>
                     <Text style={{
                         fontSize: 14,
@@ -560,8 +646,8 @@ export default function OrderDetailScreen() {
                     ))}
                 </View>
 
-                {/* Rider Info (only show if picked up or out for delivery) */}
-                {backendOrderData?.status && ['PICKED_UP', 'OUT_FOR_DELIVERY'].includes(backendOrderData.status) && renderDriverInfo()}
+                {/* 🚀 ENHANCED: Rider Info (show for assigned, picked up, or out for delivery) */}
+                {backendOrderData?.status && ['ASSIGNED', 'PICKED_UP', 'OUT_FOR_DELIVERY'].includes(backendOrderData.status) && renderDriverInfo()}
 
                 {/* Order Summary - Use transformed data */}
                 <OrderSummary

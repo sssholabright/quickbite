@@ -18,7 +18,7 @@ export const useLocationMonitor = () => {
         // Monitor app state changes
         const handleAppStateChange = async (nextAppState: AppStateStatus) => {
             if (nextAppState === 'active') {
-                // App became active, check location status
+                // App became active, check location status (local only)
                 await checkLocationStatus();
             }
         };

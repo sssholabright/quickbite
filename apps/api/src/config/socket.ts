@@ -4,12 +4,14 @@ import { Server as SocketIOServer, Socket } from 'socket.io';
 import { Server as HTTPServer } from 'http';
 import { env } from './env.js';
 import jwt from 'jsonwebtoken';
+import { prisma } from './db.js';
+
 interface AuthenticatedSocket extends Socket {
     userId?: string;
     userRole?: string;
     vendorId?: string;
     customerId?: string;
-    riderId?: string;
+    riderId?: string | null;
 }
 
 export class SocketService {
@@ -22,7 +24,16 @@ export class SocketService {
             cors: {
                 origin: env.NODE_ENV === 'production' 
                     ? ['https://yourdomain.com'] 
-                    : ['http://localhost:3000', 'http://localhost:3001', 'http://192.168.0.176:8081', 'http://localhost:5173', 'http://10.213.134.234:8081', 'http://10.213.134.234:8082', 'http://192.168.100.234:8081'], 
+                    : [
+                        'http://localhost:3000', 
+                        'http://localhost:5173', 
+                        'http://192.168.0.176:8081', 
+                        'http://192.168.0.176:5000',
+                        'http://10.48.184.234:8081',
+                        'http://10.48.184.234:8082',
+                        'http://10.48.184.234:5000',
+                        'http://10.200.122.234:5000'
+                    ], 
                 methods: ['GET', 'POST'],
                 credentials: true
             },
@@ -35,7 +46,7 @@ export class SocketService {
 
     private setupMiddleware() {
         // Authentication middleware
-        this.io.use((socket: AuthenticatedSocket, next) => {
+        this.io.use(async (socket: AuthenticatedSocket, next) => {
             try {
                 const token = socket.handshake.auth.token || socket.handshake.headers.authorization?.replace('Bearer ', '');
                 
@@ -61,7 +72,12 @@ export class SocketService {
                 } else if (decoded.role === 'CUSTOMER') {
                     socket.customerId = decoded.userId;
                 } else if (decoded.role === 'RIDER') {
-                    socket.riderId = decoded.userId;
+                    // Get actual rider ID from database
+                    const rider = await prisma.rider.findUnique({
+                        where: { userId: decoded.userId },
+                        select: { id: true }
+                    });
+                    socket.riderId = rider?.id || null;
                 }
 
                 next();
@@ -103,7 +119,6 @@ export class SocketService {
                 }
                 this.connectedUsers.get(socket.userId)!.push(socket.id);
             }
-
 
             // Handle disconnect
             socket.on('disconnect', () => {
@@ -164,6 +179,26 @@ export class SocketService {
                     isTyping: false
                 });
             });
+
+            // 🚀 NEW: When rider comes online, automatically broadcast existing ready orders
+            socket.on('rider_online', async (data) => {
+                try {
+                    logger.info(`Rider ${socket.riderId} came online, checking for existing ready orders`);
+                    
+                    // Import here to avoid circular dependencies
+                    const { OrderService } = await import('../modules/orders/order.service.js');
+                    
+                    // Broadcast existing ready orders
+                    const result = await OrderService.broadcastExistingReadyOrders();
+                    
+                    if (result.ordersBroadcasted > 0) {
+                        logger.info(`Broadcasted ${result.ordersBroadcasted} existing orders to rider ${socket.riderId}`);
+                    }
+                    
+                } catch (error) {
+                    logger.error({ error, riderId: socket.riderId }, 'Error broadcasting existing orders when rider came online');
+                }
+            });
         });
     }
 
@@ -219,42 +254,42 @@ export class SocketService {
         });
     }
 
-    // LEGACY METHODS - Keep for backward compatibility but mark as deprecated
-    // These will be removed in future versions
-
     /**
-     * @deprecated Use emitToOrder instead
+     * Emit order cancellation to all relevant parties
      */
-    public emitOrderUpdate(orderId: string, orderData: any): void {
-        this.emitToOrder(orderId, 'order_updated', { orderId, order: orderData });
-    }
+    public emitOrderCancellation(orderId: string, orderData: any, reason?: string): void {
+        const cancellationData = {
+            orderId,
+            order: orderData,
+            reason: reason || 'Order cancelled',
+            timestamp: new Date().toISOString()
+        };
 
-    /**
-     * @deprecated Use emitToAllRiders instead
-     */
-    public emitNewOrder(orderData: any): void {
-        this.emitToAllRiders('new_order', { order: orderData });
-    }
-
-    /**
-     * @deprecated Use emitToCustomer instead
-     */
-    public emitOrderStatusUpdate(orderId: string, customerId: string, status: string): void {
-        this.emitToCustomer(customerId, 'order_status_update', { orderId, status });
-    }
-
-    /**
-     * @deprecated Use emitToOrder instead
-     */
-    public emitOrderCancellation(orderId: string, orderData: any): void {
-        this.emitToOrder(orderId, 'order_cancelled', { orderId, order: orderData });
-    }
-
-    /**
-     * @deprecated Use emitToCustomer instead
-     */
-    public emitDeliveryUpdate(orderId: string, customerId: string, riderData: any): void {
-        this.emitToCustomer(customerId, 'delivery_update', { orderId, rider: riderData });
+        // Emit to order room (all participants)
+        this.emitToOrder(orderId, 'order_cancelled', cancellationData);
+        
+        // Emit to customer
+        if (orderData.customer?.id) {
+            this.emitToCustomer(orderData.customer.id, 'order_status_update', {
+                orderId,
+                status: 'CANCELLED',
+                timestamp: new Date().toISOString()
+            });
+        }
+        
+        // Emit to vendor
+        if (orderData.vendor?.id) {
+            this.emitToVendor(orderData.vendor.id, 'order_status_update', {
+                orderId,
+                status: 'CANCELLED',
+                timestamp: new Date().toISOString()
+            });
+        }
+        
+        // Emit to rider if assigned
+        if (orderData.rider?.id) {
+            this.emitToRider(orderData.rider.id, 'order_cancelled', cancellationData);
+        }
     }
 
     // Get connected users count
@@ -262,7 +297,7 @@ export class SocketService {
         return this.connectedUsers.size;
     }
 
-    // NEW: Get connected riders count
+    // Get connected riders count
     public getConnectedRidersCount(): number {
         return this.connectedRiders.size;
     }
@@ -271,7 +306,6 @@ export class SocketService {
     public getConnectedVendorsCount(): number {
         return Array.from(this.connectedUsers.entries())
             .filter(([userId, socketIds]) => {
-                // This would need to be enhanced to track vendor status
                 return socketIds.length > 0;
             }).length;
     }

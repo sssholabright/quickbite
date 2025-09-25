@@ -1,4 +1,4 @@
-import { Request, Response } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { OrderService } from './order.service.js';
 import { createOrderSchema, updateOrderStatusSchema, cancelOrderSchema } from '../../validations/order.js';
 import { logger } from '../../utils/logger.js';
@@ -118,7 +118,7 @@ export class OrderController {
             
             // Parse query parameters
             const filters = {
-                status: req.query.status as string,
+                status: req.query.status as string | string[], // Handle both string and array
                 vendorId: req.query.vendorId as string,
                 customerId: req.query.customerId as string,
                 riderId: req.query.riderId as string,
@@ -157,9 +157,23 @@ export class OrderController {
             const { orderId } = req.params;
             const userId = (req.user as any).userId as string;
             const userRole = (req.user as any).role as string;
+            
+            // 🚀 IMPROVED: Better validation
+            if (!orderId) {
+                res.status(400).json({
+                    success: false,
+                    message: 'Order ID is required'
+                });
+                return;
+            }
+
             const validatedData = cancelOrderSchema.parse(req.body);
 
-            const order = await OrderService.cancelOrder(orderId!, userId, userRole, validatedData.reason);
+            logger.info({ orderId, userId, userRole, reason: validatedData.reason }, 'Attempting to cancel order');
+
+            const order = await OrderService.cancelOrder(orderId, userId, userRole, validatedData.reason);
+
+            logger.info({ orderId, userId, userRole }, 'Order cancelled successfully');
 
             res.json({
                 success: true,
@@ -167,7 +181,8 @@ export class OrderController {
                 data: order
             });
         } catch (error) {
-            logger.error({ error }, 'Error cancelling order');
+            logger.error({ error, orderId: req.params.orderId, userId: (req.user as any)?.userId, userRole: (req.user as any)?.role }, 'Error cancelling order');
+            
             if (error instanceof CustomError) {
                 res.status(error.statusCode).json({
                     success: false,
@@ -175,11 +190,63 @@ export class OrderController {
                 });
                 return;
             }
+            
+            //  IMPROVED: More specific error handling
+            if (error instanceof Error) {
+                res.status(500).json({
+                    success: false,
+                    message: `Failed to cancel order: ${error.message}`
+                });
+                return;
+            }
+            
             res.status(500).json({
                 success: false,
                 message: 'Failed to cancel order'
             });
             return;
+        }
+    }
+
+    /**
+     * 🚀 NEW ENDPOINT: Broadcast existing ready orders
+     * POST /api/v1/orders/broadcast-ready
+     * Real-world: Admin or system can trigger this to ensure riders see all available jobs
+     */
+    static async broadcastExistingReadyOrders(req: Request, res: Response, next: NextFunction) {
+        try {
+            const result = await OrderService.broadcastExistingReadyOrders();
+            
+            res.status(200).json({
+                success: result.success,
+                message: result.message,
+                data: {
+                    ordersFound: result.ordersFound,
+                    ordersBroadcasted: result.ordersBroadcasted,
+                    errors: result.errors
+                }
+            });
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    /**
+     *  NEW ENDPOINT: Get order status statistics
+     * GET /api/v1/orders/stats
+     * Real-world: Dashboard view of order statuses
+     */
+    static async getOrderStats(req: Request, res: Response, next: NextFunction) {
+        try {
+            const stats = await OrderService.getOrderStatusStats();
+            
+            res.status(200).json({
+                success: true,
+                message: 'Order statistics retrieved successfully',
+                data: stats
+            });
+        } catch (error) {
+            next(error);
         }
     }
 }

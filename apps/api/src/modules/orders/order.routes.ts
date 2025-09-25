@@ -34,4 +34,8 @@ router.patch('/:orderId/cancel',
     OrderController.cancelOrder
 );
 
+// Add these new routes
+router.post('/broadcast-ready', authGuard, OrderController.broadcastExistingReadyOrders);
+router.get('/stats', authGuard, OrderController.getOrderStats);
+
 export default router;

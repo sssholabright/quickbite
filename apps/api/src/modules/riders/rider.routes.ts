@@ -15,4 +15,8 @@ router.get('/status', RiderController.getStatus);
 router.post('/delivery-jobs/:orderId/accept', RiderController.acceptDeliveryJob);
 router.post('/delivery-jobs/:orderId/reject', RiderController.rejectDeliveryJob);
 
+// 🚀 NEW: Location routes
+router.put('/location', RiderController.updateLocation);
+router.get('/location', RiderController.getCurrentLocation);
+
 export default router;
