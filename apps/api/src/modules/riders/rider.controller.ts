@@ -222,4 +222,55 @@ export class RiderController {
             next(error);
         }
     }
+
+    // 🚀 NEW: Update push token
+    static async updatePushToken(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+        try {
+            const userId = req.user?.userId;
+            
+            if (!userId) {
+                ResponseHandler.unauthorized(res as any, 'User not authenticated');
+                return;
+            }
+
+            // Validate request body
+            const updatePushTokenSchema = z.object({
+                pushToken: z.string().min(1, 'Push token is required'),
+            });
+
+            const { pushToken } = updatePushTokenSchema.parse(req.body);
+            
+            // Update push token
+            const rider = await RiderService.updatePushToken(userId, pushToken);
+            
+            ResponseHandler.success(res as any, { pushToken: rider.pushToken }, 'Push token updated successfully');
+        } catch (error) {
+            if (error instanceof z.ZodError) {
+                const errorMessage = error.issues.map(err => `${err.path.join('.')}: ${err.message}`).join(', ');
+                ResponseHandler.validationError(res as any, 'Validation failed', errorMessage);
+                return;
+            }
+            
+            next(error);
+        }
+    }
+
+    // 🚀 NEW: Get push token
+    static async getPushToken(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+        try {
+            const userId = req.user?.userId;
+            
+            if (!userId) {
+                ResponseHandler.unauthorized(res as any, 'User not authenticated');
+                return;
+            }
+            
+            // Get push token
+            const pushToken = await RiderService.getPushToken(userId);
+            
+            ResponseHandler.success(res as any, { pushToken }, 'Push token retrieved successfully');
+        } catch (error) {
+            next(error);
+        }
+    }
 }

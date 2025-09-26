@@ -16,10 +16,6 @@ export default function ProfileScreen() {
 	const navigation = useNavigation<ProfileNav>();
 	const logout = useAuthStore((s) => s.logout);
 
-	useEffect(() => {
-		console.log(JSON.stringify(user, null, 2));
-	}, [user]);
-
 	// Rider data
 	const [riderData] = useState({
 		name: user?.name || "John Rider",
@@ -50,9 +46,9 @@ export default function ProfileScreen() {
 			}}
 		>
 			<View style={{
-				width: 40,
-				height: 40,
-				borderRadius: 20,
+				width: 35,
+				height: 35,
+				borderRadius: 17.5,
 				backgroundColor: theme.colors.primary + '20',
 				alignItems: "center",
 				justifyContent: "center",
@@ -62,7 +58,7 @@ export default function ProfileScreen() {
 			</View>
 			<View style={{ flex: 1 }}>
 				<Text style={{
-					fontSize: 16,
+					fontSize: 14,
 					fontWeight: "600",
 					color: theme.colors.text,
 					marginBottom: subtitle ? 2 : 0,
@@ -71,7 +67,7 @@ export default function ProfileScreen() {
 				</Text>
 				{subtitle && (
 					<Text style={{
-						fontSize: 14,
+						fontSize: 12,
 						color: theme.colors.muted,
 					}}>
 						{subtitle}
@@ -94,19 +90,19 @@ export default function ProfileScreen() {
 					marginBottom: 24,
 				}}>
 					<View style={{
-						width: 60,
-						height: 60,
-						borderRadius: 30,
+						width: 50,
+						height: 50,
+						borderRadius: 25,
 						backgroundColor: theme.colors.primary + '20',
 						alignItems: "center",
 						justifyContent: "center",
 						marginRight: 16,
 					}}>
-						<Icon name="person" size={30} color={theme.colors.primary} />
+						<Icon name="person" size={25} color={theme.colors.primary} />
 					</View>
 					<View style={{ flex: 1 }}>
 						<Text style={{
-							fontSize: 20,
+							fontSize: 18,
 							fontWeight: "700",
 							color: theme.colors.text,
 							marginBottom: 4,
@@ -114,7 +110,7 @@ export default function ProfileScreen() {
 							{riderData.name}
 						</Text>
 						<Text style={{
-							fontSize: 14,
+							fontSize: 12,
 							color: theme.colors.muted,
 						}}>
 							Rider Phone: {riderData.phone}
@@ -143,12 +139,12 @@ export default function ProfileScreen() {
 				</View>
 
 				{/* Profile Actions */}
-				<View style={{ marginBottom: 24 }}>
+				<View style={{ marginBottom: 10 }}>
 					<Text style={{
-						fontSize: 18,
+						fontSize: 16,
 						fontWeight: "600",
 						color: theme.colors.text,
-						marginBottom: 16,
+						marginBottom: 10,
 					}}>
 						Profile
 					</Text>
@@ -169,12 +165,12 @@ export default function ProfileScreen() {
 				</View>
 
 				{/* Settings */}
-				<View style={{ marginBottom: 24 }}>
+				<View style={{ marginBottom: 10 }}>
 					<Text style={{
-						fontSize: 18,
+						fontSize: 16,
 						fontWeight: "600",
 						color: theme.colors.text,
-						marginBottom: 16,
+						marginBottom: 10,
 					}}>
 						Settings
 					</Text>
@@ -188,12 +184,12 @@ export default function ProfileScreen() {
 				</View>
 
 				{/* Support */}
-				<View style={{ marginBottom: 24 }}>
+				<View style={{ marginBottom: 10 }}>
 					<Text style={{
-						fontSize: 18,
+						fontSize: 16,
 						fontWeight: "600",
 						color: theme.colors.text,
-						marginBottom: 16,
+						marginBottom: 10,
 					}}>
 						Support
 					</Text>

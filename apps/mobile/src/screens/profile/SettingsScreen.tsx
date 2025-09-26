@@ -67,19 +67,19 @@ export default function SettingsScreen() {
             }}
         >
             <View style={{
-                width: 40,
-                height: 40,
-                borderRadius: 20,
+                width: 35,
+                height: 35,
+                borderRadius: 17.5,
                 backgroundColor: theme.colors.primary + '20',
                 alignItems: 'center',
                 justifyContent: 'center',
                 marginRight: 16,
             }}>
-                <Icon name={icon} size={20} color={theme.colors.primary} />
+                <Icon name={icon} size={18} color={theme.colors.primary} />
             </View>
             <View style={{ flex: 1 }}>
                 <Text style={{
-                    fontSize: 16,
+                    fontSize: 14,
                     fontWeight: '600',
                     color: theme.colors.text,
                     marginBottom: subtitle ? 2 : 0,
@@ -88,7 +88,7 @@ export default function SettingsScreen() {
                 </Text>
                 {subtitle && (
                     <Text style={{
-                        fontSize: 14,
+                        fontSize: 12,
                         color: theme.colors.muted,
                     }}>
                         {subtitle}
@@ -96,7 +96,7 @@ export default function SettingsScreen() {
                 )}
             </View>
             {rightComponent || (onPress && (
-                <Icon name="chevron-forward" size={20} color={theme.colors.muted} />
+                <Icon name="chevron-forward" size={18} color={theme.colors.muted} />
             ))}
         </Pressable>
     );
@@ -117,8 +117,8 @@ export default function SettingsScreen() {
             }}
         >
             <View style={{
-                width: 24,
-                height: 24,
+                width: 20,
+                height: 20,
                 borderRadius: 12,
                 borderWidth: 2,
                 borderColor: currentThemeMode === mode ? theme.colors.primary : theme.colors.border,
@@ -137,7 +137,7 @@ export default function SettingsScreen() {
             </View>
             <View style={{ flex: 1 }}>
                 <Text style={{
-                    fontSize: 16,
+                    fontSize: 14,
                     fontWeight: '600',
                     color: theme.colors.text,
                     marginBottom: 2,
@@ -145,14 +145,14 @@ export default function SettingsScreen() {
                     {label}
                 </Text>
                 <Text style={{
-                    fontSize: 14,
+                    fontSize: 12,
                     color: theme.colors.muted,
                 }}>
                     {description}
                 </Text>
                 {mode === 'system' && currentThemeMode === 'system' && (
                     <Text style={{
-                        fontSize: 12,
+                        fontSize: 10,
                         color: theme.colors.primary,
                         marginTop: 2,
                         fontWeight: '500',
@@ -195,7 +195,7 @@ export default function SettingsScreen() {
                 {/* Appearance */}
                 <View style={{ marginBottom: 24 }}>
                     <Text style={{
-                        fontSize: 18,
+                        fontSize: 16,
                         fontWeight: '600',
                         color: theme.colors.text,
                         marginBottom: 16,
@@ -225,7 +225,7 @@ export default function SettingsScreen() {
                 {/* Notifications */}
                 <View style={{ marginBottom: 24 }}>
                     <Text style={{
-                        fontSize: 18,
+                        fontSize: 16,
                         fontWeight: '600',
                         color: theme.colors.text,
                         marginBottom: 16,
@@ -273,7 +273,7 @@ export default function SettingsScreen() {
                 {/* Preferences */}
                 <View style={{ marginBottom: 24 }}>
                     <Text style={{
-                        fontSize: 18,
+                        fontSize: 16,
                         fontWeight: '600',
                         color: theme.colors.text,
                         marginBottom: 16,
@@ -294,14 +294,14 @@ export default function SettingsScreen() {
                         'Default Address',
                         'Set your preferred delivery address',
                         undefined,
-                        () => navigation.navigate('AddressManagement')
+                        () => navigation.navigate('AddressManagement' as any)
                     )}
                 </View>
 
                 {/* Help & Support */}
                 <View style={{ marginBottom: 24 }}>
                     <Text style={{
-                        fontSize: 18,
+                        fontSize: 16,
                         fontWeight: '600',
                         color: theme.colors.text,
                         marginBottom: 16,
@@ -329,7 +329,7 @@ export default function SettingsScreen() {
                 {/* About */}
                 <View style={{ marginBottom: 24 }}>
                     <Text style={{
-                        fontSize: 18,
+                        fontSize: 16,
                         fontWeight: '600',
                         color: theme.colors.text,
                         marginBottom: 16,

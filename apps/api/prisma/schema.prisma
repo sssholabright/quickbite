@@ -38,6 +38,7 @@ model Customer {
     addresses   Address[]
     orders      Order[]
     reviews     Review[]
+    pushToken   String?     // 🚀 NEW: FCM push token
     createdAt   DateTime  @default(now())
     updatedAt   DateTime  @updatedAt
 
@@ -58,6 +59,7 @@ model Rider {
     earnings        Float       @default(0)
     completedOrders Int         @default(0)
     rating          Float       @default(0)
+    pushToken       String?     // 🚀 NEW: FCM push token
     orders          Order[]
     createdAt       DateTime    @default(now())
     updatedAt       DateTime    @updatedAt
@@ -80,6 +82,7 @@ model Vendor {
     isActive        Boolean    @default(true)
     isOpen          Boolean    @default(false)
     rating          Float      @default(0)
+    pushToken       String?     // 🚀 NEW: FCM push token
     categories      Category[]
     menuItems       MenuItem[]
     orders          Order[]
@@ -95,6 +98,7 @@ model Admin {
     id          String   @id @default(cuid())
     userId      String   @unique
     user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    pushToken   String?     // 🚀 NEW: FCM push token
     permissions String[]
     createdAt   DateTime @default(now())
     updatedAt   DateTime @updatedAt

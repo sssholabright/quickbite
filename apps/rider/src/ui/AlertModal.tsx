@@ -14,6 +14,7 @@ interface AlertModalProps {
     confirmText?: string;
     cancelText?: string;
     showCancel?: boolean;
+    onBackdropPress?: () => void;
 }
 
 export default function AlertModal({
@@ -26,6 +27,7 @@ export default function AlertModal({
     confirmText = 'OK',
     cancelText = 'Cancel',
     showCancel = false,
+    onBackdropPress,
 }: AlertModalProps) {
     const theme = useTheme();
 
@@ -61,6 +63,16 @@ export default function AlertModal({
 
     const typeConfig = getTypeConfig();
 
+    const handleBackdropPress = () => {
+        if (onBackdropPress) {
+            onBackdropPress();
+        } else if (onCancel) {
+            onCancel();
+        } else {
+            onConfirm();
+        }
+    };
+
     return (
         <Modal 
             isVisible={visible} 
@@ -68,6 +80,8 @@ export default function AlertModal({
             animationOut="zoomOut"
             backdropOpacity={0.5}
             backdropColor={theme.mode === 'dark' ? '#000' : '#000'}
+            onBackdropPress={handleBackdropPress}
+            onBackButtonPress={handleBackdropPress}
         >
             <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
                 {/* Icon */}

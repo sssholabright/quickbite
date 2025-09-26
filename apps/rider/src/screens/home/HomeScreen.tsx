@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, FlatList, Pressable, ScrollView, Text, View, Switch, Modal, Animated } from "react-native";
+import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
+import { FlatList, Pressable, ScrollView, Text, View, Switch, Modal, Animated } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useTheme } from "../../theme/theme";
@@ -18,6 +18,7 @@ import { useRealtimeStore, DeliveryJob } from '../../stores/realtime';
 import riderService from '../../services/riderService';
 import { useLocationStore } from '../../stores/location';
 import AlertModal from '../../ui/AlertModal'; 
+import notificationService from "../../services/notificationService";
 
 // React Native compatible timer component
 const CountdownTimer = ({ seconds, onComplete }: { seconds: number; onComplete: () => void }) => {
@@ -457,12 +458,60 @@ export default function HomeScreen() {
         }
     }, [socket, isConnected, setSocket]);
 
+    // Set up notification listeners
+    useEffect(() => {
+        const notificationListener = notificationService.addNotificationListener((notification) => {
+          console.log('📱 Received notification:', notification);
+          // Handle incoming notifications
+        });
+      
+        const responseListener = notificationService.addNotificationResponseListener((response) => {
+          console.log('�� Notification tapped:', response);
+          // Handle notification taps
+        });
+      
+        return () => {
+          notificationService.removeNotificationListener(notificationListener);
+          notificationService.removeNotificationListener(responseListener);
+        };
+      }, []);
+
+    // Add a ref to track shown notifications
+    const shownNotifications = useRef(new Set<string>());
+
+    // Handle new delivery jobs with socket events
+    useEffect(() => {
+        if (!socket) return;
+
+        const handleNewDeliveryJob = (data: any) => {
+            // Check if we've already shown notification for this job
+            if (!shownNotifications.current.has(data.orderId)) {
+                // Show notification
+                notificationService.scheduleLocalNotification({
+                    title: '🚚 New Delivery Job!',
+                    body: `Order from ${data.vendorName} - ₦${data.deliveryFee} delivery fee`,
+                    data: { orderId: data.orderId, type: 'delivery_job' }
+                });
+                
+                // Mark as shown
+                shownNotifications.current.add(data.orderId);
+            }
+        };  
+
+        // Listen to socket events
+        socket.on('new_delivery_job', handleNewDeliveryJob);
+        
+        return () => {
+            socket.off('new_delivery_job', handleNewDeliveryJob);
+        };
+    }, [socket]);
+
     return (
         <SafeAreaWrapper>
             <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
                 {/* Enhanced Status Bar with Location */}
                 <View style={{
-                    backgroundColor: theme.colors.surface,
+                    // backgroundColor: theme.colors.surface,
                     paddingHorizontal: 16,
                     paddingVertical: 12,
                     borderBottomWidth: 1,
@@ -548,7 +597,6 @@ export default function HomeScreen() {
                     }}>
                         {isOnline ? "You're Online" : "You're Offline"}
                     </Text>
-                    
                     <Text style={{ 
                         fontSize: 12, 
                         color: theme.colors.muted,
@@ -570,6 +618,7 @@ export default function HomeScreen() {
                             justifyContent: "space-between",
                             backgroundColor: theme.colors.background,
                             paddingHorizontal: 16,
+                            paddingVertical: 8,
                             borderRadius: 12,
                             borderWidth: 1,
                             borderColor: theme.colors.border
@@ -1092,217 +1141,7 @@ export default function HomeScreen() {
                     </View>
                 </Modal>
 
-                {/* Enhanced New Order Popup (Fallback to mock system)
-                <Modal
-                    visible={!!incomingOrder}
-                    transparent
-                    animationType="fade"
-                    onRequestClose={rejectIncomingOrder}
-                >
-                    <View style={{
-                        flex: 1,
-                        backgroundColor: 'rgba(0,0,0,0.8)',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        padding: 20
-                    }}>
-                        {incomingOrder && (
-                            <View style={{
-                                backgroundColor: theme.colors.surface,
-                                borderRadius: 20,
-                                padding: 24,
-                                width: '100%',
-                                maxWidth: 400,
-                                shadowColor: "#000",
-                                shadowOpacity: 0.3,
-                                shadowRadius: 20,
-                                shadowOffset: { width: 0, height: 10 },
-                                elevation: 20
-                            }}>
-                                {/* Header with Timer /}
-                                <View style={{
-                                    flexDirection: "row",
-                                    justifyContent: "space-between",
-                                    alignItems: "center",
-                                    marginBottom: 24
-                                }}>
-                                    <Text style={{
-                                        fontSize: 22,
-                                        fontWeight: "800",
-                                        color: theme.colors.text
-                                    }}>
-                                        New Order Request
-                                    </Text>
-                                    <CountdownTimer 
-                                        seconds={25} 
-                                        onComplete={handleTimerComplete} 
-                                    />
-                                </View>
-
-                                {/* PICKUP INFO *}
-                                <View style={{
-                                    backgroundColor: theme.colors.background,
-                                    borderRadius: 12,
-                                    padding: 16,
-                                    marginBottom: 16
-                                }}>
-                                    <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
-                                        <View style={{
-                                            width: 28,
-                                            height: 32,
-                                            borderRadius: 8,
-                                            backgroundColor: theme.colors.primary + '15',
-                                            alignItems: "center",
-                                            justifyContent: "center",
-                                            marginRight: 12
-                                        }}>
-                                            <Icon name="restaurant" size={14} color={theme.colors.primary} />
-                                        </View>
-                                        <View style={{ flex: 1 }}>
-                                            <Text style={{ fontSize: 9, color: theme.colors.muted, marginBottom: 2 }}>
-                                                PICKUP FROM
-                                            </Text>
-                                            <Text style={{ fontSize: 16, fontWeight: "800", color: theme.colors.text }}>
-                                                {incomingOrder.vendor.name}
-                                            </Text>
-                                        </View>
-                                        <Text style={{ 
-                                            fontSize: 12, 
-                                            fontWeight: "700", 
-                                            color: theme.colors.primary,
-                                            backgroundColor: theme.colors.primary + '15',
-                                            paddingHorizontal: 8,
-                                            paddingVertical: 4,
-                                            borderRadius: 8
-                                        }}>
-                                            {calculateOrderDistances(incomingOrder).riderToVendor.toFixed(1)} km
-                                        </Text>
-                                    </View>
-                                    <Text style={{ fontSize: 12, color: theme.colors.muted, marginLeft: 44 }}>
-                                        📍 {incomingOrder.vendor.pickupLocation}
-                                    </Text>
-                                </View>
-
-                                {/* DROP-OFF INFO /}
-                                <View style={{
-                                    backgroundColor: theme.colors.background,
-                                    borderRadius: 12,
-                                    padding: 16,
-                                    marginBottom: 20
-                                }}>
-                                    <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
-                                        <View style={{
-                                            width: 28,
-                                            height: 32,
-                                            borderRadius: 8,
-                                            backgroundColor: '#ef4444' + '15',
-                                            alignItems: "center",
-                                            justifyContent: "center",
-                                            marginRight: 12
-                                        }}>
-                                            <Icon name="navigate" size={14} color="#ef4444" />
-                                        </View>
-                                        <View style={{ flex: 1 }}>
-                                            <Text style={{ fontSize: 9, color: theme.colors.muted, marginBottom: 2 }}>
-                                                DELIVER TO
-                                            </Text>
-                                            <Text style={{ fontSize: 14, fontWeight: "700", color: theme.colors.text }}>
-                                                {incomingOrder.customerName || 'Customer'}
-                                            </Text>
-                                        </View>
-                                        <Text style={{ 
-                                            fontSize: 12, 
-                                            fontWeight: "700", 
-                                            color: "#ef4444",
-                                            backgroundColor: '#ef4444' + '15',
-                                            paddingHorizontal: 8,
-                                            paddingVertical: 4,
-                                            borderRadius: 8
-                                        }}>
-                                            {calculateOrderDistances(incomingOrder).vendorToCustomer.toFixed(1)} km
-                                        </Text>
-                                    </View>
-                                    <Text style={{ fontSize: 12, color: theme.colors.muted, marginLeft: 44 }}>
-                                        🚚 {incomingOrder.dropoffAddress}
-                                    </Text>
-                                </View>
-
-                                {/* PAYOUT INFO /}
-                                <View style={{
-                                    backgroundColor: theme.colors.primary + '10',
-                                    borderRadius: 12,
-                                    padding: 16,
-                                    marginBottom: 24,
-                                    alignItems: "center",
-                                    borderWidth: 1,
-                                    borderColor: theme.colors.primary + '30'
-                                }}>
-                                    <Text style={{ fontSize: 12, color: theme.colors.muted, marginBottom: 4 }}>
-                                        DELIVERY FEE
-                                    </Text>
-                                    <Text style={{ fontSize: 28, fontWeight: "900", color: theme.colors.primary }}>
-                                        ₦{(incomingOrder.payout || 0).toLocaleString()}
-                                    </Text>
-                                </View>
-
-                                {/* ACTION BUTTONS /}
-                                <View style={{ flexDirection: "row", gap: 16 }}>
-                                    <Pressable
-                                        onPress={rejectIncomingOrder}
-                                        style={{
-                                            flex: 0.35,
-                                            paddingVertical: 16,
-                                            borderRadius: 16,
-                                            backgroundColor: theme.colors.background,
-                                            borderWidth: 2,
-                                            borderColor: theme.colors.border,
-                                            alignItems: "center",
-                                            justifyContent: "center"
-                                        }}
-                                    >
-                                        <Icon name="close" size={20} color={theme.colors.muted} />
-                                        <Text style={{ 
-                                            fontSize: 12, 
-                                            fontWeight: "600", 
-                                            color: theme.colors.muted,
-                                            marginTop: 4
-                                        }}>
-                                            Reject
-                                        </Text>
-                                    </Pressable>
-                                    
-                                    <Pressable
-                                        onPress={() => acceptIncomingOrder(incomingOrder)}
-                                        style={{
-                                            flex: 0.65,
-                                            paddingVertical: 16,
-                                            borderRadius: 16,
-                                            backgroundColor: '#10b981',
-                                            alignItems: "center",
-                                            justifyContent: "center",
-                                            shadowColor: "#10b981",
-                                            shadowOpacity: 0.3,
-                                            shadowRadius: 8,
-                                            shadowOffset: { width: 0, height: 4 },
-                                            elevation: 8
-                                        }}
-                                    >
-                                        <Icon name="checkmark" size={24} color="white" />
-                                        <Text style={{ 
-                                            fontSize: 16, 
-                                            fontWeight: "800", 
-                                            color: "white",
-                                            marginTop: 4
-                                        }}>
-                                            Accept Order
-                                        </Text>
-                                    </Pressable>
-                                </View>
-                            </View>
-                        )}
-                    </View>
-                </Modal> */}
-
+                
                 {/* 🚀 NEW: Custom Alert Modal */}
                 <AlertModal
                     visible={alertModal.visible}

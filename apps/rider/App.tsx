@@ -9,17 +9,20 @@ import { useAuthStore } from './src/stores/auth';
 import { useSocket } from './src/hooks/useSocket';
 import React from 'react';
 import { useLocationMonitor } from './src/hooks/useLocationMonitor';
+import { useRiderStore } from "./src/stores/rider";
 
 const queryClient = new QueryClient();
 
 function AppContent() {
   const { hydrate } = useAuthStore();
-  
+  const { initializeNotifications } = useRiderStore();
+
   // 🚀 FIXED: Initialize socket at app level without parameters - persists across navigation
   useSocket();
 
   useEffect(() => {
     hydrate();
+    initializeNotifications();
   }, []);
 
   return (

@@ -206,4 +206,88 @@ export class RiderService {
             throw new CustomError('Failed to get rider status', 500);
         }
     }
+
+    // 🚀 NEW: Update rider push token
+    static async updatePushToken(userId: string, pushToken: string): Promise<any> {
+        try {
+            // Check if rider exists
+            const existingRider = await prisma.rider.findUnique({
+                where: { userId },
+                include: { user: true }
+            });
+
+            if (!existingRider) {
+                throw new CustomError('Rider not found', 404);
+            }
+
+            // Update push token
+            const updatedRider = await prisma.rider.update({
+                where: { userId },
+                data: { pushToken },
+                include: {
+                    user: {
+                        select: {
+                            id: true,
+                            email: true,
+                            name: true,
+                            phone: true,
+                            avatar: true,
+                            role: true,
+                            isActive: true,
+                            createdAt: true,
+                            updatedAt: true,
+                        }
+                    }
+                }
+            });
+
+            logger.info(`Push token updated for rider: ${updatedRider.user.email}`);
+
+            return {
+                id: updatedRider.id,
+                userId: updatedRider.userId,
+                vehicleType: updatedRider.vehicleType,
+                isOnline: updatedRider.isOnline,
+                isAvailable: updatedRider.isAvailable,
+                currentLat: updatedRider.currentLat,
+                currentLng: updatedRider.currentLng,
+                bankAccount: updatedRider.bankAccount,
+                earnings: updatedRider.earnings,
+                completedOrders: updatedRider.completedOrders,
+                rating: updatedRider.rating,
+                pushToken: updatedRider.pushToken,
+                createdAt: updatedRider.createdAt,
+                updatedAt: updatedRider.updatedAt,
+                user: updatedRider.user
+            };
+        } catch (error: any) {
+            logger.error({ error, userId }, 'Error updating rider push token');
+            if (error instanceof CustomError) {
+                throw error;
+            }
+            throw new CustomError('Failed to update push token', 500);
+        }
+    }
+
+    // 🚀 NEW: Get rider push token
+    static async getPushToken(userId: string): Promise<string | null> {
+        try {
+            const rider = await prisma.rider.findUnique({
+                where: { userId },
+                select: { pushToken: true }
+            });
+
+            if (!rider) {
+                throw new CustomError('Rider not found', 404);
+            }
+
+            return rider.pushToken;
+        } catch (error: any) {
+            logger.error({ error, userId }, 'Error getting rider push token');
+            if (error instanceof CustomError) {
+                throw error;
+            }
+            throw new CustomError('Failed to get push token', 500);
+        }
+    }
 }

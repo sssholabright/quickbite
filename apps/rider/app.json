@@ -43,7 +43,8 @@
                 "android.permission.ACCESS_FINE_LOCATION"
             ],
             "edgeToEdgeEnabled": true,
-            "predictiveBackGestureEnabled": false
+            "predictiveBackGestureEnabled": false,
+            "googleServicesFile": "./google-services.json"
         },
         "web": {
             "favicon": "../mobile/assets/favicon.png"
@@ -57,7 +58,9 @@
             [
                 "expo-notifications",
                 {
-                "color": "#FF4500"
+                    "color": "#FF4500",
+                    "androidMode": "default",
+                    "androidCollapsedTitle": "#{unread_notifications} new interactions"
                 }
             ],
             "expo-build-properties"

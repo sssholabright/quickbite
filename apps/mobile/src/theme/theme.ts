@@ -54,11 +54,11 @@ export const ThemeModeContext = createContext<ThemeMode>("system");
 
 // Custom hook to get system color scheme with better handling
 function useSystemColorScheme() {
-	const [colorScheme, setColorScheme] = useState<ColorSchemeName>(null);
 	const rnColorScheme = useColorScheme();
+	const [colorScheme, setColorScheme] = useState<ColorSchemeName>(rnColorScheme ?? null);
 
 	useEffect(() => {
-		setColorScheme(rnColorScheme ?? null); // handle undefined safely
+		setColorScheme(rnColorScheme ?? null);
 	}, [rnColorScheme]);
 
 	return colorScheme;

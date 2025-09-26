@@ -7,6 +7,7 @@ import { DeliveryJobBroadcast as DeliveryJobBroadcastType } from '../../types/de
 import { queueService } from '../queues/queue.service.js';
 import redisService from '../../config/redis.js';
 import { Socket } from 'socket.io';
+import { FCMService } from '../../services/fcm.service.js';
 
 export class DeliveryJobService {
     private static activeJobs = new Map<string, any>();
@@ -391,57 +392,6 @@ export class DeliveryJobService {
     }
 
     /**
-     * Handle case when no riders are available
-     */
-    private static async handleNoRidersAvailable(jobData: DeliveryJobData): Promise<void> {
-        try {
-            logger.warn(`🚫 No riders available for order ${jobData.orderId}`);
-
-            // Remove from active jobs and queue
-            this.activeJobs.delete(jobData.orderId);
-            const queueIndex = this.jobQueue.indexOf(jobData.orderId);
-            if (queueIndex > -1) {
-                this.jobQueue.splice(queueIndex, 1);
-            }
-
-            // Update order status to indicate no riders available
-            await prisma.order.update({
-                where: { id: jobData.orderId },
-                data: {
-                    status: 'CANCELLED',
-                    cancellationReason: 'No riders available',
-                    cancelledAt: new Date()
-                }
-            });
-
-            // Notify vendor and customer
-            const socketManager = getSocketManager();
-
-            // Notify vendor
-            socketManager.emitToVendor(jobData.vendorId, 'order_cancelled', {
-                orderId: jobData.orderId,
-                reason: 'No riders available',
-                message: 'Your order was cancelled because no riders are currently available'
-            });
-
-            // Notify customer
-            socketManager.emitToCustomer(jobData.customerId, 'order_cancelled', {
-                orderId: jobData.orderId,
-                reason: 'No riders available',
-                message: 'Your order was cancelled because no riders are currently available'
-            });
-
-            logger.info(`🚫 Order ${jobData.orderId} cancelled due to no riders available`);
-
-            // Continue processing next job
-            this.processJobQueue();
-
-        } catch (error) {
-            logger.error({ error, orderId: jobData.orderId }, 'Error handling no available riders');
-        }
-    }
-
-    /**
      * Find available riders excluding rejected ones and those with assigned orders
      */
     private static async findAvailableRiders(jobData: DeliveryJobData, rejectedRiders?: Set<string>): Promise<any[]> {
@@ -593,6 +543,33 @@ export class DeliveryJobService {
                 logger.info(`🔍 Emitting to rider:${rider.id}`);
                 manager.emitToRider(rider.id, 'new_delivery_job', broadcastData);
             });
+
+            // 🚀 NEW: Send FCM push notification to all available riders
+            const fcmPromises = riders.map(async (rider) => {
+                try {
+                    await FCMService.sendToRider(rider.id, {
+                        title: '🚚 New Delivery Job Available!',
+                        body: `Order from ${broadcastData.vendorName} - ${broadcastData.deliveryFee} delivery fee`,
+                        data: {
+                            orderId: broadcastData.orderId,
+                            type: 'new_delivery_job',
+                            vendorName: broadcastData.vendorName,
+                            deliveryFee: broadcastData.deliveryFee,
+                            expiresAt: broadcastData.expiresAt.toISOString()
+                        }
+                    }, {
+                        orderId: broadcastData.orderId,
+                        riderId: rider.id
+                    })
+
+                    logger.info(`🔍 Sent FCM push notification to rider:${rider.id}`);
+                } catch (error) {
+                    logger.error({ error, riderId: rider.id }, 'Error sending FCM push notification');
+                }
+            })
+
+            // Wait for all FCM notifications to be sent
+            await Promise.allSettled(fcmPromises);
             
             logger.info(`Delivery job broadcasted to ${riders.length} riders for order ${broadcastData.orderId}`);
         } catch (error) {

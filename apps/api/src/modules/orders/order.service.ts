@@ -5,6 +5,7 @@ import { CreateOrderRequest, OrderFilters, OrderResponse, OrderStatusUpdate } fr
 import { getSocketManager } from '../../config/socket.js';
 import { DeliveryJobData } from '../../types/queue.js';
 import { queueService } from '../queues/queue.service.js';
+import { FCMService } from '../../services/fcm.service.js';
 
 export class OrderService {
     // Create new order
@@ -1139,5 +1140,30 @@ export class OrderService {
         }
 
         return where;
+    }
+
+    // 🚀 NEW: Send order notification to rider
+    static async notifyRiderAboutOrder(orderId: string, message: string): Promise<void> {
+        try {
+            const order = await prisma.order.findUnique({
+                where: { id: orderId },
+                include: { rider: true }
+            });
+
+            if (!order || !order.riderId) {
+                logger.warn(`No rider assigned to order: ${orderId}`);
+                return;
+            }
+
+            await FCMService.sendToRider(order.riderId, {
+                title: 'New Order Assignment',
+                body: message,
+                data: { orderId, type: 'order_assignment' }
+            }, { orderId });
+
+            logger.info(`Order notification sent to rider: ${order.riderId}`);
+        } catch (error) {
+            logger.error({ error, orderId }, 'Failed to send order notification to rider');
+        }
     }
 }

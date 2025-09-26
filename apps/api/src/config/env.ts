@@ -42,6 +42,10 @@ const envSchema = z.object({
 
     // 🚀 NEW: Socket configuration
     SOCKET_CORS_ORIGINS: z.string().optional(),
+
+    // 🚀 NEW: FCM configuration
+    FCM_PROJECT_ID: z.string().optional(),
+    FCM_SERVER_KEY: z.string().optional()
 });
 
 // Validate and export environment variables

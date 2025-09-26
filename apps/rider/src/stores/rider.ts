@@ -2,16 +2,21 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import riderService from '../services/riderService';
+import notificationService from '../services/notificationService';
 
 interface RiderState {
     isOnline: boolean;
     isLoading: boolean;
     error: string | null;
     socket: any;
+    pushToken: string | null;
+    notificationsEnabled: boolean;
     
     // Actions
     setOnlineStatus: (isOnline: boolean) => Promise<void>;
     toggleOnlineStatus: () => Promise<void>;
+    initializeNotifications: () => Promise<void>;
+    sendTestNotification: () => Promise<void>;
     
     // 🚀 NEW: Socket reference for emitting events
     setSocket: (socket: any) => void;
@@ -24,6 +29,8 @@ export const useRiderStore = create<RiderState>()(
             isLoading: false,
             error: null,
             socket: null,
+            pushToken: null,
+            notificationsEnabled: false,
 
             setOnlineStatus: async (isOnline: boolean) => {
                 try {
@@ -68,12 +75,62 @@ export const useRiderStore = create<RiderState>()(
                 await get().setOnlineStatus(!isOnline);
             },
 
+            initializeNotifications: async () => {
+                try {
+                    console.log('🔔 Initializing notifications...');
+                    const token = await notificationService.initialize();
+                    
+                    if (token) {
+                        set({ 
+                            pushToken: token, 
+                            notificationsEnabled: true 
+                        });
+                        
+                        // Send token to backend
+                        await riderService.updatePushToken(token);
+                        console.log('✅ Push token sent to backend');
+                    } else {
+                        set({ notificationsEnabled: false });
+                        console.log('❌ Failed to get push token');
+                    }
+                } catch (error: any) {
+                    console.error('Error initializing notifications:', error);
+                    set({ 
+                        error: error.message,
+                        notificationsEnabled: false 
+                    });
+                }
+            },
+
+            sendTestNotification: async () => {
+                try {
+                    console.log('🧪 Sending test notifications...');
+                    
+                    // Test local notification
+                    await notificationService.scheduleLocalNotification({
+                        title: ' Local Test',
+                        body: 'This is a local notification test',
+                        data: { type: 'local_test' }
+                    });
+                    
+                    // Test push notification
+                    await notificationService.testPushNotification();
+                    
+                } catch (error) {
+                    console.error('❌ Error sending test notifications:', error);
+                }
+            },
+
             setSocket: (socket) => set({ socket }),
         }),
         {
             name: 'rider-status-storage',
-            storage: createJSONStorage(() => AsyncStorage), // 🚀 FIX: Use AsyncStorage
-            partialize: (state) => ({ isOnline: state.isOnline }),
+            storage: createJSONStorage(() => AsyncStorage),
+            partialize: (state) => ({ 
+                isOnline: state.isOnline,
+                pushToken: state.pushToken,
+                notificationsEnabled: state.notificationsEnabled
+            }),
             onRehydrateStorage: () => (state) => {
                 console.log('💾 Rehydrating rider store:', state);
             },

@@ -155,6 +155,18 @@ const riderService = {
             throw new Error(error.response?.data?.message || 'Failed to get order details');
         }
     },
+
+    // 🚀 NEW: Update push token
+    async updatePushToken(pushToken: string): Promise<any> {
+        try {
+            const response = await apiClient.patch<ApiResponse<any>>('/riders/push-token', {
+                pushToken
+            });
+            return response.data.data;
+        } catch (error: any) {
+            throw new Error(error.response?.data?.message || 'Failed to update push token');
+        }
+    },
 };
 
 export default riderService;

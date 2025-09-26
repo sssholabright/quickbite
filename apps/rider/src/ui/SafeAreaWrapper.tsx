@@ -23,11 +23,20 @@ export function SafeAreaWrapper({
     
     const bgColor = backgroundColor || theme.colors.background;
     const statusBarBg = statusBarBackgroundColor || bgColor;
+    
+    // Auto-determine status bar style based on theme
+    const getStatusBarStyle = () => {
+        if (statusBarStyle === "auto") {
+            // Use light content for dark themes, dark content for light themes
+            return theme.mode === "dark" ? "light-content" : "dark-content";
+        }
+        return statusBarStyle === "light" ? "light-content" : "dark-content";
+    };
 
     return (
         <>
             <StatusBar
-                barStyle={statusBarStyle === "light" ? "light-content" : "dark-content"}
+                barStyle={getStatusBarStyle()}
                 backgroundColor={statusBarBg}
                 translucent={false}
             />
