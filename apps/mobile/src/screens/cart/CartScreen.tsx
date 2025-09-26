@@ -11,7 +11,7 @@ import type { RootStackParamList } from '../../navigation/types';
 import { useCartStore } from '../../stores/cart';
 import { LinearGradient } from 'expo-linear-gradient';
 
-type CartScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'AppTabs'>;
+type CartScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Checkout'>;
 
 interface CartScreenProps {
     visible: boolean;
@@ -58,7 +58,7 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
         const items = cartItemsList.map(item => ({
             id: item.id,
             name: item.name,
-            price: item.price,
+            price: item.price || 0,
             quantity: item.quantity
         }));
         
@@ -76,7 +76,7 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
             <View style={{
                 backgroundColor: theme.colors.background,
                 borderRadius: 16,
-                padding: 16,
+                padding: 8,
                 marginBottom: 12,
                 borderWidth: 1,
                 borderColor: theme.colors.border,
@@ -124,7 +124,7 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                             <View style={{ flex: 1, marginRight: 8 }}>
                                 <Text style={{
-                                    fontSize: 16,
+                                    fontSize: 14,
                                     fontWeight: '700',
                                     color: theme.colors.text,
                                     marginBottom: 2,
@@ -132,7 +132,7 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
                                     {item.name}
                                 </Text>
                                 <Text style={{
-                                    fontSize: 12,
+                                    fontSize: 10,
                                     color: theme.colors.muted,
                                     marginBottom: 4,
                                 }}>
@@ -170,11 +170,11 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
 
                                 {/* Price */}
                                 <Text style={{
-                                    fontSize: 16,
+                                    fontSize: 14,
                                     fontWeight: '700',
                                     color: theme.colors.primary,
                                 }}>
-                                    ₦{item.price.toLocaleString()}
+                                    ₦{(item.price || 0).toLocaleString()}
                                 </Text>
                             </View>
 
@@ -203,7 +203,7 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
                                 </Pressable>
                                 
                                 <Text style={{
-                                    fontSize: 14,
+                                    fontSize: 12,
                                     fontWeight: '600',
                                     color: theme.colors.text,
                                     marginHorizontal: 12,
@@ -243,9 +243,9 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
                                 alignSelf: 'flex-start'
                             }}
                         >
-                            <Icon name="trash" size={12} color={theme.colors.danger} />
+                            <Icon name="trash" size={10} color={theme.colors.danger} />
                             <Text style={{
-                                fontSize: 12,
+                                fontSize: 10,
                                 color: theme.colors.danger,
                                 marginLeft: 4,
                                 fontWeight: '500'
@@ -283,7 +283,7 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
                 <Icon name="shopping-cart" size={48} color={theme.colors.muted} />
             </View>
             <Text style={{
-                fontSize: 20,
+                fontSize: 18,
                 fontWeight: '700',
                 color: theme.colors.text,
                 marginBottom: 8,
@@ -292,7 +292,7 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
                 Your cart is empty
             </Text>
             <Text style={{
-                fontSize: 16,
+                fontSize: 14,
                 color: theme.colors.muted,
                 textAlign: 'center',
                 lineHeight: 24,
@@ -344,7 +344,7 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
                         }}>
                             <View>
                                 <Text style={{
-                                    fontSize: 24,
+                                    fontSize: 20,
                                     fontWeight: '800',
                                     color: 'white',
                                     marginBottom: 4,
@@ -352,7 +352,7 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
                                     Your Cart
                                 </Text>
                                 <Text style={{
-                                    fontSize: 14,
+                                    fontSize: 12,
                                     color: 'rgba(255,255,255,0.8)',
                                 }}>
                                     {cartItemsList.length} {cartItemsList.length === 1 ? 'item' : 'items'}
@@ -361,9 +361,9 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
                             <Pressable
                                 onPress={onClose}
                                 style={{
-                                    width: 40,
+                                    width: 36,
                                     height: 40,
-                                    borderRadius: 20,
+                                    borderRadius: 18,
                                     backgroundColor: 'rgba(255,255,255,0.2)',
                                     alignItems: 'center',
                                     justifyContent: 'center',
@@ -376,8 +376,9 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
                         {/* Cart Summary Card */}
                         <View style={{
                             backgroundColor: 'rgba(255,255,255,0.2)',
-                            borderRadius: 16,
-                            padding: 16,
+                            borderRadius: 12,
+                            paddingHorizontal: 12,
+                            paddingVertical: 8,
                         }}>
                             <View style={{
                                 flexDirection: 'row',
@@ -386,18 +387,18 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
                             }}>
                                 <View>
                                     <Text style={{
-                                        fontSize: 12,
+                                        fontSize: 10,
                                         color: 'rgba(255,255,255,0.8)',
                                         marginBottom: 2,
                                     }}>
                                         Total Amount
                                     </Text>
                                     <Text style={{
-                                        fontSize: 24,
+                                        fontSize: 16,
                                         fontWeight: '800',
                                         color: 'white',
                                     }}>
-                                        ₦{total.toLocaleString()}
+                                        ₦{total?.toLocaleString()}
                                     </Text>
                                 </View>
                                 <View style={{
@@ -407,7 +408,7 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
                                     borderRadius: 20,
                                 }}>
                                     <Text style={{
-                                        fontSize: 12,
+                                        fontSize: 10,
                                         color: 'white',
                                         fontWeight: '600',
                                     }}>
@@ -428,7 +429,7 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
                                 style={{ flex: 1 }}
                                 contentContainerStyle={{ 
                                     padding: 20,
-                                    paddingBottom: 100
+                                    paddingBottom: 50
                                 }}
                                 showsVerticalScrollIndicator={false}
                             />
@@ -442,7 +443,7 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
                                 backgroundColor: theme.colors.background,
                                 borderTopWidth: 1,
                                 borderTopColor: theme.colors.border,
-                                paddingTop: 20,
+                                paddingTop: 10,
                                 paddingBottom: insets.bottom,
                                 paddingHorizontal: 20,
                             }}>
@@ -451,25 +452,25 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
                                     <View style={{
                                         flexDirection: 'row',
                                         justifyContent: 'space-between',
-                                        marginBottom: 8,
+                                        marginBottom: 4,
                                     }}>
-                                        <Text style={{ fontSize: 14, color: theme.colors.muted }}>
+                                        <Text style={{ fontSize: 12, color: theme.colors.muted }}>
                                             Subtotal
                                         </Text>
-                                        <Text style={{ fontSize: 14, color: theme.colors.text }}>
-                                            ₦{subtotal.toLocaleString()}
+                                        <Text style={{ fontSize: 12, color: theme.colors.text }}>
+                                            ₦{subtotal?.toLocaleString()}
                                         </Text>
                                     </View>
                                     <View style={{
                                         flexDirection: 'row',
                                         justifyContent: 'space-between',
-                                        marginBottom: 8,
+                                        marginBottom: 4,
                                     }}>
-                                        <Text style={{ fontSize: 14, color: theme.colors.muted }}>
+                                        <Text style={{ fontSize: 12, color: theme.colors.muted }}>
                                             Delivery Fee
                                         </Text>
-                                        <Text style={{ fontSize: 14, color: theme.colors.text }}>
-                                            ₦{deliveryFee.toLocaleString()}
+                                        <Text style={{ fontSize: 12, color: theme.colors.text }}>
+                                            ₦{deliveryFee?.toLocaleString()}
                                         </Text>
                                     </View>
                                     <View style={{
@@ -477,11 +478,11 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
                                         justifyContent: 'space-between',
                                         marginBottom: 12,
                                     }}>
-                                        <Text style={{ fontSize: 14, color: theme.colors.muted }}>
+                                        <Text style={{ fontSize: 12, color: theme.colors.muted }}>
                                             Service Fee
                                         </Text>
-                                        <Text style={{ fontSize: 14, color: theme.colors.text }}>
-                                            ₦{serviceFee.toLocaleString()}
+                                        <Text style={{ fontSize: 12, color: theme.colors.text }}>
+                                            ₦{serviceFee?.toLocaleString()}
                                         </Text>
                                     </View>
                                     <View style={{
@@ -494,18 +495,18 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
                                         justifyContent: 'space-between',
                                     }}>
                                         <Text style={{
-                                            fontSize: 18,
+                                            fontSize: 16,
                                             fontWeight: '700',
                                             color: theme.colors.text,
                                         }}>
                                             Total
                                         </Text>
                                         <Text style={{
-                                            fontSize: 18,
+                                            fontSize: 16,
                                             fontWeight: '700',
                                             color: theme.colors.primary,
                                         }}>
-                                            ₦{total.toLocaleString()}
+                                            ₦{total?.toLocaleString()}
                                         </Text>
                                     </View>
                                 </View>
@@ -516,7 +517,7 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
                                     onPress={handleProceedToCheckout}
                                     style={{
                                         borderRadius: 12,
-                                        paddingVertical: 16,
+                                        paddingVertical: 12,
                                     }}
                                 />
                             </View>
