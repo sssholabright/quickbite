@@ -67,18 +67,27 @@ export class SocketService {
 
                 // Set role-specific IDs
                 if (decoded.role === 'VENDOR') {
-                    socket.vendorId = decoded.userId;
+                    // Get actual vendor ID from database
+                    const vendor = await prisma.vendor.findUnique({
+                        where: { userId: decoded.userId },
+                        select: { id: true }
+                    });
+                    socket.vendorId = vendor?.id || '';
                 } else if (decoded.role === 'CUSTOMER') {
-                    socket.customerId = decoded.userId;
+                    // Get actual customer ID from database
+                    const customer = await prisma.customer.findUnique({
+                        where: { userId: decoded.userId },
+                        select: { id: true }
+                    });
+                    socket.customerId = customer?.id || '';
                 } else if (decoded.role === 'RIDER') {
                     // Get actual rider ID from database
                     const rider = await prisma.rider.findUnique({
                         where: { userId: decoded.userId },
                         select: { id: true }
                     });
-                    socket.riderId = rider?.id || null;
+                    socket.riderId = rider?.id || '';
                 }
-
                 next();
             } catch (error) {
                 console.log('Socket authentication error:', error);

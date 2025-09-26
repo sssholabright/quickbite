@@ -162,8 +162,67 @@ export class OrderService {
             // Emit WebSocket events
             try {
                 const socketManager = getSocketManager();
+                
+                // Emit to riders
                 socketManager.emitToAllRiders('new_order', { order: formattedOrder });
+                
+                // Emit to order room
                 socketManager.emitToOrder(order.id, 'order_updated', { order: formattedOrder });
+
+                console.log('🔍 DEBUG: About to emit notification');
+                console.log('🔍 DEBUG: Vendor ID:', orderData.vendorId);
+                console.log('🔍 DEBUG: Order ID:', order.id);
+                console.log('🔍 DEBUG: Order Number:', order.orderNumber);
+
+                try {
+                    const notificationData = {
+                        id: `new-order-${order.id}-${Date.now()}`,
+                        type: 'order',
+                        title: 'New Order Received!',
+                        message: `Order #${order.orderNumber} from ${order.customer.user.name} - ₦${order.total} total`,
+                        priority: 'high',
+                        data: { 
+                            orderId: order.id, 
+                            orderNumber: order.orderNumber,
+                            customerName: order.customer.user.name,
+                            totalAmount: order.total,
+                            itemCount: order.items.length
+                        },
+                        actions: [
+                            { 
+                                label: 'View Order', 
+                                action: 'view_order', 
+                                data: { orderId: order.id } 
+                            },
+                            { 
+                                label: 'Accept Order', 
+                                action: 'accept_order', 
+                                data: { orderId: order.id } 
+                            }
+                        ],
+                        timestamp: new Date().toISOString(),
+                        read: false
+                    };
+
+                    console.log('🔍 DEBUG: Notification data prepared:', notificationData);
+    
+                    // Check if vendor room exists
+                    const io = socketManager.getIO();
+                    const vendorRoom = io.sockets.adapter.rooms.get(`vendor:${orderData.vendorId}`);
+                    console.log('🔍 DEBUG: Vendor room exists:', !!vendorRoom);
+                    console.log('🔍 DEBUG: Vendor room size:', vendorRoom?.size || 0);
+                    
+                    if (vendorRoom && vendorRoom.size > 0) {
+                        socketManager.emitToVendor(orderData.vendorId, 'notification_received', notificationData);
+                        console.log('✅ DEBUG: Notification emitted to vendor successfully');
+                    } else {
+                        console.log('❌ DEBUG: Vendor not connected, notification not sent');
+                    }
+                    
+                } catch (notificationError) {
+                    console.error('❌ DEBUG: Error preparing notification:', notificationError);
+                }
+                
             } catch (socketError) {
                 logger.error({ error: socketError }, 'Failed to emit socket events');
             }
@@ -443,8 +502,6 @@ export class OrderService {
                 }),
                 prisma.order.count({ where })
             ]);
-
-            console.log('🔍 Orders:', orders);
 
             return {
                 orders: orders.map(order => this.formatOrderResponse(order)),

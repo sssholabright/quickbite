@@ -1,7 +1,9 @@
 import { ReactNode, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../stores/authStore'
-import { FaHome, FaClipboardList, FaUtensils, FaUser, FaCog, FaBell, FaSignOutAlt, FaBars, FaTimes, FaTags } from 'react-icons/fa'
+import NotificationCenter from '../notifications/NotificationCenter'
+import NotificationToastContainer from '../notifications/NotificationToastContainer'
+import { FaHome, FaClipboardList, FaUtensils, FaUser, FaCog, FaSignOutAlt, FaBars, FaTimes, FaTags } from 'react-icons/fa'
 
 interface VendorLayoutProps {
     children: ReactNode
@@ -111,11 +113,8 @@ export default function VendorLayout({ children }: VendorLayoutProps) {
 
                         {/* Right side - Notifications and vendor info */}
                         <div className="flex items-center space-x-4 ml-auto">
-                            {/* Notifications */}
-                            <button className="relative p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
-                                <FaBell className="w-5 h-5" />
-                                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-                            </button>
+                            {/* Enhanced Notifications */}
+                            <NotificationCenter />
 
                             {/* Vendor info */}
                             <div className="flex items-center">
@@ -136,6 +135,9 @@ export default function VendorLayout({ children }: VendorLayoutProps) {
                     {children}
                 </main>
             </div>
+
+            {/* Notification Toast Container */}
+            <NotificationToastContainer />
         </div>
     )
 }

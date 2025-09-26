@@ -80,12 +80,90 @@ export class OrderController {
     // Update order status
     static async updateOrderStatus(req: Request, res: Response): Promise<void> {
         try {
+            const { getSocketManager } = await import('../../config/socket.js');
+            const socketManager = getSocketManager();
+
             const { orderId } = req.params;
             const userId = (req.user as any).userId as string; // Change from 'id' to 'userId'
             const userRole = (req.user as any).role as string;
             const validatedData = updateOrderStatusSchema.parse(req.body);
 
             const order = await OrderService.updateOrderStatus(orderId!, validatedData, userId, userRole);
+
+            socketManager.emitToOrder(orderId!, 'order_updated', { order: order });
+
+                // 🚀 NEW: Emit notification based on status change
+                let notificationTitle = '';
+                let notificationMessage = '';
+                let priority: 'low' | 'normal' | 'high' | 'urgent' = 'normal';
+                
+                switch (validatedData.status) {
+                    case 'CONFIRMED':
+                        notificationTitle = 'Order Confirmed';
+                        notificationMessage = `Order #${order.orderNumber} has been confirmed`;
+                        priority = 'high';
+                        break;
+                    case 'PREPARING':
+                        notificationTitle = 'Order Being Prepared';
+                        notificationMessage = `Order #${order.orderNumber} is being prepared`;
+                        priority = 'normal';
+                        break;
+                    case 'READY_FOR_PICKUP':
+                        notificationTitle = 'Order Ready for Pickup!';
+                        notificationMessage = `Order #${order.orderNumber} is ready for pickup`;
+                        priority = 'high';
+                        break;
+                    case 'PICKED_UP':
+                        notificationTitle = 'Order Picked Up';
+                        notificationMessage = `Order #${order.orderNumber} has been picked up`;
+                        priority = 'high';
+                        break;
+                    case 'OUT_FOR_DELIVERY':
+                        notificationTitle = 'Order Out for Delivery';
+                        notificationMessage = `Order #${order.orderNumber} is out for delivery`;
+                        priority = 'high';
+                        break;
+                    case 'DELIVERED':
+                        notificationTitle = 'Order Delivered';
+                        notificationMessage = `Order #${order.orderNumber} has been delivered`;
+                        priority = 'high';
+                        break;
+                    case 'CANCELLED':
+                        notificationTitle = 'Order Cancelled';
+                        notificationMessage = `Order #${order.orderNumber} has been cancelled`;
+                        priority = 'high';
+                        break;
+                    default:
+                        notificationTitle = 'Order Status Updated';
+                        notificationMessage = `Order #${order.orderNumber} status changed to ${validatedData.status}`;
+                        priority = 'normal';
+                }
+                
+                // Notify customer
+                if (order.customer) {
+                    socketManager.emitToCustomer(order.customer.id, 'notification_received', {
+                        id: `order-status-${order.id}-${Date.now()}`,
+                        type: 'order',
+                        title: notificationTitle,
+                        message: notificationMessage,
+                        priority: priority,
+                        data: { orderId: order.id, status: validatedData.status },
+                        timestamp: new Date().toISOString(),
+                        read: false
+                    });
+                }
+                
+                // Notify vendor
+                socketManager.emitToVendor(order.vendor.id, 'notification_received', {
+                    id: `order-status-vendor-${order.id}-${Date.now()}`,
+                    type: 'order',
+                    title: notificationTitle,
+                    message: notificationMessage,
+                    priority: priority,
+                        data: { orderId: order.id, status: validatedData.status },
+                    timestamp: new Date().toISOString(),
+                    read: false
+                });
 
             res.json({
                 success: true,
