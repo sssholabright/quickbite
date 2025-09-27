@@ -445,12 +445,15 @@ export const useSocket = () => {
             // Remove from delivery jobs
             removeDeliveryJob(data.orderId);
             
-            // Update rider status to unavailable
-            const { setOnlineStatus } = useRiderStore.getState();
-            setOnlineStatus(false);
+            // 🚀 FIXED: Update rider status to unavailable (NOT offline)
+            const { updateRiderStatus } = useRiderStore.getState();
+            updateRiderStatus({ 
+                isOnline: true,      // Keep online
+                isAvailable: false   // Make unavailable for new orders
+            });
             
             // Show success message
-            // Alert.alert('Job Accepted', 'You have successfully accepted this delivery job'); // This line was removed from the original file
+            // Alert.alert('Job Accepted', 'You have successfully accepted this delivery job');
         });
 
         // 🚀 NEW: Handle delivery job rejection confirmation

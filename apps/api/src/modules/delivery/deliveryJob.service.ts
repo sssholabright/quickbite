@@ -55,6 +55,9 @@ export class DeliveryJobService {
         this.isProcessing = true;
         logger.info(`🔄 Starting job queue processing (${this.jobQueue.length} jobs pending)`);
 
+        // 🚀 NEW: Collect orders with no riders by vendor
+        const ordersWithNoRidersByVendor = new Map<string, string[]>();
+
         while (this.jobQueue.length > 0) {
             const orderId = this.jobQueue.shift();
             if (!orderId) continue;
@@ -63,7 +66,7 @@ export class DeliveryJobService {
             if (!jobInfo) continue;
 
             try {
-                await this.processSingleJob(jobInfo);
+                await this.processSingleJob(jobInfo, ordersWithNoRidersByVendor);
                 
                 // Wait 5 seconds before next job
                 if (this.jobQueue.length > 0) {
@@ -75,6 +78,9 @@ export class DeliveryJobService {
             }
         }
 
+        // 🚀 NEW: Send batched notifications
+        await this.sendBatchedNoRidersNotifications(ordersWithNoRidersByVendor);
+
         this.isProcessing = false;
         logger.info(`✅ Job queue processing completed`);
     }
@@ -82,7 +88,7 @@ export class DeliveryJobService {
     /**
      * Process ONE job with 60-second timeout
      */
-    private static async processSingleJob(jobInfo: any): Promise<void> {
+    private static async processSingleJob(jobInfo: any, ordersWithNoRidersByVendor: Map<string, string[]>): Promise<void> {
         const { jobData, socketManager, rejectedRiders } = jobInfo;
         
         logger.info(`🎯 Processing order ${jobData.orderId} (attempt ${jobInfo.attempts + 1})`);
@@ -97,13 +103,11 @@ export class DeliveryJobService {
             jobInfo.status = 'WAITING_FOR_RIDERS';
             this.activeJobs.delete(jobData.orderId);
             
-            // Notify vendor that no riders are currently available
-            const socketManager = getSocketManager();
-            socketManager.emitToVendor(jobData.vendorId, 'no_riders_available', {
-                orderId: jobData.orderId,
-                message: 'No riders are currently available. Order will be broadcast when riders come online.',
-                status: 'waiting_for_riders'
-            });
+            // 🚀 NEW: Collect instead of immediately notify
+            if (!ordersWithNoRidersByVendor.has(jobData.vendorId)) {
+                ordersWithNoRidersByVendor.set(jobData.vendorId, []);
+            }
+            ordersWithNoRidersByVendor.get(jobData.vendorId)!.push(jobData.orderId);
             
             return; // Keep order in READY_FOR_PICKUP status
         }
@@ -224,10 +228,13 @@ export class DeliveryJobService {
                 throw new CustomError('Order already assigned to another rider', 400);
             }
 
-            // 🚀 NEW: Update rider status to unavailable (they now have an assigned order)
+            // 🚀 FIXED: Update rider status to unavailable (they now have an assigned order)
             await prisma.rider.update({
                 where: { id: riderId },
-                data: { isAvailable: false }
+                data: { 
+                    isAvailable: false,  // Not available for new orders
+                    isOnline: true       // Keep online (they're still connected)
+                }
             });
 
             logger.info(`🚫 Rider ${riderId} marked as unavailable (has assigned order ${orderId})`);
@@ -402,16 +409,17 @@ export class DeliveryJobService {
      */
     public static async checkWaitingOrders(): Promise<void> {
         try {
-            logger.info(` Checking for orders waiting for riders...`);
+            logger.info(`🔍 Checking for orders waiting for riders...`);
 
             // Find orders that are READY_FOR_PICKUP but not assigned
             const waitingOrders = await prisma.order.findMany({
                 where: {
                     status: 'READY_FOR_PICKUP',
                     riderId: null,
-                    createdAt: {
-                        gte: new Date(Date.now() - 24 * 60 * 60 * 1000) // Only orders from last 24 hours
-                    }
+                    // 🚀 FIXED: Remove 24-hour filter to get ALL waiting orders
+                    // createdAt: {
+                    //     gte: new Date(Date.now() - 24 * 60 * 60 * 1000)
+                    // }
                 },
                 include: {
                     vendor: {
@@ -706,6 +714,22 @@ export class DeliveryJobService {
             logger.info(`Sent delivery_job_removed for already assigned order ${orderId}`);
         } catch (error) {
             logger.error({ error, orderId }, 'Error handling already assigned order');
+        }
+    }
+
+    // 🚀 NEW: Send batched notifications instead of individual ones
+    private static async sendBatchedNoRidersNotifications(ordersWithNoRidersByVendor: Map<string, string[]>): Promise<void> {
+        const socketManager = getSocketManager();
+        
+        for (const [vendorId, orderIds] of ordersWithNoRidersByVendor) {
+            if (orderIds.length > 0) {
+                socketManager.emitToVendor(vendorId, 'no_riders_available', {
+                    orderIds: orderIds,
+                    message: `No riders are currently available for ${orderIds.length} order(s). Orders will be broadcast when riders come online.`,
+                    status: 'waiting_for_riders'
+                });
+                logger.info(`📢 Sent batched no-riders notification to vendor ${vendorId} for ${orderIds.length} orders`);
+            }
         }
     }
 }

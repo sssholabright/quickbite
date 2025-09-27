@@ -48,29 +48,32 @@ export const useNotificationStore = create<NotificationState>()(
 
             addNotification: (notification) => {
                 console.log('🔔 Store: Adding notification:', notification);
-                console.log('🔔 Store: Notification ID:', notification.id);
-                console.log('🔔 Store: Notification read status:', notification.read);
                 
                 set((state) => {
-                    // Check if notification already exists
-                    const exists = state.notifications.find((n) => n.id === notification.id);
+                    // 🚀 IMPROVED: Better deduplication logic
+                    const exists = state.notifications.find((n) => 
+                        n.id === notification.id || 
+                        (n.type === notification.type && 
+                         n.data?.orderId === notification.data?.orderId && 
+                         n.data?.status === notification.data?.status &&
+                         Math.abs(new Date(n.timestamp).getTime() - new Date(notification.timestamp).getTime()) < 5000) // Within 5 seconds
+                    );
+                    
                     if (exists) {
-                        console.log('⚠️ Store: Notification already exists, skipping');
+                        console.log('⚠️ Store: Duplicate notification detected, skipping');
                         return state;
                     }
-            
+
                     // Check if notification has expired
                     if (notification.expiresAt && new Date(notification.expiresAt) < new Date()) {
                         console.log('⚠️ Store: Notification expired, skipping');
                         return state;
                     }
-            
+
                     // Add to beginning of array and limit to 50 notifications
                     const newNotifications = [notification, ...state.notifications].slice(0, 50);
                     
                     console.log('✅ Store: Notification added successfully');
-                    console.log('🔔 Store: Total notifications:', newNotifications.length);
-                    console.log('🔔 Store: Unread count:', state.unreadCount + 1);
                     
                     return {
                         notifications: newNotifications,

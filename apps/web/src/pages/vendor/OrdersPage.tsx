@@ -10,13 +10,19 @@ import { useEnhancedOrders } from '../../hooks/useEnhancedOrders'
 import { useRealtimeStore } from '../../stores/realtimeStore'
 import { showConfirm, showSuccess, showError } from '../../utils/sweetAlert'
 import Pagination from '../../components/ui/Pagination'
+import React from 'react'
+import { ORDER_PRIORITY } from '../../types/order'
 
 export default function OrdersPage() {
     const [showFilters, setShowFilters] = useState(false)
     const [autoRefresh, setAutoRefresh] = useState(true)
-    const [filters, setFilters] = useState<OrderFiltersType>({})
+    // 🚀 NEW: Default filters with priority sorting
+    const [filters, setFilters] = useState<OrderFiltersType>({
+        sortBy: 'priority', // Default to priority sorting
+        sortOrder: 'asc'    // Ascending for priority (Pending first)
+    })
     const [currentPage, setCurrentPage] = useState(1)
-    const [itemsPerPage] = useState(10) // You can make this configurable
+    const [itemsPerPage] = useState(10)
 
     // Enhanced orders with real-time updates
     const { 
@@ -37,6 +43,24 @@ export default function OrdersPage() {
     const { connectionStatus } = useRealtimeStore()
 
     const orders = ordersData?.orders || []
+
+    // 🚀 NEW: Apply client-side priority sorting as fallback
+    const sortedOrders = React.useMemo(() => {
+        if (filters.sortBy === 'priority') {
+            return [...orders].sort((a, b) => {
+                const priorityA = ORDER_PRIORITY[a.status] || 999
+                const priorityB = ORDER_PRIORITY[b.status] || 999
+                
+                if (priorityA !== priorityB) {
+                    return priorityA - priorityB
+                }
+                
+                // If same priority, sort by creation date
+                return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+            })
+        }
+        return orders
+    }, [orders, filters.sortBy])
 
     // Auto-refresh functionality
     // useEffect(() => {
@@ -186,139 +210,134 @@ export default function OrdersPage() {
     return (
         <VendorLayout>
             <div className="space-y-6">
-                {/* Header with connection status */}
-                <div className="flex justify-between items-center">
-                    <div className="flex items-center space-x-4">
-                        <h1 className="text-2xl font-bold text-gray-900 flex items-center">
-                            <FaClipboardList className="mr-3" />
-                            Orders
-                        </h1>
-                        
-                        {/* Connection status indicator */}
-                        <div className={`flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                            connectionStatus === 'connected' 
-                                ? 'bg-green-100 text-green-800' 
-                                : 'bg-red-100 text-red-800'
-                        }`}>
-                            <FaWifi className={`w-3 h-3 mr-1 ${
-                                connectionStatus === 'connected' ? 'text-green-600' : 'text-red-600'
-                            }`} />
-                            {connectionStatus === 'connected' ? 'LIVE' : 'OFFLINE'}
-                        </div>
+                {/* Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div>
+                        <h1 className="text-2xl font-bold text-gray-900">Orders</h1>
+                        <p className="text-gray-600">Manage and track your orders</p>
                     </div>
                     
-                    <div className="flex items-center space-x-3">
-                        {/* Auto-refresh toggle */}
-                        {/* <label className="flex items-center">
-                            <input
-                                type="checkbox"
-                                checked={autoRefresh}
-                                onChange={(e) => setAutoRefresh(e.target.checked)}
-                                className="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500"
-                            />
-                            <span className="ml-2 text-sm text-gray-600">Auto-refresh</span>
-                        </label> */}
-                        
-                        {/* Manual refresh */}
-                        {/* <button
-                            onClick={handleRefresh}
-                            disabled={isLoading}
-                            className="flex items-center px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-                        >
-                            <FaSync className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-                            Refresh
-                        </button> */}
-                        
-                        {/* Filters toggle */}
+                    <div className="flex items-center gap-3">
+                        {/* Connection Status */}
+                        <div className="flex items-center gap-2">
+                            <div className={`w-2 h-2 rounded-full ${
+                                connectionStatus === 'connected' ? 'bg-green-500' : 'bg-red-500'
+                            }`} />
+                            <span className="text-sm text-gray-600">
+                                {connectionStatus === 'connected' ? 'Connected' : 'Disconnected'}
+                            </span>
+                        </div>
+
+                        {/* Filter Toggle */}
                         <button
                             onClick={() => setShowFilters(!showFilters)}
-                            className="flex items-center px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                            className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${
+                                showFilters 
+                                    ? 'bg-primary-50 border-primary-200 text-primary-700' 
+                                    : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                            }`}
                         >
-                            <FaFilter className="w-4 h-4 mr-2" />
+                            <FaFilter className="w-4 h-4" />
                             Filters
+                        </button>
+
+                        {/* Refresh Button */}
+                        <button
+                            onClick={handleRefresh}
+                            disabled={isLoading}
+                            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                            <FaSync className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+                            Refresh
                         </button>
                     </div>
                 </div>
 
-                {/* Error message */}
-                {error && (
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                        <p className="text-red-600">{error.message}</p>
-                    </div>
-                )}
-
-                {/* Order Statistics - shows total stats from database */}
+                {/* Order Statistics */}
                 {stats && <OrderStats stats={stats} />}
 
                 {/* Filters */}
                 {showFilters && (
                     <OrderFilters 
-                        filters={filters}
-                        onFiltersChange={handleFilterChange}
+                        filters={filters} 
+                        onFiltersChange={handleFilterChange} 
                     />
                 )}
-                
 
-                {/* Orders by Status */}
-                {isLoading ? (
-                    <div className="space-y-4">
-                        {[...Array(5)].map((_, i) => (
-                            <div key={i} className="bg-white rounded-lg border border-gray-200 p-6 animate-pulse">
-                                <div className="h-4 bg-gray-200 rounded w-1/4 mb-2"></div>
-                                <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                {/* Orders List */}
+                <div className="bg-white rounded-lg border border-gray-200">
+                    <div className="p-6 border-b border-gray-200">
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-lg font-semibold text-gray-900">
+                                Orders ({ordersData?.total || 0})
+                            </h2>
+                            
+                            {/* Sort Indicator */}
+                            <div className="text-sm text-gray-500">
+                                {filters.sortBy === 'priority' ? 'Sorted by Priority (Pending First)' : 
+                                 `Sorted by ${filters.sortBy} (${filters.sortOrder})`}
                             </div>
-                        ))}
-                    </div>
-                ) : orders.length > 0 ? (
-                    <div className="space-y-4">
-                        {orders.map((order) => (
-                            <OrderCard
-                                key={order.id}
-                                order={order}
-                                onAccept={() => handleAcceptOrder(order.id)}
-                                onReject={() => handleRejectOrder(order.id)}
-                                onStatusUpdate={(status) => handleStatusUpdate(order.id, status)}
-                                onMarkReady={() => handleMarkReady(order.id)}
-                                isLoading={updateOrderStatusMutation.isPending || cancelOrderMutation.isPending}
-                            />
-                        ))}
-                        
-                        {/* Pagination */}
-                        {ordersData && (
-                            <div className="mt-8">
-                                <Pagination
-                                    currentPage={currentPage}
-                                    totalPages={Math.ceil(ordersData.total / itemsPerPage)}
-                                    totalItems={ordersData.total}
-                                    itemsPerPage={itemsPerPage}
-                                    onPageChange={handlePageChange}
-                                />
-                            </div>
-                        )}
-                    </div>
-                ) : (
-                    <div className="text-center py-12">
-                        <FaClipboardList className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                        <h3 className="text-lg font-medium text-gray-900 mb-2">No orders found</h3>
-                        <p className="text-gray-500">
-                            {Object.keys(filters).length > 0 
-                                ? 'Try adjusting your filters to see more orders.'
-                                : 'Orders will appear here when customers place them.'
-                            }
-                        </p>
-                    </div>
-                )}
-
-                {/* No orders message */}
-                {orders.length === 0 && !isLoading && (
-                    <div className="text-center py-12">
-                        <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <FaClipboardList className="w-8 h-8 text-gray-400" />
                         </div>
-                        <h3 className="text-lg font-medium text-gray-900 mb-2">No orders found</h3>
-                        <p className="text-gray-600">Orders will appear here when customers place them.</p>
                     </div>
-                )}
+
+                    {isLoading ? (
+                        <div className="p-8 text-center">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
+                            <p className="mt-2 text-gray-600">Loading orders...</p>
+                        </div>
+                    ) : error ? (
+                        <div className="p-8 text-center">
+                            <FaExclamationTriangle className="w-8 h-8 text-red-500 mx-auto mb-2" />
+                            <p className="text-red-600">Failed to load orders</p>
+                            <button
+                                onClick={handleRefresh}
+                                className="mt-2 text-primary-600 hover:text-primary-700"
+                            >
+                                Try again
+                            </button>
+                        </div>
+                    ) : sortedOrders.length === 0 ? (
+                        <div className="p-8 text-center">
+                            <FaClipboardList className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                            <p className="text-gray-600">No orders found</p>
+                            {Object.keys(filters).length > 0 && (
+                                <button
+                                    onClick={() => handleFilterChange({})}
+                                    className="mt-2 text-primary-600 hover:text-primary-700"
+                                >
+                                    Clear filters
+                                </button>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="divide-y divide-gray-200">
+                            {sortedOrders.map((order) => (
+                                <OrderCard
+                                    key={order.id}
+                                    order={order}
+                                    onStatusUpdate={(status) => handleStatusUpdate(order.id, status)}
+                                    onAccept={() => handleAcceptOrder(order.id)}
+                                    onReject={() => handleRejectOrder(order.id)}
+                                    onMarkReady={() => handleMarkReady(order.id)}
+                                    isLoading={isLoading}
+                                />
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Pagination */}
+                    {ordersData && ordersData.total > itemsPerPage && (
+                        <div className="p-6 border-t border-gray-200">
+                            <Pagination
+                                currentPage={currentPage}
+                                totalPages={Math.ceil(ordersData.total / itemsPerPage)}
+                                onPageChange={handlePageChange}
+                                totalItems={ordersData.total}
+                                itemsPerPage={itemsPerPage}
+                            />
+                        </div>
+                    )}
+                </div>
             </div>
         </VendorLayout>
     )

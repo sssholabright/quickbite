@@ -123,12 +123,16 @@ export type OrderStatus =
     | 'CANCELLED';
 
 export interface OrderFilters {
-    status?: string | string[]; // Allow both string and array
-    vendorId?: string;
-    customerId?: string;
-    riderId?: string;
-    dateFrom?: Date;
-    dateTo?: Date;
-    page?: number;
-    limit?: number;
+    status?: OrderStatus
+    dateFrom?: string
+    dateTo?: string
+    search?: string
+    searchType?: 'orderId' | 'customerName' | 'riderName' | 'all'
+    sortBy?: 'createdAt' | 'status' | 'total' | 'priority' // 🚀 ADD: Missing properties
+    sortOrder?: 'asc' | 'desc'
+    page?: number
+    limit?: number
+    vendorId?: string
+    customerId?: string
+    riderId?: string
 }

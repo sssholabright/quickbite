@@ -476,6 +476,9 @@ export class OrderService {
         try {
             const where = this.buildOrderWhereClause(filters, userId, userRole);
             
+            // 🚀 NEW: Build orderBy clause with priority sorting
+            const orderBy = this.buildOrderByClause(filters);
+            
             const [orders, total] = await Promise.all([
                 prisma.order.findMany({
                     where,
@@ -506,7 +509,7 @@ export class OrderService {
                             }
                         }
                     },
-                    orderBy: { createdAt: 'desc' },
+                    orderBy, // 🚀 NEW: Use dynamic ordering
                     skip: ((filters.page || 1) - 1) * (filters.limit || 10),
                     take: filters.limit || 10
                 }),
@@ -1132,6 +1135,33 @@ export class OrderService {
         return cancellableStatuses.includes(status);
     }
 
+    // 🚀 NEW: Build orderBy clause with priority sorting
+    private static buildOrderByClause(filters: OrderFilters) {
+        // Default: Priority sorting (Pending first)
+        if (!filters.sortBy || filters.sortBy === 'priority') {
+            return [
+                { status: 'asc' as const }, // 🚀 FIX: Add 'as const' and proper typing
+                { createdAt: 'desc' as const }
+            ];
+        }
+        
+        // Custom sorting
+        const sortOrder = (filters.sortOrder || 'desc') as 'asc' | 'desc'; // 🚀 FIX: Type assertion
+        const sortBy = filters.sortBy;
+        
+        switch (sortBy) {
+            case 'createdAt':
+                return { createdAt: sortOrder };
+            case 'status':
+                return { status: sortOrder };
+            case 'total':
+                return { total: sortOrder };
+            default:
+                return { createdAt: 'desc' as const }; // 🚀 FIX: Add 'as const'
+        }
+    }
+
+    // Update buildOrderWhereClause method around line 1135
     private static buildOrderWhereClause(filters: OrderFilters, userId: string, userRole: string) {
         const where: any = {};
 
@@ -1145,6 +1175,82 @@ export class OrderService {
             } else {
                 where.status = filters.status;
             }
+        }
+
+        // 🚀 NEW: Enhanced search functionality
+        if (filters.search) {
+            const searchTerm = filters.search.toLowerCase();
+            const searchType = filters.searchType || 'all';
+            
+            const searchConditions = [];
+            
+            switch (searchType) {
+                case 'orderId':
+                    searchConditions.push({
+                        orderNumber: {
+                            contains: searchTerm,
+                            mode: 'insensitive'
+                        }
+                    });
+                    break;
+                case 'customerName':
+                    searchConditions.push({
+                        customer: {
+                            user: {
+                                name: {
+                                    contains: searchTerm,
+                                    mode: 'insensitive'
+                                }
+                            }
+                        }
+                    });
+                    break;
+                case 'riderName':
+                    searchConditions.push({
+                        rider: {
+                            user: {
+                                name: {
+                                    contains: searchTerm,
+                                    mode: 'insensitive'
+                                }
+                            }
+                        }
+                    });
+                    break;
+                case 'all':
+                default:
+                    searchConditions.push(
+                        {
+                            orderNumber: {
+                                contains: searchTerm,
+                                mode: 'insensitive'
+                            }
+                        },
+                        {
+                            customer: {
+                                user: {
+                                    name: {
+                                        contains: searchTerm,
+                                        mode: 'insensitive'
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            rider: {
+                                user: {
+                                    name: {
+                                        contains: searchTerm,
+                                        mode: 'insensitive'
+                                    }
+                                }
+                            }
+                        }
+                    );
+                    break;
+            }
+            
+            where.OR = searchConditions;
         }
 
         if (filters.dateFrom || filters.dateTo) {

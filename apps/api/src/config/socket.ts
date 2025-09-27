@@ -177,11 +177,25 @@ export class SocketService {
             });
 
             // Handle disconnect
-            socket.on('disconnect', () => {
+            socket.on('disconnect', async () => {
                 logger.info(`Socket disconnected: ${socket.id}`);
                 
-                // 🚀 CRITICAL FIX: Remove rider from 'riders' room on disconnect
+                // 🚀 CRITICAL FIX: Set rider offline in database when they disconnect
                 if (socket.userRole === 'RIDER' && socket.riderId) {
+                    try {
+                        // Set rider as offline and unavailable when they disconnect
+                        await prisma.rider.update({
+                            where: { id: socket.riderId },
+                            data: { 
+                                isOnline: false,
+                                isAvailable: false 
+                            }
+                        });
+                        logger.info(`✅ Rider ${socket.riderId} set offline due to disconnect`);
+                    } catch (error) {
+                        logger.error({ error, riderId: socket.riderId }, 'Failed to set rider offline on disconnect');
+                    }
+                    
                     socket.leave('riders');
                     logger.info(`Rider ${socket.riderId} left 'riders' room due to disconnect`);
                 }

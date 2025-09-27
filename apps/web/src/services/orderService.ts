@@ -15,6 +15,9 @@ export class OrderService {
             if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom)
             if (filters?.dateTo) params.append('dateTo', filters.dateTo)
             if (filters?.search) params.append('search', filters.search)
+            if (filters?.searchType) params.append('searchType', filters.searchType)
+            if (filters?.sortBy) params.append('sortBy', filters.sortBy)
+            if (filters?.sortOrder) params.append('sortOrder', filters.sortOrder)
             if (filters?.page) params.append('page', filters.page.toString())
             if (filters?.limit) params.append('limit', filters.limit.toString())
 

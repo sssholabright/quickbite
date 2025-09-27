@@ -14,6 +14,7 @@ interface RiderState {
     
     // Actions
     setOnlineStatus: (isOnline: boolean) => Promise<void>;
+    updateRiderStatus: (data: { isOnline?: boolean; isAvailable?: boolean }) => Promise<void>; // 🚀 NEW
     toggleOnlineStatus: () => Promise<void>;
     initializeNotifications: () => Promise<void>;
     sendTestNotification: () => Promise<void>;
@@ -63,6 +64,43 @@ export const useRiderStore = create<RiderState>()(
                 } catch (error: any) {
                     set({ 
                         error: error.message || 'Failed to update online status',
+                        isLoading: false 
+                    });
+                    throw error;
+                }
+            },
+
+            updateRiderStatus: async (data: { isOnline?: boolean; isAvailable?: boolean }) => {
+                try {
+                    set({ isLoading: true, error: null });
+                    
+                    console.log(`🔄 Updating rider status:`, data);
+                    
+                    await riderService.updateRiderStatus(data);
+                    
+                    console.log(`✅ Database updated, rider status:`, data);
+                    
+                    // 🚀 NEW: Emit socket event
+                    const { socket } = get();
+                    if (socket) {
+                        socket.emit('rider_status_change', { 
+                            isOnline: data.isOnline !== undefined ? data.isOnline : get().isOnline,
+                            isAvailable: data.isAvailable !== undefined ? data.isAvailable : true
+                        });
+                        console.log(`📡 Emitted rider_status_change:`, data);
+                    } else {
+                        console.error('❌ Socket is null, cannot emit rider_status_change');
+                    }
+                    
+                    set({ 
+                        ...(data.isOnline !== undefined && { isOnline: data.isOnline }),
+                        isLoading: false 
+                    });
+                    
+                    console.log(`💾 State after updateRiderStatus:`, get().isOnline);
+                } catch (error: any) {
+                    set({ 
+                        error: error.message || 'Failed to update rider status',
                         isLoading: false 
                     });
                     throw error;

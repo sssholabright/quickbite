@@ -82,8 +82,24 @@ export interface OrderFilters {
     dateFrom?: string
     dateTo?: string
     search?: string
+    searchType?: 'orderId' | 'customerName' | 'riderName' | 'all'
+    sortBy?: 'createdAt' | 'status' | 'total' | 'priority'
+    sortOrder?: 'asc' | 'desc'
     page?: number
     limit?: number
+}
+
+// 🚀 NEW: Priority order for auto-sorting
+export const ORDER_PRIORITY: Record<OrderStatus, number> = {
+    'PENDING': 1,
+    'CONFIRMED': 2,
+    'PREPARING': 3,
+    'READY_FOR_PICKUP': 4,
+    'ASSIGNED': 5,
+    'PICKED_UP': 6,
+    'OUT_FOR_DELIVERY': 7,
+    'DELIVERED': 8,
+    'CANCELLED': 9
 }
 
 export interface ApiOrderResponse {

@@ -161,21 +161,27 @@ export const useSocket = () => {
                 return oldData;
             });
 
-            // Add notification with delay
-            setTimeout(() => {
-                addNotification({
-                    id: `order-status-${data.orderId}-${Date.now()}`,
-                    type: 'order',
-                    title: 'Order Status Updated',
-                    message: `Order status changed to ${data.status}`,
-                    priority: 'normal',
-                    data: { orderId: data.orderId, status: data.status },
-                    timestamp: data.timestamp || new Date().toISOString(),
-                    read: false
-                });
-            }, 1000);
+            // 🚀 FIXED: Only show notifications for important status changes
+            const importantStatuses = ['ASSIGNED', 'PICKED_UP', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED'];
+            
+            if (importantStatuses.includes(data.status)) {
+                // Add notification with delay
+                setTimeout(() => {
+                    addNotification({
+                        id: `order-status-${data.orderId}-${data.status}-${Date.now()}`,
+                        type: 'order',
+                        title: 'Order Status Updated',
+                        message: `Order status changed to ${data.status}`,
+                        priority: 'normal',
+                        data: { orderId: data.orderId, status: data.status },
+                        timestamp: data.timestamp || new Date().toISOString(),
+                        read: false
+                    });
+                }, 1000);
+            }
         });
 
+        // 🚀 FIXED: Remove duplicate notification from order_updated
         socketInstance.on('order_updated', (data) => {
             console.log('🌐 Order updated:', data);
             
@@ -189,116 +195,61 @@ export const useSocket = () => {
             
             // Also update individual order cache
             queryClient.setQueryData(['orders', 'detail', order.id], order);
+            
+            // 🚀 REMOVED: No notification here - only in order_status_update
         });
 
-        socketInstance.on('order_cancelled', (data) => {
-            console.log(' Order cancelled:', data);
-            
-            // Update status to cancelled
-            // updateOrderStatus(data.orderId, 'CANCELLED'); // This line was removed as per the edit hint
-            
-            // Update cache
-            queryClient.setQueryData(['order', data.orderId], (oldData: any) => {
-                if (oldData) {
-                    return { ...oldData, status: 'CANCELLED' };
-                }
-                return oldData;
-            });
-            
-            queryClient.invalidateQueries({ queryKey: ['orders'] });
+        // 🚀 REMOVED: order_cancelled handler - handled by order_status_update
+        // socketInstance.on('order_cancelled', ...) - REMOVE THIS ENTIRE BLOCK
 
-            // Add cancellation notification
-            addNotification({
-                id: `order-cancelled-${data.orderId}-${Date.now()}`,
-                type: 'order',
-                title: 'Order Cancelled',
-                message: data.reason || 'Your order has been cancelled',
-                priority: 'high',
-                data: { orderId: data.orderId, reason: data.reason },
-                timestamp: data.timestamp || new Date().toISOString(),
-                read: false
-            });
-        });
+        // 🚀 REMOVED: rider_assigned handler - handled by order_status_update
+        // socketInstance.on('rider_assigned', ...) - REMOVE THIS ENTIRE BLOCK
 
-        // Handle rider assignment with enhanced notification
-        socketInstance.on('rider_assigned', (data) => {
-            console.log('🌐 Rider assigned to order:', data);
-            
-            // 🚀 FIXED: Invalidate ALL orders queries
-            queryClient.invalidateQueries({ 
-                queryKey: ['orders'],
-                exact: false // This will invalidate all queries that start with ['orders']
-            });
-            
-            // Also update individual order cache
-            queryClient.setQueryData(['orders', 'detail', data.orderId], (oldData: any) => {
-                if (oldData) {
-                    return { 
-                        ...oldData, 
-                        status: 'ASSIGNED',
-                        rider: data.rider 
-                    };
-                }
-                return oldData;
-            });
-
-            // Add notification with delay
-            setTimeout(() => {
-                const notification = {
-                    id: `rider-assigned-${data.orderId}-${Date.now()}`,
-                    type: 'delivery' as const,
-                    title: 'Rider Assigned!',
-                    message: `${data.rider.name} has been assigned to your order`,
-                    priority: 'high' as const,
-                    data: { orderId: data.orderId, rider: data.rider },
-                    actions: [
-                        { label: 'Track Order', action: 'view_order', data: { orderId: data.orderId } },
-                        { label: 'Contact Rider', action: 'contact_rider', data: { riderId: data.rider.id } }
-                    ],
-                    timestamp: data.timestamp || new Date().toISOString(),
-                    read: false
-                };
-
-                addNotification(notification);
-                showBrowserNotification(notification);
-                showSweetAlertNotification(notification);
-            }, 1000);
-        });
-
-        // Handle no riders available with notification
+        // Handle no riders available with batched notification
         socketInstance.on('no_riders_available', (data) => {
-            console.log('🌐 No riders available for order:', data);
+            console.log('🌐 No riders available for orders:', data);
             
-            // Add notification
+            // 🚀 NEW: Handle both single order and batched notifications
+            const orderIds = data.orderIds || [data.orderId];
+            const orderCount = orderIds.length;
+            
+            // Add single notification for all orders
             addNotification({
-                id: `no-riders-${data.orderId}-${Date.now()}`,
+                id: `no-riders-${orderIds.join('-')}-${Date.now()}`,
                 type: 'delivery',
                 title: 'No Riders Available',
                 message: data.message,
                 priority: 'normal',
-                data: { orderId: data.orderId },
+                data: { orderIds: orderIds },
                 timestamp: data.timestamp || new Date().toISOString(),
                 read: false
             });
 
-            // Show SweetAlert for this important message
-            Swal.fire({
-                title: 'No Riders Available',
-                text: data.message,
-                icon: 'warning',
-                timer: 5000,
-                showConfirmButton: true
-            });
+            // Show SweetAlert only once for all orders
+            if (orderCount > 1) {
+                Swal.fire({
+                    title: 'No Riders Available',
+                    text: `No riders are currently available for ${orderCount} orders. They will be broadcast when riders come online.`,
+                    icon: 'warning',
+                    timer: 5000,
+                    showConfirmButton: true
+                });
+            } else {
+                Swal.fire({
+                    title: 'No Riders Available',
+                    text: data.message,
+                    icon: 'warning',
+                    timer: 5000,
+                    showConfirmButton: true
+                });
+            }
             
             queryClient.invalidateQueries({ queryKey: ['orders'] });
         });
 
         // Handle delivery updates
         socketInstance.on('delivery_update', (data) => {
-            console.log('�� Delivery update:', data);
-            
-            // Update rider info
-            // updateOrderRider(data.orderId, data.rider); // This line was removed as per the edit hint
+            console.log('🌐 Delivery update:', data);
             
             // Update React Query cache
             queryClient.setQueryData(['order', data.orderId], (oldData: any) => {
@@ -332,12 +283,9 @@ export const useSocket = () => {
         //     });
         // });
 
-        // NEW: Handle notification events
+        // 🚀 NEW: Handle notification events
         socketInstance.on('notification_received', (data) => {
             console.log('🔔 Notification received:', data);
-            console.log('🔔 Notification data type:', typeof data);
-            console.log('🔔 Notification timestamp:', data.timestamp);
-            console.log('🔔 Notification read status:', data.read);
             
             // Add to notification store
             try {

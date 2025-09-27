@@ -91,27 +91,33 @@ export class OrderController {
             const order = await OrderService.updateOrderStatus(orderId!, validatedData, userId, userRole);
 
             // Emit socket events
-            socketManager.emitToOrder(orderId!, 'order_updated', { order: order });
-            socketManager.emitToOrder(orderId!, 'order_status_update', {
-                orderId: orderId!,
-                status: validatedData.status,
-                timestamp: new Date().toISOString()
-            });
+            // 🚀 FIXED: Only emit socket events for important status changes
+            const importantStatuses = ['ASSIGNED', 'PICKED_UP', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED'];
 
-            // Emit to specific users
-            if (order.customer) {
-                socketManager.emitToCustomer(order.customer.id, 'order_status_update', {
+            if (importantStatuses.includes(validatedData.status)) {
+                // Emit socket events only for important status changes
+                socketManager.emitToOrder(orderId!, 'order_updated', { order: order });
+                socketManager.emitToOrder(orderId!, 'order_status_update', {
+                    orderId: orderId!,
+                    status: validatedData.status,
+                    timestamp: new Date().toISOString()
+                });
+
+                // Emit to specific users
+                if (order.customer) {
+                    socketManager.emitToCustomer(order.customer.id, 'order_status_update', {
+                        orderId: orderId!,
+                        status: validatedData.status,
+                        timestamp: new Date().toISOString()
+                    });
+                }
+
+                socketManager.emitToVendor(order.vendor.id, 'order_status_update', {
                     orderId: orderId!,
                     status: validatedData.status,
                     timestamp: new Date().toISOString()
                 });
             }
-
-            socketManager.emitToVendor(order.vendor.id, 'order_status_update', {
-                orderId: orderId!,
-                status: validatedData.status,
-                timestamp: new Date().toISOString()
-            });
 
                 // Emit notification based on status change
                 let notificationTitle = '';
@@ -217,12 +223,16 @@ export class OrderController {
             
             // Parse query parameters
             const filters = {
-                status: req.query.status as string | string[], // Handle both string and array
+                status: req.query.status as string | string[],
                 vendorId: req.query.vendorId as string,
                 customerId: req.query.customerId as string,
                 riderId: req.query.riderId as string,
-                dateFrom: req.query.dateFrom ? new Date(req.query.dateFrom as string) : undefined,
-                dateTo: req.query.dateTo ? new Date(req.query.dateTo as string) : undefined,
+                search: req.query.search as string, // 🚀 ADD: Missing search properties
+                searchType: req.query.searchType as 'orderId' | 'customerName' | 'riderName' | 'all',
+                sortBy: req.query.sortBy as 'createdAt' | 'status' | 'total' | 'priority', // 🚀 ADD: Missing sort properties
+                sortOrder: req.query.sortOrder as 'asc' | 'desc',
+                dateFrom: req.query.dateFrom as string, // 🚀 FIX: Keep as string, not Date
+                dateTo: req.query.dateTo as string, // 🚀 FIX: Keep as string, not Date
                 page: req.query.page ? parseInt(req.query.page as string) : 1,
                 limit: req.query.limit ? parseInt(req.query.limit as string) : 10
             };

@@ -342,6 +342,12 @@ export default function HomeScreen() {
                 createdAt: new Date(incomingDeliveryJob.createdAt)
             };
             
+            showAlert(
+                "Job Accepted", 
+                "You have accepted the delivery job. Navigate to the vendor to pick up the order.",
+                'success'
+            );
+
             // 🚀 CRITICAL: Set active order in store
             setActiveOrder(activeOrderData);
             setOrderStatus('going_to_pickup');
@@ -368,13 +374,6 @@ export default function HomeScreen() {
             setIncomingDeliveryJob(null);
             setDeliveryJobTimer(60);
             removeDeliveryJob(incomingDeliveryJob.orderId);
-            
-            // 🚀 REPLACED: Alert.alert with custom modal
-            showAlert(
-                "Job Accepted", 
-                "You have accepted the delivery job. Navigate to the vendor to pick up the order.",
-                'success'
-            );
             
         } catch (error: any) {
             console.error('Failed to accept delivery job:', error);

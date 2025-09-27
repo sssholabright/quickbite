@@ -180,12 +180,12 @@ export default function OrderCard({
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {/* Order Items */}
                         <div>
-                            <h4 className="font-medium text-gray-900 mb-3">Order Items</h4>
+                            <h4 className="font-bold text-gray-900 mb-3">Order Items</h4>
                             <div className="space-y-2">
                                 {order.items.map((item) => (
                                     <div key={item.id} className="flex justify-between items-center py-2 border-b border-gray-200 last:border-b-0">
                                         <div>
-                                            <p className="font-medium text-gray-900">{item.name}</p>
+                                            <p className="font-semibold text-gray-900">{item.name}</p>
                                             <p className="text-sm text-gray-600">Qty: {item.quantity}</p>
                                             {item.specialInstructions && (
                                                 <p className="text-xs text-gray-500 italic">Note: {item.specialInstructions}</p>
@@ -200,7 +200,7 @@ export default function OrderCard({
                                                 </div>
                                             )}
                                         </div>
-                                        <p className="font-medium text-gray-900">{formatNaira(item.totalPrice)}</p>
+                                        <p className="font-semibold text-gray-900">{formatNaira(item.totalPrice)}</p>
                                     </div>
                                 ))}
                             </div>
@@ -208,17 +208,17 @@ export default function OrderCard({
 
                         {/* Delivery Details */}
                         <div>
-                            <h4 className="font-medium text-gray-900 mb-3">Delivery Details</h4>
+                            <h4 className="font-bold text-gray-900 mb-3">Delivery Details</h4>
                             <div className="space-y-3">
                                 <div>
-                                    <p className="text-sm font-medium text-gray-700">Customer</p>
+                                    <p className="text-sm font-semibold text-gray-700">Customer</p>
                                     <p className="text-gray-900">{order.customerName}</p>
                                     {order.customerPhone && (
                                         <p className="text-sm text-gray-600">{order.customerPhone}</p>
                                     )}
                                 </div>
                                 <div>
-                                    <p className="text-sm font-medium text-gray-700">Address</p>
+                                    <p className="text-sm font-semibold text-gray-700">Address</p>
                                     <p className="text-gray-900">{order.deliveryAddress.address}</p>
                                     {order.deliveryAddress.city && (
                                         <p className="text-sm text-gray-600">
@@ -228,13 +228,13 @@ export default function OrderCard({
                                 </div>
                                 {order.specialInstructions && (
                                     <div>
-                                        <p className="text-sm font-medium text-gray-700">Special Instructions</p>
+                                        <p className="text-sm font-semibold text-gray-700">Special Instructions</p>
                                         <p className="text-gray-900">{order.specialInstructions}</p>
                                     </div>
                                 )}
                                 {order.rider && (
                                     <div>
-                                        <p className="text-sm font-medium text-gray-700">Rider</p>
+                                        <p className="text-sm font-semibold text-gray-700">Rider</p>
                                         <p className="text-gray-900">{order.rider.name}</p>
                                         <p className="text-sm text-gray-600">
                                             {order.rider.vehicleType} • Rating: {order.rider.rating}/5
