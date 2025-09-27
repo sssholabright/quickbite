@@ -62,7 +62,9 @@ export class MenuController {
             const filters = {
                 categoryId: req.query.categoryId as string,
                 isAvailable: req.query.isAvailable ? req.query.isAvailable === 'true' : undefined,
-                search: req.query.search as string
+                search: req.query.search as string,
+                page: req.query.page ? parseInt(req.query.page as string) : undefined,
+                limit: req.query.limit ? parseInt(req.query.limit as string) : undefined
             };
 
             // Filter out undefined values
@@ -70,9 +72,9 @@ export class MenuController {
                 Object.entries(filters).filter(([_, value]) => value !== undefined)
             );
 
-            const menuItems = await MenuService.getVendorMenuItems(vendorId, cleanFilters);
+            const result = await MenuService.getVendorMenuItems(vendorId, cleanFilters);
             
-            ResponseHandler.success(res as any, menuItems, 'Menu items retrieved successfully');
+            ResponseHandler.success(res as any, result, 'Menu items retrieved successfully');
         } catch (error) {
             next(error);
         }

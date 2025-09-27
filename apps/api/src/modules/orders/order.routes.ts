@@ -16,6 +16,12 @@ router.get('/',
     OrderController.getOrders
 );
 
+// Get order statistics (All authenticated users)
+router.get('/stats',
+    authGuard({ requiredRoles: ['CUSTOMER', 'VENDOR', 'RIDER', 'ADMIN'] }),
+    OrderController.getOrderStats
+);
+
 // Get order by ID (All authenticated users)
 router.get('/:orderId',
     authGuard({ requiredRoles: ['CUSTOMER', 'VENDOR', 'RIDER', 'ADMIN'] }),
@@ -30,13 +36,12 @@ router.patch('/:orderId/status',
 
 // Cancel order (Customer, Vendor, Rider, Admin)
 router.patch('/:orderId/cancel',
-    authGuard({ requiredRoles: ['CUSTOMER', 'VENDOR', 'RIDER', 'ADMIN'] }), // 🚀 ADD: RIDER
+    authGuard({ requiredRoles: ['CUSTOMER', 'VENDOR', 'RIDER', 'ADMIN'] }),
     OrderController.cancelOrder
 );
 
 // Add these new routes
 router.post('/broadcast-ready', authGuard, OrderController.broadcastExistingReadyOrders);
-router.get('/stats', authGuard, OrderController.getOrderStats);
 router.post('/test-socket-emission', authGuard, OrderController.testSocketEmission);
 
 export default router;

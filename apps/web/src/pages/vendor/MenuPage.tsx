@@ -7,19 +7,25 @@ import MenuFilters from '../../components/menu/MenuFilters'
 import MenuStats from '../../components/menu/MenuStats'
 import AddMenuItemModal from '../../components/menu/AddMenuItemModal'
 import { FaPlus, FaFilter, FaUtensils } from 'react-icons/fa'
+import Pagination from '../../components/ui/Pagination'
 
 export default function MenuPage() {
     const [filters, setFilters] = useState<MenuFiltersType>({})
     const [showFilters, setShowFilters] = useState(false)
     const [showAddModal, setShowAddModal] = useState(false)
     const [editingItem, setEditingItem] = useState<MenuItem | null>(null)
+    const [currentPage, setCurrentPage] = useState(1)
+    const [itemsPerPage] = useState(12) // 12 items per page for grid layout
 
     // React Query hooks
     const { 
-        data: items = [], 
+        data: menuData, 
         isLoading, 
         error 
-    } = useMenuItems(filters)
+    } = useMenuItems({ ...filters, page: currentPage, limit: itemsPerPage })
+
+    const items = menuData?.items || []
+    const totalItems = menuData?.total || 0
 
     // Group items by category
     const groupedItems = useMemo(() => {
@@ -33,6 +39,7 @@ export default function MenuPage() {
 
     const handleFilterChange = (newFilters: MenuFiltersType) => {
         setFilters(newFilters)
+        setCurrentPage(1)
     }
 
     const handleAddNew = () => {
@@ -48,6 +55,11 @@ export default function MenuPage() {
     const handleCloseModal = () => {
         setShowAddModal(false)
         setEditingItem(null)
+    }
+
+    const handlePageChange = (page: number) => {
+        setCurrentPage(page)
+        window.scrollTo({ top: 0, behavior: 'smooth' })
     }
 
     return (
@@ -130,6 +142,19 @@ export default function MenuPage() {
                                 </div>
                             </div>
                         ))}
+                        
+                        {/* Pagination */}
+                        {menuData && (
+                            <div className="mt-8">
+                                <Pagination
+                                    currentPage={currentPage}
+                                    totalPages={Math.ceil(totalItems / itemsPerPage)}
+                                    totalItems={totalItems}
+                                    itemsPerPage={itemsPerPage}
+                                    onPageChange={handlePageChange}
+                                />
+                            </div>
+                        )}
                     </div>
                 ) : (
                     <div className="text-center py-12">

@@ -7,7 +7,7 @@ import { showSuccess, showError } from '../utils/sweetAlert'
 export const menuKeys = {
     all: ['menu'] as const,
     items: () => [...menuKeys.all, 'items'] as const,
-    itemsList: (filters?: MenuFilters) => [...menuKeys.items(), 'list', filters] as const,
+    list: (filters?: MenuFilters) => [...menuKeys.items(), 'list', filters] as const,
     item: (id: string) => [...menuKeys.items(), 'detail', id] as const,
     categories: () => [...menuKeys.all, 'categories'] as const,
 }
@@ -15,9 +15,9 @@ export const menuKeys = {
 // Menu Items Hooks
 export const useMenuItems = (filters?: MenuFilters) => {
     return useQuery({
-        queryKey: menuKeys.itemsList(filters),
+        queryKey: menuKeys.list(filters || {}),
         queryFn: () => MenuService.getMenuItems(filters),
-        staleTime: 2 * 60 * 1000, // 2 minutes
+        staleTime: 1000 * 60 * 5, // 5 minutes
     })
 }
 

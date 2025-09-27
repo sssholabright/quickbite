@@ -15,6 +15,8 @@ export class OrderService {
             if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom)
             if (filters?.dateTo) params.append('dateTo', filters.dateTo)
             if (filters?.search) params.append('search', filters.search)
+            if (filters?.page) params.append('page', filters.page.toString())
+            if (filters?.limit) params.append('limit', filters.limit.toString())
 
             const response = await api.get(`/orders?${params.toString()}`)
             return {
@@ -67,23 +69,11 @@ export class OrderService {
         }
     }
 
-    // Get order statistics
+    // Get order statistics (separate from filtered orders)
     static async getOrderStats(): Promise<OrderStats> {
         try {
-            // This would typically be a separate endpoint
-            // For now, we'll calculate stats from the orders
-            const response = await api.get('/orders')
-            const orders = response.data.data.orders || []
-            
-            const stats: OrderStats = {
-                pending: orders.filter((o: ApiOrderResponse) => o.status === 'PENDING').length,
-                preparing: orders.filter((o: ApiOrderResponse) => ['CONFIRMED', 'PREPARING'].includes(o.status)).length,
-                ready: orders.filter((o: ApiOrderResponse) => o.status === 'READY_FOR_PICKUP').length,
-                delivered: orders.filter((o: ApiOrderResponse) => o.status === 'DELIVERED').length,
-                cancelled: orders.filter((o: ApiOrderResponse) => o.status === 'CANCELLED').length
-            }
-            
-            return stats
+            const response = await api.get('/orders/stats')
+            return response.data.data
         } catch (error) {
             logError(error, 'getOrderStats')
             throw error

@@ -9,11 +9,14 @@ import { useOrderStats, useUpdateOrderStatus, useCancelOrder } from '../../hooks
 import { useEnhancedOrders } from '../../hooks/useEnhancedOrders'
 import { useRealtimeStore } from '../../stores/realtimeStore'
 import { showConfirm, showSuccess, showError } from '../../utils/sweetAlert'
+import Pagination from '../../components/ui/Pagination'
 
 export default function OrdersPage() {
     const [showFilters, setShowFilters] = useState(false)
     const [autoRefresh, setAutoRefresh] = useState(true)
     const [filters, setFilters] = useState<OrderFiltersType>({})
+    const [currentPage, setCurrentPage] = useState(1)
+    const [itemsPerPage] = useState(10) // You can make this configurable
 
     // Enhanced orders with real-time updates
     const { 
@@ -21,8 +24,9 @@ export default function OrdersPage() {
         isLoading, 
         error, 
         refetch: refetchOrders 
-    } = useEnhancedOrders(filters)
+    } = useEnhancedOrders({ ...filters, page: currentPage, limit: itemsPerPage })
     
+    // Get order statistics from dedicated endpoint (not from filtered orders)
     const { 
         data: stats, 
         refetch: refetchStats 
@@ -46,8 +50,15 @@ export default function OrdersPage() {
     //     return () => clearInterval(interval)
     // }, [autoRefresh, refetchOrders, refetchStats])
 
+    const handlePageChange = (page: number) => {
+        setCurrentPage(page)
+        // Scroll to top when page changes
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+
     const handleFilterChange = (newFilters: OrderFiltersType) => {
         setFilters(newFilters)
+        setCurrentPage(1) // Reset to first page when filters change
     }
 
     const handleRefresh = () => {
@@ -236,7 +247,7 @@ export default function OrdersPage() {
                     </div>
                 )}
 
-                {/* Order Statistics */}
+                {/* Order Statistics - shows total stats from database */}
                 {stats && <OrderStats stats={stats} />}
 
                 {/* Filters */}
@@ -249,196 +260,65 @@ export default function OrdersPage() {
                 
 
                 {/* Orders by Status */}
-                <div className="space-y-8">
-                    {/* Pending Orders */}
-                    {groupedOrders.pending.length > 0 && (
-                        <div>
-                            <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-                                <span className="w-3 h-3 bg-yellow-500 rounded-full mr-3"></span>
-                                Pending Orders ({groupedOrders.pending.length})
-                            </h2>
-                            <div className="space-y-4">
-                                {groupedOrders.pending.map(order => (
-                                    <OrderCard 
-                                        key={order.id} 
-                                        order={order as Order}
-                                        onAccept={() => handleAcceptOrder(order.id)}
-                                        onReject={() => handleRejectOrder(order.id)}
-                                        onStatusUpdate={(status) => handleStatusUpdate(order.id, status)}
-                                        isLoading={updateOrderStatusMutation.isPending || cancelOrderMutation.isPending}
-                                    />
-                                ))}
+                {isLoading ? (
+                    <div className="space-y-4">
+                        {[...Array(5)].map((_, i) => (
+                            <div key={i} className="bg-white rounded-lg border border-gray-200 p-6 animate-pulse">
+                                <div className="h-4 bg-gray-200 rounded w-1/4 mb-2"></div>
+                                <div className="h-3 bg-gray-200 rounded w-1/2"></div>
                             </div>
-                        </div>
-                    )}
+                        ))}
+                    </div>
+                ) : orders.length > 0 ? (
+                    <div className="space-y-4">
+                        {orders.map((order) => (
+                            <OrderCard
+                                key={order.id}
+                                order={order}
+                                onAccept={() => handleAcceptOrder(order.id)}
+                                onReject={() => handleRejectOrder(order.id)}
+                                onStatusUpdate={(status) => handleStatusUpdate(order.id, status)}
+                                onMarkReady={() => handleMarkReady(order.id)}
+                                isLoading={updateOrderStatusMutation.isPending || cancelOrderMutation.isPending}
+                            />
+                        ))}
+                        
+                        {/* Pagination */}
+                        {ordersData && (
+                            <div className="mt-8">
+                                <Pagination
+                                    currentPage={currentPage}
+                                    totalPages={Math.ceil(ordersData.total / itemsPerPage)}
+                                    totalItems={ordersData.total}
+                                    itemsPerPage={itemsPerPage}
+                                    onPageChange={handlePageChange}
+                                />
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    <div className="text-center py-12">
+                        <FaClipboardList className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">No orders found</h3>
+                        <p className="text-gray-500">
+                            {Object.keys(filters).length > 0 
+                                ? 'Try adjusting your filters to see more orders.'
+                                : 'Orders will appear here when customers place them.'
+                            }
+                        </p>
+                    </div>
+                )}
 
-                    {/* Confirmed Orders */}
-                    {groupedOrders.confirmed.length > 0 && (
-                        <div>
-                            <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-                                <span className="w-3 h-3 bg-blue-500 rounded-full mr-3"></span>
-                                Confirmed Orders ({groupedOrders.confirmed.length})
-                            </h2>
-                            <div className="space-y-4">
-                                {groupedOrders.confirmed.map(order => (
-                                    <OrderCard 
-                                        key={order.id} 
-                                        order={order as Order}
-                                        onAccept={() => handleAcceptOrder(order.id)}
-                                        onReject={() => handleRejectOrder(order.id)}
-                                        onStatusUpdate={(status) => handleStatusUpdate(order.id, status)}
-                                        isLoading={updateOrderStatusMutation.isPending || cancelOrderMutation.isPending}
-                                    />
-                                ))}
-                            </div>
+                {/* No orders message */}
+                {orders.length === 0 && !isLoading && (
+                    <div className="text-center py-12">
+                        <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <FaClipboardList className="w-8 h-8 text-gray-400" />
                         </div>
-                    )}
-
-                    {/* Preparing Orders */}
-                    {groupedOrders.preparing.length > 0 && (
-                        <div>
-                            <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-                                <span className="w-3 h-3 bg-blue-500 rounded-full mr-3"></span>
-                                Preparing Orders ({groupedOrders.preparing.length})
-                            </h2>
-                            <div className="space-y-4">
-                                {groupedOrders.preparing.map(order => (
-                                    <OrderCard 
-                                        key={order.id} 
-                                        order={order as Order}
-                                        onAccept={() => handleAcceptOrder(order.id)}
-                                        onReject={() => handleRejectOrder(order.id)}
-                                        onStatusUpdate={(status) => handleStatusUpdate(order.id, status)}
-                                        onMarkReady={() => handleMarkReady(order.id)}
-                                        isLoading={updateOrderStatusMutation.isPending || cancelOrderMutation.isPending}
-                                    />
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Ready for Pickup Orders */}
-                    {groupedOrders.ready.length > 0 && (
-                        <div>
-                            <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-                                <span className="w-3 h-3 bg-green-500 rounded-full mr-3"></span>
-                                Ready for Pickup ({groupedOrders.ready.length})
-                                <span className="ml-2 text-sm text-gray-500">• Broadcasting to riders</span>
-                            </h2>
-                            <div className="space-y-4">
-                                {groupedOrders.ready.map(order => (
-                                    <OrderCard 
-                                        key={order.id} 
-                                        order={order as Order}
-                                        onAccept={() => handleAcceptOrder(order.id)}
-                                        onReject={() => handleRejectOrder(order.id)}
-                                        onStatusUpdate={(status) => handleStatusUpdate(order.id, status)}
-                                        isLoading={updateOrderStatusMutation.isPending || cancelOrderMutation.isPending}
-                                    />
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Assigned Orders */}
-                    {groupedOrders.assigned.length > 0 && (
-                        <div>
-                            <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-                                <FaMotorcycle className="w-5 h-5 text-blue-600 mr-3" />
-                                Assigned to Riders ({groupedOrders.assigned.length})
-                            </h2>
-                            <div className="space-y-4">
-                                {groupedOrders.assigned.map(order => (
-                                    <OrderCard 
-                                        key={order.id} 
-                                        order={order as Order}
-                                        onAccept={() => handleAcceptOrder(order.id)}
-                                        onReject={() => handleRejectOrder(order.id)}
-                                        onStatusUpdate={(status) => handleStatusUpdate(order.id, status)}
-                                        isLoading={updateOrderStatusMutation.isPending || cancelOrderMutation.isPending}
-                                    />
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Picked Up Orders */}
-                    {groupedOrders.pickedUp.length > 0 && (
-                        <div>
-                            <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-                                <span className="w-3 h-3 bg-purple-500 rounded-full mr-3"></span>
-                                Picked Up ({groupedOrders.pickedUp.length})
-                            </h2>
-                            <div className="space-y-4">
-                                {groupedOrders.pickedUp.map(order => (
-                                    <OrderCard 
-                                        key={order.id} 
-                                        order={order as Order}
-                                        onAccept={() => handleAcceptOrder(order.id)}
-                                        onReject={() => handleRejectOrder(order.id)}
-                                        onStatusUpdate={(status) => handleStatusUpdate(order.id, status)}
-                                        isLoading={updateOrderStatusMutation.isPending || cancelOrderMutation.isPending}
-                                    />
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Delivered Orders */}
-                    {groupedOrders.delivered.length > 0 && (
-                        <div>
-                            <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-                                <span className="w-3 h-3 bg-green-500 rounded-full mr-3"></span>
-                                Delivered Orders ({groupedOrders.delivered.length})
-                            </h2>
-                            <div className="space-y-4">
-                                {groupedOrders.delivered.map(order => (
-                                    <OrderCard 
-                                        key={order.id} 
-                                        order={order as Order}
-                                        onAccept={() => handleAcceptOrder(order.id)}
-                                        onReject={() => handleRejectOrder(order.id)}
-                                        onStatusUpdate={(status) => handleStatusUpdate(order.id, status)}
-                                        isLoading={updateOrderStatusMutation.isPending || cancelOrderMutation.isPending}
-                                    />
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Cancelled Orders */}
-                    {groupedOrders.cancelled.length > 0 && (
-                        <div>
-                            <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-                                <span className="w-3 h-3 bg-red-500 rounded-full mr-3"></span>
-                                Cancelled Orders ({groupedOrders.cancelled.length})
-                            </h2>
-                            <div className="space-y-4">
-                                {groupedOrders.cancelled.map(order => (
-                                    <OrderCard 
-                                        key={order.id} 
-                                        order={order as Order}
-                                        onAccept={() => handleAcceptOrder(order.id)}
-                                        onReject={() => handleRejectOrder(order.id)}
-                                        onStatusUpdate={(status) => handleStatusUpdate(order.id, status)}
-                                        isLoading={updateOrderStatusMutation.isPending || cancelOrderMutation.isPending}
-                                    />
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* No orders message */}
-                    {orders.length === 0 && !isLoading && (
-                        <div className="text-center py-12">
-                            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <FaClipboardList className="w-8 h-8 text-gray-400" />
-                            </div>
-                            <h3 className="text-lg font-medium text-gray-900 mb-2">No orders found</h3>
-                            <p className="text-gray-600">Orders will appear here when customers place them.</p>
-                        </div>
-                    )}
-                </div>
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">No orders found</h3>
+                        <p className="text-gray-600">Orders will appear here when customers place them.</p>
+                    </div>
+                )}
             </div>
         </VendorLayout>
     )

@@ -82,6 +82,8 @@ export interface OrderFilters {
     dateFrom?: string
     dateTo?: string
     search?: string
+    page?: number
+    limit?: number
 }
 
 export interface ApiOrderResponse {

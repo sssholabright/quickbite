@@ -812,15 +812,13 @@ export class OrderService {
      * Real-world: Dashboard view of order statuses for monitoring
      */
      static async getOrderStatusStats(): Promise<{
-        total: number;
-        byStatus: Record<string, number>;
-        readyForPickup: number;
-        unassignedReadyOrders: number;
+        pending: number;
+        preparing: number;
+        ready: number;
+        delivered: number;
+        cancelled: number;
     }> {
         try {
-            // Get total count
-            const total = await prisma.order.count();
-
             // Get counts by status
             const statusCounts = await prisma.order.groupBy({
                 by: ['status'],
@@ -835,26 +833,15 @@ export class OrderService {
                 return acc;
             }, {} as Record<string, number>);
 
-            // Get ready for pickup count
-            const readyForPickup = byStatus['READY_FOR_PICKUP'] || 0;
-
-            // Get unassigned ready orders count
-            const unassignedReadyOrders = await prisma.order.count({
-                where: {
-                    status: 'READY_FOR_PICKUP',
-                    riderId: null
-                }
-            });
-
             return {
-                total,
-                byStatus,
-                readyForPickup,
-                unassignedReadyOrders
+                pending: byStatus['PENDING'] || 0,
+                preparing: (byStatus['CONFIRMED'] || 0) + (byStatus['PREPARING'] || 0),
+                ready: byStatus['READY_FOR_PICKUP'] || 0,
+                delivered: byStatus['DELIVERED'] || 0,
+                cancelled: byStatus['CANCELLED'] || 0
             };
         } catch (error) {
             console.error("Error getting order status stats: ", error);
-            // logger.error({ error }, 'Error getting order status stats');
             throw new CustomError('Failed to get order status stats', 500);
         }
     }

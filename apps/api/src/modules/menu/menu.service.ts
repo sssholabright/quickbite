@@ -67,6 +67,8 @@ class MenuService {
         categoryId?: string;
         isAvailable?: boolean;
         search?: string;
+        page?: number;
+        limit?: number;
     }) {
         try {
             // First find the vendor by userId
@@ -95,16 +97,30 @@ class MenuService {
                 ];
             }
 
-            const menuItems = await prisma.menuItem.findMany({
-                where,
-                include: {
-                    category: true,
-                    addOns: true
-                },
-                orderBy: { createdAt: 'desc' }
-            });
+            const page = filters?.page || 1;
+            const limit = filters?.limit || 10;
+            const skip = (page - 1) * limit;
 
-            return menuItems;
+            const [menuItems, total] = await Promise.all([
+                prisma.menuItem.findMany({
+                    where,
+                    include: {
+                        category: true,
+                        addOns: true
+                    },
+                    orderBy: { createdAt: 'desc' },
+                    skip,
+                    take: limit
+                }),
+                prisma.menuItem.count({ where })
+            ]);
+
+            return {
+                items: menuItems,
+                total,
+                page,
+                limit
+            };
         } catch (error) {
             logger.error({error}, 'Error fetching menu items');
             throw error;

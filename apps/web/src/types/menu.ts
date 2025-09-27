@@ -38,6 +38,8 @@ export interface MenuFilters {
     isAvailable?: boolean
     sortBy?: 'name' | 'price' | 'createdAt'
     sortOrder?: 'asc' | 'desc'
+    page?: number
+    limit?: number
 }
 
 export interface MenuStats {
