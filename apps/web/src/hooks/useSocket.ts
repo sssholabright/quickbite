@@ -49,9 +49,6 @@ export const useSocket = () => {
     
     // Real-time store actions
     const { 
-        updateOrderStatus, 
-        updateOrderRider, 
-        updateOrderETA,
         setConnectionStatus 
     } = useRealtimeStore();
 
@@ -150,30 +147,33 @@ export const useSocket = () => {
         socketInstance.on('order_status_update', (data) => {
             console.log('🌐 Order status updated:', data);
             
-            // Update real-time store
-            updateOrderStatus(data.orderId, data.status);
+            // 🚀 FIXED: Invalidate ALL orders queries (including filtered ones)
+            queryClient.invalidateQueries({ 
+                queryKey: ['orders'],
+                exact: false // This will invalidate all queries that start with ['orders']
+            });
             
-            // Update React Query cache
-            queryClient.setQueryData(['order', data.orderId], (oldData: any) => {
+            // Also update individual order cache if it exists
+            queryClient.setQueryData(['orders', 'detail', data.orderId], (oldData: any) => {
                 if (oldData) {
                     return { ...oldData, status: data.status };
                 }
                 return oldData;
             });
-            
-            queryClient.invalidateQueries({ queryKey: ['orders'] });
 
-            // Add notification for status changes
-            addNotification({
-                id: `order-status-${data.orderId}-${Date.now()}`,
-                type: 'order',
-                title: 'Order Status Updated',
-                message: `Order status changed to ${data.status}`,
-                priority: 'normal',
-                data: { orderId: data.orderId, status: data.status },
-                timestamp: data.timestamp || new Date().toISOString(),
-                read: false
-            });
+            // Add notification with delay
+            setTimeout(() => {
+                addNotification({
+                    id: `order-status-${data.orderId}-${Date.now()}`,
+                    type: 'order',
+                    title: 'Order Status Updated',
+                    message: `Order status changed to ${data.status}`,
+                    priority: 'normal',
+                    data: { orderId: data.orderId, status: data.status },
+                    timestamp: data.timestamp || new Date().toISOString(),
+                    read: false
+                });
+            }, 1000);
         });
 
         socketInstance.on('order_updated', (data) => {
@@ -181,27 +181,21 @@ export const useSocket = () => {
             
             const { order } = data;
             
-            // Update real-time store with relevant data
-            if (order.status) {
-                updateOrderStatus(order.id, order.status);
-            }
-            if (order.rider) {
-                updateOrderRider(order.id, order.rider);
-            }
-            if (order.estimatedDeliveryTime) {
-                updateOrderETA(order.id, new Date(order.estimatedDeliveryTime));
-            }
+            // 🚀 FIXED: Invalidate ALL orders queries
+            queryClient.invalidateQueries({ 
+                queryKey: ['orders'],
+                exact: false // This will invalidate all queries that start with ['orders']
+            });
             
-            // Update React Query cache with full order data
-            queryClient.setQueryData(['order', order.id], order);
-            queryClient.invalidateQueries({ queryKey: ['orders'] });
+            // Also update individual order cache
+            queryClient.setQueryData(['orders', 'detail', order.id], order);
         });
 
         socketInstance.on('order_cancelled', (data) => {
-            console.log('🌐 Order cancelled:', data);
+            console.log(' Order cancelled:', data);
             
             // Update status to cancelled
-            updateOrderStatus(data.orderId, 'CANCELLED');
+            // updateOrderStatus(data.orderId, 'CANCELLED'); // This line was removed as per the edit hint
             
             // Update cache
             queryClient.setQueryData(['order', data.orderId], (oldData: any) => {
@@ -230,45 +224,45 @@ export const useSocket = () => {
         socketInstance.on('rider_assigned', (data) => {
             console.log('🌐 Rider assigned to order:', data);
             
-            // Update order status to ASSIGNED
-            updateOrderStatus(data.orderId, 'ASSIGNED');
+            // 🚀 FIXED: Invalidate ALL orders queries
+            queryClient.invalidateQueries({ 
+                queryKey: ['orders'],
+                exact: false // This will invalidate all queries that start with ['orders']
+            });
             
-            // Update rider info
-            updateOrderRider(data.orderId, data.rider);
-            
-            // Update React Query cache
-            queryClient.setQueryData(['order', data.orderId], (oldData: any) => {
+            // Also update individual order cache
+            queryClient.setQueryData(['orders', 'detail', data.orderId], (oldData: any) => {
                 if (oldData) {
                     return { 
                         ...oldData, 
                         status: 'ASSIGNED',
-                        rider: data.rider
+                        rider: data.rider 
                     };
                 }
                 return oldData;
             });
-            
-            // Enhanced notification with actions
-            const notification = {
-                id: `rider-assigned-${data.orderId}-${Date.now()}`,
-                type: 'delivery' as const,
-                title: 'Rider Assigned!',
-                message: `${data.rider.name} has been assigned to your order`,
-                priority: 'high' as const,
-                data: { orderId: data.orderId, rider: data.rider },
-                actions: [
-                    { label: 'Track Order', action: 'view_order', data: { orderId: data.orderId } },
-                    { label: 'Contact Rider', action: 'contact_rider', data: { riderId: data.rider.id } }
-                ],
-                timestamp: data.timestamp || new Date().toISOString(),
-                read: false
-            };
 
-            addNotification(notification);
-            showBrowserNotification(notification);
-            showSweetAlertNotification(notification);
-            
-            queryClient.invalidateQueries({ queryKey: ['orders'] });
+            // Add notification with delay
+            setTimeout(() => {
+                const notification = {
+                    id: `rider-assigned-${data.orderId}-${Date.now()}`,
+                    type: 'delivery' as const,
+                    title: 'Rider Assigned!',
+                    message: `${data.rider.name} has been assigned to your order`,
+                    priority: 'high' as const,
+                    data: { orderId: data.orderId, rider: data.rider },
+                    actions: [
+                        { label: 'Track Order', action: 'view_order', data: { orderId: data.orderId } },
+                        { label: 'Contact Rider', action: 'contact_rider', data: { riderId: data.rider.id } }
+                    ],
+                    timestamp: data.timestamp || new Date().toISOString(),
+                    read: false
+                };
+
+                addNotification(notification);
+                showBrowserNotification(notification);
+                showSweetAlertNotification(notification);
+            }, 1000);
         });
 
         // Handle no riders available with notification
@@ -301,10 +295,10 @@ export const useSocket = () => {
 
         // Handle delivery updates
         socketInstance.on('delivery_update', (data) => {
-            console.log('🌐 Delivery update:', data);
+            console.log('�� Delivery update:', data);
             
             // Update rider info
-            updateOrderRider(data.orderId, data.rider);
+            // updateOrderRider(data.orderId, data.rider); // This line was removed as per the edit hint
             
             // Update React Query cache
             queryClient.setQueryData(['order', data.orderId], (oldData: any) => {
@@ -371,7 +365,7 @@ export const useSocket = () => {
             socketInstance.disconnect();
             setConnectionStatus('disconnected');
         };
-    }, [user, updateOrderStatus, updateOrderRider, updateOrderETA, setConnectionStatus, queryClient, addNotification, markAsRead, requestNotificationPermission, showBrowserNotification, showSweetAlertNotification]);
+    }, [user, setConnectionStatus, queryClient, addNotification, markAsRead, requestNotificationPermission, showBrowserNotification, showSweetAlertNotification]);
 
     const joinOrderRoom = (orderId: string) => {
         if (socket && isConnected) {

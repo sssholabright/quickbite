@@ -262,31 +262,55 @@ export class DeliveryJobService {
             });
 
             if (order) {
+                try {
+                    const socketManager = getSocketManager();
+                    
+                    // Emit order_updated event
+                    socketManager.emitToOrder(orderId, 'order_updated', { 
+                        order: {
+                            id: order.id,
+                            status: 'ASSIGNED',
+                            rider: {
+                                id: order.rider?.id,
+                                name: order.rider?.user.name,
+                                phone: order.rider?.user.phone
+                            }
+                        }
+                    });
+                    
+                    // Emit order_status_update events
+                    socketManager.emitToCustomer(order.customer.userId, 'order_status_update', {
+                        orderId: orderId,
+                        status: 'ASSIGNED',
+                        timestamp: new Date().toISOString()
+                    });
+                    
+                    socketManager.emitToVendor(order.vendor.id, 'order_status_update', {
+                        orderId: orderId,
+                        status: 'ASSIGNED',
+                        timestamp: new Date().toISOString()
+                    });
+                    
+                    // Emit rider_assigned event
+                    socketManager.emitToCustomer(order.customer.userId, 'rider_assigned', {
+                        orderId: orderId,
+                        rider: {
+                            id: order.rider?.id,
+                            name: order.rider?.user.name,
+                            phone: order.rider?.user.phone
+                        },
+                        timestamp: new Date().toISOString()
+                    });
+                    
+                    logger.info(`📡 Socket events emitted for rider assignment: ${orderId}`);
+                } catch (socketError) {
+                    logger.error({ error: socketError, orderId }, 'Failed to emit socket events for rider assignment');
+                }
+
                 // 🚀 NEW: Send notifications to customer and vendor
                 try {
                     const { notificationQueueService } = await import('../../services/notificationQueue.service.js');
                     
-                    // // Notify customer
-                    // await notificationQueueService.addNotification({
-                    //     id: `rider-assigned-${orderId}-${Date.now()}`,
-                    //     targetType: 'customer',
-                    //     targetId: order.customer.id,
-                    //     type: 'order',
-                    //     title: '🚚 Rider Assigned!',
-                    //     message: `Your order has been assigned to ${order.rider.user.name}. They will pick it up soon!`,
-                    //     data: {
-                    //         orderId: orderId,
-                    //         riderName: order.rider.user.name,
-                    //         riderPhone: order.rider.user.phone,
-                    //         status: 'ASSIGNED'
-                    //     },
-                    //     priority: 'high',
-                    //     actions: [
-                    //         { label: 'Track Order', action: 'track_order', data: { orderId } }
-                    //     ],
-                    //     timestamp: new Date().toISOString()
-                    // });
-
                     // Notify vendor
                     await notificationQueueService.addNotification({
                         id: `rider-assigned-vendor-${orderId}-${Date.now()}`,
@@ -312,7 +336,6 @@ export class DeliveryJobService {
                     logger.info(`📱 Notifications sent for rider assignment: ${orderId}`);
                 } catch (notificationError) {
                     logger.error({ error: notificationError, orderId }, 'Failed to send rider assignment notifications');
-                    // Don't throw error, continue with other operations
                 }
             }
 

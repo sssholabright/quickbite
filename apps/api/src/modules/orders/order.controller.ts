@@ -90,9 +90,30 @@ export class OrderController {
 
             const order = await OrderService.updateOrderStatus(orderId!, validatedData, userId, userRole);
 
+            // Emit socket events
             socketManager.emitToOrder(orderId!, 'order_updated', { order: order });
+            socketManager.emitToOrder(orderId!, 'order_status_update', {
+                orderId: orderId!,
+                status: validatedData.status,
+                timestamp: new Date().toISOString()
+            });
 
-                // 🚀 NEW: Emit notification based on status change
+            // Emit to specific users
+            if (order.customer) {
+                socketManager.emitToCustomer(order.customer.id, 'order_status_update', {
+                    orderId: orderId!,
+                    status: validatedData.status,
+                    timestamp: new Date().toISOString()
+                });
+            }
+
+            socketManager.emitToVendor(order.vendor.id, 'order_status_update', {
+                orderId: orderId!,
+                status: validatedData.status,
+                timestamp: new Date().toISOString()
+            });
+
+                // Emit notification based on status change
                 let notificationTitle = '';
                 let notificationMessage = '';
                 let priority: 'low' | 'normal' | 'high' | 'urgent' = 'normal';

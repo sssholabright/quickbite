@@ -43,6 +43,7 @@ export type OrderStatus =
     | 'CONFIRMED' 
     | 'PREPARING'
     | 'READY_FOR_PICKUP'
+    | 'ASSIGNED'
     | 'PICKED_UP'
     | 'OUT_FOR_DELIVERY'
     | 'DELIVERED'

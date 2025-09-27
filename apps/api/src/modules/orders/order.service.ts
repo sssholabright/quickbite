@@ -169,62 +169,42 @@ export class OrderService {
                 // Emit to order room
                 socketManager.emitToOrder(order.id, 'order_updated', { order: formattedOrder });
                 
-                // 🚀 NEW: Emit directly to vendor
+                // Emit directly to vendor
                 socketManager.emitToVendor(order.vendorId, 'new_order', { order: formattedOrder });
-                // 🚀 NEW: Emit to vendor orders room
+                // Emit to vendor orders room
                 socketManager.getIO().to(`vendor_orders:${order.vendorId}`).emit('new_order', { 
                     order: formattedOrder,
                     timestamp: new Date().toISOString()
                 });
-                console.log(`✅ DEBUG: Order emitted to vendor ${order.vendorId}`);
 
-                console.log('🔍 DEBUG: About to emit notification');
-                console.log('🔍 DEBUG: Vendor ID:', order.vendorId);
-                console.log('🔍 DEBUG: Order ID:', order.id);
-                console.log('🔍 DEBUG: Order Number:', order.orderNumber);
-
-                try {
-                    const { notificationQueueService } = await import('../../services/notificationQueue.service.js');
-                    
-                    const notification: NotificationJobData = {
-                        id: `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                        type: 'order',
-                        title: 'New Order Received',
-                        message: `Order ${order.orderNumber} has been placed with a total of $${order.total}`,
-                        data: {
-                            orderId: order.id,
-                            orderNumber: order.orderNumber,
-                            totalAmount: order.total,
-                            itemCount: order.items.length
-                        },
-                        priority: 'high',
-                        actions: [
-                            {
-                                label: 'View Order',
-                                action: 'view_order',
-                                data: { orderId: order.id }
+                // Send notifications with delay
+                setTimeout(async () => {
+                    try {
+                        const { notificationQueueService } = await import('../../services/notificationQueue.service.js');
+                        
+                        const notification = {
+                            id: `new-order-${order.id}-${Date.now()}`,
+                            targetType: 'vendor' as const,
+                            targetId: order.vendorId,
+                            type: 'order' as const,
+                            title: '🆕 New Order!',
+                            message: `New order #${order.orderNumber} received`,
+                            data: {
+                                orderId: order.id,
+                                orderNumber: order.orderNumber,
+                                customerName: order.customer?.user?.name || 'Unknown Customer',
+                                total: order.total
                             },
-                            {
-                                label: 'Accept Order',
-                                action: 'accept_order',
-                                data: { orderId: order.id }
-                            }
-                        ],
-                        timestamp: new Date().toISOString(),
-                        targetType: 'vendor',
-                        targetId: order.vendorId,
-                        maxRetries: 3,
-                        retryDelay: 5000
-                    };
-                    
-                    await notificationQueueService.addNotification(notification);
-                    console.log('✅ DEBUG: Notification queued successfully');
-                } catch (error) {
-                    console.error('❌ DEBUG: Error queuing notification:', error);
-                    logger.error({ error, orderId: order.id }, 'Failed to queue notification');
-                }
+                            priority: 'urgent' as const,
+                            timestamp: new Date().toISOString()
+                        };
+                        
+                        await notificationQueueService.addNotification(notification);
+                    } catch (error) {
+                        logger.error({ error, orderId: order.id }, 'Failed to queue notification');
+                    }
+                }, 2000);
             } catch (error) {
-                console.error('❌ DEBUG: Error emitting notification:', error);
                 logger.error({ error, orderId: order.id }, 'Failed to emit notification');
             }
 
@@ -416,9 +396,9 @@ export class OrderService {
                     }
                 }
                 
-                // 🚀 NEW: Send notifications AFTER socket events (with a small delay)
+                // Send notifications AFTER socket events with longer delay
                 if (statusUpdate.status === 'ASSIGNED' && statusUpdate.riderId) {
-                    // Small delay to ensure UI updates are processed first
+                    // Longer delay to ensure UI updates are processed first
                     setTimeout(async () => {
                         try {
                             const { notificationQueueService } = await import('../../services/notificationQueue.service.js');
@@ -441,7 +421,7 @@ export class OrderService {
                         } catch (error) {
                             logger.error({ error, orderId }, 'Failed to send order assignment notification');
                         }
-                    }, 500); // 500ms delay after socket events
+                    }, 2000); // 🚀 INCREASED: 2 second delay after socket events
                 }
                 
             } catch (socketError) {

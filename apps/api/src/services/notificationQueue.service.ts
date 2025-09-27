@@ -83,14 +83,7 @@ export class NotificationQueueService {
         console.log(`🔔 Target ${notification.targetType}:${notification.targetId} is online: ${isOnline}`);
         
         if (isOnline) {
-            // 🚀 FIXED: Increase delay for critical notifications to ensure UI updates first
-            if (notification.priority === 'urgent' || notification.type === 'order') {
-                // Wait longer for order-related notifications to ensure UI state is updated first
-                await new Promise(resolve => setTimeout(resolve, 5000)); // 5 second delay
-            } else if (notification.priority === 'high') {
-                await new Promise(resolve => setTimeout(resolve, 5000)); // 5 second delay
-            }
-            
+            // 🚀 REMOVED: No additional delay here since we already delayed in the queue
             console.log(`🔔 Delivering notification via socket to ${notification.targetType}:${notification.targetId}`);
             await this.deliverViaSocket(socketManager, notification);
         } else {
@@ -184,12 +177,23 @@ export class NotificationQueueService {
     // Public methods
     public async addNotification(notification: NotificationJobData): Promise<void> {
         try {
+            // 🚀 FIXED: Add delay based on notification type and priority
+            let delay = 0;
+            
+            if (notification.type === 'order' || notification.priority === 'urgent') {
+                delay = 3000; // 3 seconds for order/urgent notifications
+            } else if (notification.priority === 'high') {
+                delay = 2000; // 2 seconds for high priority
+            } else {
+                delay = 1000; // 1 second for normal notifications
+            }
+            
             const job = await this.notificationQueue.add('deliver-notification', notification, {
-                delay: 0, // Process immediately
+                delay: delay, // 🚀 FIXED: Use calculated delay instead of 0
                 priority: this.getPriorityValue(notification.priority),
             });
             
-            console.log(`📋 Notification queued: ${notification.title} (Job ID: ${job.id})`);
+            console.log(`📋 Notification queued: ${notification.title} (Job ID: ${job.id}, Delay: ${delay}ms)`);
             logger.info(`Notification queued: ${notification.title}`);
         } catch (error) {
             console.error(`❌ Failed to queue notification: ${error}`);
