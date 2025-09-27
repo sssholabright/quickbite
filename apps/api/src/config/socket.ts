@@ -73,6 +73,7 @@ export class SocketService {
                         select: { id: true }
                     });
                     socket.vendorId = vendor?.id || '';
+                    console.log(`Vendor ID set: ${socket.vendorId}`);
                 } else if (decoded.role === 'CUSTOMER') {
                     // Get actual customer ID from database
                     const customer = await prisma.customer.findUnique({
@@ -98,15 +99,39 @@ export class SocketService {
     }
 
     private setupEventHandlers() {
-        this.io.on('connection', (socket: AuthenticatedSocket) => {
+        this.io.on('connection', async (socket: AuthenticatedSocket) => {
             logger.info(`Socket connected: ${socket.id}, User: ${socket.userId}, Role: ${socket.userRole}`);
-
+    
             // Join role-specific rooms
             if (socket.userRole === 'VENDOR' && socket.vendorId) {
                 socket.join(`vendor:${socket.vendorId}`);
                 socket.join('vendors');
+
+                // 🚀 NEW: Auto-join vendor to their orders room
+                socket.join(`vendor_orders:${socket.vendorId}`);
+                console.log(`Vendor ${socket.vendorId} joined vendor orders room`);
+                
+                // 🚀 DELIVER PENDING NOTIFICATIONS
+                try {
+                    const { notificationQueueService } = await import('../services/notificationQueue.service.js');
+                    await notificationQueueService.deliverPendingNotifications('vendor', socket.vendorId);
+                    console.log(`📬 Pending notifications check completed for vendor ${socket.vendorId}`);
+                } catch (error) {
+                    console.error('Error delivering pending notifications:', error);
+                    logger.error({ error, vendorId: socket.vendorId }, 'Error delivering pending notifications');
+                }
             } else if (socket.userRole === 'CUSTOMER' && socket.customerId) {
                 socket.join(`customer:${socket.customerId}`);
+                
+                // 🚀 DELIVER PENDING NOTIFICATIONS
+                try {
+                    const { notificationQueueService } = await import('../services/notificationQueue.service.js');
+                    await notificationQueueService.deliverPendingNotifications('customer', socket.customerId);
+                    console.log(`📬 Pending notifications check completed for customer ${socket.customerId}`);
+                } catch (error) {
+                    console.error('Error delivering pending notifications:', error);
+                    logger.error({ error, customerId: socket.customerId }, 'Error delivering pending notifications');
+                }
             } else if (socket.userRole === 'RIDER' && socket.riderId) {
                 socket.join(`rider:${socket.riderId}`);
                 socket.join('riders');
@@ -116,16 +141,18 @@ export class SocketService {
                     this.connectedRiders.set(socket.riderId, []);
                 }
                 this.connectedRiders.get(socket.riderId)!.push(socket.id);
+                
+                // 🚀 DELIVER PENDING NOTIFICATIONS
+                try {
+                    const { notificationQueueService } = await import('../services/notificationQueue.service.js');
+                    await notificationQueueService.deliverPendingNotifications('rider', socket.riderId);
+                    console.log(`📬 Pending notifications check completed for rider ${socket.riderId}`);
+                } catch (error) {
+                    console.error('Error delivering pending notifications:', error);
+                    logger.error({ error, riderId: socket.riderId }, 'Error delivering pending notifications');
+                }
             } else if (socket.userRole === 'ADMIN') {
                 socket.join('admins');
-            }
-
-            // Track connected users
-            if (socket.userId) {
-                if (!this.connectedUsers.has(socket.userId)) {
-                    this.connectedUsers.set(socket.userId, []);
-                }
-                this.connectedUsers.get(socket.userId)!.push(socket.id);
             }
 
             // 🚀 NEW: Handle rider status changes

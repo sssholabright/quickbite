@@ -245,6 +245,77 @@ export class DeliveryJobService {
                 message: 'You have successfully accepted this delivery job'
             });
 
+            // 🚀 NEW: Get order details for notifications
+            const order = await prisma.order.findUnique({
+                where: { id: orderId },
+                include: {
+                    customer: {
+                        include: { user: true }
+                    },
+                    vendor: {
+                        include: { user: true }
+                    },
+                    rider: {
+                        include: { user: true }
+                    }
+                }
+            });
+
+            if (order) {
+                // 🚀 NEW: Send notifications to customer and vendor
+                try {
+                    const { notificationQueueService } = await import('../../services/notificationQueue.service.js');
+                    
+                    // // Notify customer
+                    // await notificationQueueService.addNotification({
+                    //     id: `rider-assigned-${orderId}-${Date.now()}`,
+                    //     targetType: 'customer',
+                    //     targetId: order.customer.id,
+                    //     type: 'order',
+                    //     title: '🚚 Rider Assigned!',
+                    //     message: `Your order has been assigned to ${order.rider.user.name}. They will pick it up soon!`,
+                    //     data: {
+                    //         orderId: orderId,
+                    //         riderName: order.rider.user.name,
+                    //         riderPhone: order.rider.user.phone,
+                    //         status: 'ASSIGNED'
+                    //     },
+                    //     priority: 'high',
+                    //     actions: [
+                    //         { label: 'Track Order', action: 'track_order', data: { orderId } }
+                    //     ],
+                    //     timestamp: new Date().toISOString()
+                    // });
+
+                    // Notify vendor
+                    await notificationQueueService.addNotification({
+                        id: `rider-assigned-vendor-${orderId}-${Date.now()}`,
+                        targetType: 'vendor',
+                        targetId: order.vendor.id,
+                        type: 'order',
+                        title: '🚚 Rider Assigned!',
+                        message: `Order #${order.orderNumber} has been assigned to ${order.rider?.user.name}`,
+                        data: {
+                            orderId: orderId,
+                            orderNumber: order.orderNumber,
+                            riderName: order.rider?.user.name,
+                            riderPhone: order.rider?.user.phone,
+                            status: 'ASSIGNED'
+                        },
+                        priority: 'normal',
+                        actions: [
+                            { label: 'View Order', action: 'view_order', data: { orderId } }
+                        ],
+                        timestamp: new Date().toISOString()
+                    });
+
+                    logger.info(`📱 Notifications sent for rider assignment: ${orderId}`);
+                } catch (notificationError) {
+                    logger.error({ error: notificationError, orderId }, 'Failed to send rider assignment notifications');
+                    // Don't throw error, continue with other operations
+                }
+            }
+
             logger.info(`🎯 Order ${orderId} assigned to rider ${riderId}, processing next job...`);
 
             // Continue processing queue

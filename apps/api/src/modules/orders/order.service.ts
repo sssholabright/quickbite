@@ -3,7 +3,7 @@ import { CustomError } from './../../middlewares/errorHandler.js';
 import { prisma } from './../../config/db.js';
 import { CreateOrderRequest, OrderFilters, OrderResponse, OrderStatusUpdate } from './../../types/order.js';
 import { getSocketManager } from '../../config/socket.js';
-import { DeliveryJobData } from '../../types/queue.js';
+import { DeliveryJobData, NotificationJobData } from '../../types/queue.js';
 import { queueService } from '../queues/queue.service.js';
 import { FCMService } from '../../services/fcm.service.js';
 
@@ -168,63 +168,64 @@ export class OrderService {
                 
                 // Emit to order room
                 socketManager.emitToOrder(order.id, 'order_updated', { order: formattedOrder });
+                
+                // 🚀 NEW: Emit directly to vendor
+                socketManager.emitToVendor(order.vendorId, 'new_order', { order: formattedOrder });
+                // 🚀 NEW: Emit to vendor orders room
+                socketManager.getIO().to(`vendor_orders:${order.vendorId}`).emit('new_order', { 
+                    order: formattedOrder,
+                    timestamp: new Date().toISOString()
+                });
+                console.log(`✅ DEBUG: Order emitted to vendor ${order.vendorId}`);
 
                 console.log('🔍 DEBUG: About to emit notification');
-                console.log('🔍 DEBUG: Vendor ID:', orderData.vendorId);
+                console.log('🔍 DEBUG: Vendor ID:', order.vendorId);
                 console.log('🔍 DEBUG: Order ID:', order.id);
                 console.log('🔍 DEBUG: Order Number:', order.orderNumber);
 
                 try {
-                    const notificationData = {
-                        id: `new-order-${order.id}-${Date.now()}`,
+                    const { notificationQueueService } = await import('../../services/notificationQueue.service.js');
+                    
+                    const notification: NotificationJobData = {
+                        id: `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
                         type: 'order',
-                        title: 'New Order Received!',
-                        message: `Order #${order.orderNumber} from ${order.customer.user.name} - ₦${order.total} total`,
-                        priority: 'high',
-                        data: { 
-                            orderId: order.id, 
+                        title: 'New Order Received',
+                        message: `Order ${order.orderNumber} has been placed with a total of $${order.total}`,
+                        data: {
+                            orderId: order.id,
                             orderNumber: order.orderNumber,
-                            customerName: order.customer.user.name,
                             totalAmount: order.total,
                             itemCount: order.items.length
                         },
+                        priority: 'high',
                         actions: [
-                            { 
-                                label: 'View Order', 
-                                action: 'view_order', 
-                                data: { orderId: order.id } 
+                            {
+                                label: 'View Order',
+                                action: 'view_order',
+                                data: { orderId: order.id }
                             },
-                            { 
-                                label: 'Accept Order', 
-                                action: 'accept_order', 
-                                data: { orderId: order.id } 
+                            {
+                                label: 'Accept Order',
+                                action: 'accept_order',
+                                data: { orderId: order.id }
                             }
                         ],
                         timestamp: new Date().toISOString(),
-                        read: false
+                        targetType: 'vendor',
+                        targetId: order.vendorId,
+                        maxRetries: 3,
+                        retryDelay: 5000
                     };
-
-                    console.log('🔍 DEBUG: Notification data prepared:', notificationData);
-    
-                    // Check if vendor room exists
-                    const io = socketManager.getIO();
-                    const vendorRoom = io.sockets.adapter.rooms.get(`vendor:${orderData.vendorId}`);
-                    console.log('🔍 DEBUG: Vendor room exists:', !!vendorRoom);
-                    console.log('🔍 DEBUG: Vendor room size:', vendorRoom?.size || 0);
                     
-                    if (vendorRoom && vendorRoom.size > 0) {
-                        socketManager.emitToVendor(orderData.vendorId, 'notification_received', notificationData);
-                        console.log('✅ DEBUG: Notification emitted to vendor successfully');
-                    } else {
-                        console.log('❌ DEBUG: Vendor not connected, notification not sent');
-                    }
-                    
-                } catch (notificationError) {
-                    console.error('❌ DEBUG: Error preparing notification:', notificationError);
+                    await notificationQueueService.addNotification(notification);
+                    console.log('✅ DEBUG: Notification queued successfully');
+                } catch (error) {
+                    console.error('❌ DEBUG: Error queuing notification:', error);
+                    logger.error({ error, orderId: order.id }, 'Failed to queue notification');
                 }
-                
-            } catch (socketError) {
-                logger.error({ error: socketError }, 'Failed to emit socket events');
+            } catch (error) {
+                console.error('❌ DEBUG: Error emitting notification:', error);
+                logger.error({ error, orderId: order.id }, 'Failed to emit notification');
             }
 
             return formattedOrder;
@@ -398,7 +399,7 @@ export class OrderService {
                 });
                 
                 // Emit delivery updates if rider is assigned
-                if (statusUpdate.riderId && ['PICKED_UP', 'OUT_FOR_DELIVERY', 'DELIVERED'].includes(statusUpdate.status)) {
+                if (statusUpdate.riderId && ['PICKED_UP', 'ASSIGNED', 'OUT_FOR_DELIVERY', 'DELIVERED'].includes(statusUpdate.status)) {
                     const rider = await prisma.rider.findUnique({
                         where: { id: statusUpdate.riderId },
                         include: { user: true }
@@ -414,6 +415,35 @@ export class OrderService {
                         });
                     }
                 }
+                
+                // 🚀 NEW: Send notifications AFTER socket events (with a small delay)
+                if (statusUpdate.status === 'ASSIGNED' && statusUpdate.riderId) {
+                    // Small delay to ensure UI updates are processed first
+                    setTimeout(async () => {
+                        try {
+                            const { notificationQueueService } = await import('../../services/notificationQueue.service.js');
+                            
+                            // Send notification to customer
+                            await notificationQueueService.addNotification({
+                                id: `order-assigned-${orderId}-${Date.now()}`,
+                                targetType: 'customer',
+                                targetId: updatedOrder.customer.id,
+                                type: 'order',
+                                title: '🚚 Order Assigned!',
+                                message: `Your order has been assigned to a rider and will be picked up soon!`,
+                                data: {
+                                    orderId: orderId,
+                                    status: 'ASSIGNED'
+                                },
+                                priority: 'high',
+                                timestamp: new Date().toISOString()
+                            });
+                        } catch (error) {
+                            logger.error({ error, orderId }, 'Failed to send order assignment notification');
+                        }
+                    }, 500); // 500ms delay after socket events
+                }
+                
             } catch (socketError) {
                 logger.error({ error: socketError }, 'Failed to emit socket events');
             }

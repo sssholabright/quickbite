@@ -315,6 +315,29 @@ export const useSocket = () => {
             });
         });
 
+        // socketInstance.on('new_order', (data) => {
+        //     console.log('🌐 New order received:', data);
+            
+        //     // Invalidate orders query to refresh the list
+        //     queryClient.invalidateQueries({ queryKey: ['orders'] });
+            
+        //     // Add new order notification
+        //     addNotification({
+        //         id: `new-order-${data.order.id}-${Date.now()}`,
+        //         type: 'order',
+        //         title: 'New Order Received',
+        //         message: `Order ${data.order.orderNumber} has been placed with a total of $${data.order.total}`,
+        //         priority: 'high',
+        //         data: { 
+        //             orderId: data.order.id, 
+        //             orderNumber: data.order.orderNumber,
+        //             totalAmount: data.order.total
+        //         },
+        //         timestamp: data.timestamp || new Date().toISOString(),
+        //         read: false
+        //     });
+        // });
+
         // NEW: Handle notification events
         socketInstance.on('notification_received', (data) => {
             console.log('🔔 Notification received:', data);

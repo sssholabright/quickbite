@@ -44,3 +44,25 @@ export interface OrderTimeoutJobData {
     timeoutType: 'rider_assignment' | 'pickup' | 'delivery';
     timeoutMinutes: number;
 }
+
+export interface NotificationJobData {
+    id: string;
+    type: 'order' | 'delivery' | 'payment' | 'system';
+    title: string;
+    message: string;
+    data?: any;
+    priority: 'low' | 'normal' | 'high' | 'urgent';
+    actions?: Array<{
+        label: string;
+        action: string;
+        data?: any;
+    }>;
+    timestamp: string;
+    expiresAt?: string;
+    // Target information
+    targetType: 'vendor' | 'customer' | 'rider' | 'admin';
+    targetId: string;
+    // Retry configuration
+    maxRetries?: number;
+    retryDelay?: number;
+}
