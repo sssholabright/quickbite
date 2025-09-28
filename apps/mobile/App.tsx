@@ -11,14 +11,15 @@ import { useSocket } from './src/hooks/useSocket';
 const queryClient = new QueryClient();
 
 function AppContent() {
-  const { hydrate } = useAuthStore();
+  const { hydrate: hydrateAuth } = useAuthStore();
   
   // Initialize socket at app level - persists across navigation
   useSocket();
 
   useEffect(() => {
-    hydrate();
-  }, []);
+    // Only hydrate auth store, theme store handles its own hydration
+    hydrateAuth();
+  }, [hydrateAuth]);
 
   return (
     <>

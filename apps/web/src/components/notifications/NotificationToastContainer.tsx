@@ -3,7 +3,7 @@ import { useNotificationStore } from '../../stores/notificationStore';
 import NotificationToast from './NotificationToast';
 
 const NotificationToastContainer: React.FC = () => {
-    const { notifications, removeNotification } = useNotificationStore();
+    const { notifications, removeNotification, markAsRead } = useNotificationStore();
     const [activeToasts, setActiveToasts] = useState<string[]>([]);
     const processedNotifications = useRef<Set<string>>(new Set());
 
@@ -27,7 +27,7 @@ const NotificationToastContainer: React.FC = () => {
 
     const handleToastClose = (notificationId: string) => {
         setActiveToasts(prev => prev.filter(id => id !== notificationId));
-        removeNotification(notificationId);
+        markAsRead(notificationId); // 🚀 FIX: Mark as read instead of removing
         
         // Remove from processed set when closed
         processedNotifications.current.delete(notificationId);

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, Pressable, Switch, Alert, Linking } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -6,7 +6,8 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../navigation/types';
 import { useTheme, useThemeMode, useSetThemeMode, useEffectiveThemeMode } from '../../theme/theme';
 import { Icon } from '../../ui/Icon';
-import { mockSettings } from '../../lib/mockProfile';
+// import notificationService from '../../services/notificationService';
+import AlertModal from '../../ui/AlertModal';
 
 type SettingsNav = NativeStackNavigationProp<RootStackParamList, 'Settings'>;
 
@@ -14,47 +15,134 @@ export default function SettingsScreen() {
     const theme = useTheme();
     const insets = useSafeAreaInsets();
     const navigation = useNavigation<SettingsNav>();
-    const [settings, setSettings] = useState(mockSettings);
+    const [notificationPermission, setNotificationPermission] = useState<'granted' | 'denied' | 'undetermined'>('undetermined');
+    
+    // AlertModal states
+    const [alertModal, setAlertModal] = useState({
+        visible: false,
+        title: '',
+        message: '',
+        type: 'info' as 'success' | 'error' | 'warning' | 'info',
+        onConfirm: () => {},
+        onCancel: undefined as (() => void) | undefined,
+        confirmText: 'OK',
+        cancelText: 'Cancel',
+        showCancel: false,
+    });
     
     const currentThemeMode = useThemeMode();
     const setThemeMode = useSetThemeMode();
     const effectiveMode = useEffectiveThemeMode();
 
-    const handleNotificationToggle = (type: 'push' | 'email' | 'sms') => {
-        setSettings(prev => ({
-            ...prev,
-            notifications: {
-                ...prev.notifications,
-                [type]: !prev.notifications[type]
+    useEffect(() => {
+        // checkNotificationStatus();
+    }, []);
+
+    const showAlert = (
+        title: string,
+        message: string,
+        type: 'success' | 'error' | 'warning' | 'info' = 'info',
+        onConfirm?: () => void,
+        onCancel?: () => void,
+        confirmText: string = 'OK',
+        cancelText: string = 'Cancel',
+        showCancel: boolean = false
+    ) => {
+        setAlertModal({
+            visible: true,
+            title,
+            message,
+            type,
+            onConfirm: onConfirm || (() => setAlertModal(prev => ({ ...prev, visible: false }))),
+            onCancel: onCancel || (() => setAlertModal(prev => ({ ...prev, visible: false }))),
+            confirmText,
+            cancelText,
+            showCancel,
+        });
+    };
+
+    // const checkNotificationStatus = async () => {
+    //     try {
+    //         const permissions = await notificationService.getPermissionStatus();
+    //         setNotificationPermission(permissions.status);
+    //     } catch (error) {
+    //         console.error('Error checking notification status:', error);
+    //     }
+    // };
+
+    // const handleRequestNotificationPermission = async () => {
+    //     try {
+    //         const permissions = await notificationService.requestPermissions();
+    //         setNotificationPermission(permissions.status);
+            
+    //         if (permissions.status === 'granted') {
+    //             showAlert(
+    //                 'Success', 
+    //                 'Notifications enabled! You will now receive delivery job notifications.',
+    //                 'success'
+    //             );
+    //             // Re-initialize to get push token
+    //             await notificationService.initialize();
+    //         } else {
+    //             showAlert(
+    //                 'Permission Denied', 
+    //                 'Please enable notifications manually in your device settings:\n\nSettings > Apps > QuickBite Rider > Notifications',
+    //                 'warning'
+    //             );
+    //         }
+    //     } catch (error) {
+    //         console.error('Error requesting notification permission:', error);
+    //         showAlert('Error', 'Failed to request notification permission', 'error');
+    //     }
+    // };
+
+    const handleNotificationToggle = async (type: 'push' | 'email' | 'sms') => {
+        if (type === 'push') {
+            // Handle push notification permission
+            if (notificationPermission === 'granted') {
+                // Show alert when trying to turn OFF
+                showAlert(
+                    "Disable Notifications",
+                    "To disable notifications, please go to your device settings:\n\nSettings > Apps > QuickBite Rider > Notifications",
+                    'info'
+                );
+            } else {
+                // Request permission when toggling ON
+                // await handleRequestNotificationPermission();
             }
-        }));
+        } else {
+            // Handle other notification types normally
+            
+        }
     };
 
     const handleThemeChange = (mode: 'system' | 'light' | 'dark') => {
         setThemeMode(mode);
+        showAlert(
+            'Theme Updated',
+            `Theme changed to ${mode === 'system' ? 'System' : mode === 'light' ? 'Light' : 'Dark'} mode.`,
+            'success'
+        );
     };
 
-    const handleContactSupport = () => {
-        Alert.alert(
-            'Contact Support',
-            'How would you like to contact us?',
-            [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Email', onPress: () => Linking.openURL('mailto:support@quickbite.com') },
-                { text: 'WhatsApp', onPress: () => Linking.openURL('https://wa.me/2348012345678') }
-            ]
+    const handleComingSoon = (feature: string) => {
+        showAlert(
+            'Coming Soon',
+            `${feature} feature will be available in a future update.`,
+            'info'
         );
     };
 
     const renderSettingItem = (
         icon: string,
         title: string,
+        disabled?: boolean,
         subtitle?: string,
         rightComponent?: React.ReactNode,
         onPress?: () => void
     ) => (
         <Pressable
-            onPress={onPress}
+            onPress={disabled ? () => handleComingSoon(title) : onPress}
             style={{
                 flexDirection: 'row',
                 alignItems: 'center',
@@ -64,6 +152,7 @@ export default function SettingsScreen() {
                 marginBottom: 12,
                 borderWidth: 1,
                 borderColor: theme.colors.border,
+                opacity: disabled ? 0.5 : 1,
             }}
         >
             <View style={{
@@ -75,13 +164,13 @@ export default function SettingsScreen() {
                 justifyContent: 'center',
                 marginRight: 16,
             }}>
-                <Icon name={icon} size={18} color={theme.colors.primary} />
+                <Icon name={icon} size={18} color={disabled ? theme.colors.muted : theme.colors.primary} />
             </View>
             <View style={{ flex: 1 }}>
                 <Text style={{
                     fontSize: 14,
                     fontWeight: '600',
-                    color: theme.colors.text,
+                    color: disabled ? theme.colors.muted : theme.colors.text,
                     marginBottom: subtitle ? 2 : 0,
                 }}>
                     {title}
@@ -89,14 +178,14 @@ export default function SettingsScreen() {
                 {subtitle && (
                     <Text style={{
                         fontSize: 12,
-                        color: theme.colors.muted,
+                        color: disabled ? theme.colors.muted : theme.colors.text,
                     }}>
                         {subtitle}
                     </Text>
                 )}
             </View>
             {rightComponent || (onPress && (
-                <Icon name="chevron-forward" size={18} color={theme.colors.muted} />
+                <Icon name="chevron-forward" size={18} color={disabled ? theme.colors.muted : theme.colors.text} />
             ))}
         </Pressable>
     );
@@ -198,7 +287,7 @@ export default function SettingsScreen() {
                         fontSize: 16,
                         fontWeight: '600',
                         color: theme.colors.text,
-                        marginBottom: 16,
+                        marginBottom: 10,
                     }}>
                         Appearance
                     </Text>
@@ -228,7 +317,7 @@ export default function SettingsScreen() {
                         fontSize: 16,
                         fontWeight: '600',
                         color: theme.colors.text,
-                        marginBottom: 16,
+                        marginBottom: 10,
                     }}>
                         Notifications
                     </Text>
@@ -236,36 +325,43 @@ export default function SettingsScreen() {
                     {renderSettingItem(
                         'notifications',
                         'Push Notifications',
-                        'Get notified about order updates',
+                        false,
+                        notificationPermission === 'granted' 
+                            ? 'Get notified about order updates' 
+                            : 'Enable to receive delivery job notifications',
                         <Switch
-                            value={settings.notifications.push}
+                            value={notificationPermission === 'granted'}
                             onValueChange={() => handleNotificationToggle('push')}
                             trackColor={{ false: theme.colors.border, true: theme.colors.primary + '40' }}
-                            thumbColor={settings.notifications.push ? theme.colors.primary : theme.colors.muted}
+                            thumbColor={notificationPermission === 'granted' ? theme.colors.primary : theme.colors.muted}
                         />
                     )}
 
                     {renderSettingItem(
                         'mail',
                         'Email Notifications',
-                        'Receive updates via email',
+                        true,
+                        'Coming Soon',
                         <Switch
-                            value={settings.notifications.email}
-                            onValueChange={() => handleNotificationToggle('email')}
+                            value={false}
+                            onValueChange={() => {}}
                             trackColor={{ false: theme.colors.border, true: theme.colors.primary + '40' }}
-                            thumbColor={settings.notifications.email ? theme.colors.primary : theme.colors.muted}
+                            thumbColor={theme.colors.muted}
+                            disabled={true}
                         />
                     )}
 
                     {renderSettingItem(
                         'chatbubble',
                         'SMS Notifications',
-                        'Get text message updates',
+                        true,
+                        'Coming Soon',
                         <Switch
-                            value={settings.notifications.sms}
-                            onValueChange={() => handleNotificationToggle('sms')}
+                            value={false}
+                            onValueChange={() => {}}
                             trackColor={{ false: theme.colors.border, true: theme.colors.primary + '40' }}
-                            thumbColor={settings.notifications.sms ? theme.colors.primary : theme.colors.muted}
+                            thumbColor={theme.colors.muted}
+                            disabled={true}
                         />
                     )}
                 </View>
@@ -276,7 +372,7 @@ export default function SettingsScreen() {
                         fontSize: 16,
                         fontWeight: '600',
                         color: theme.colors.text,
-                        marginBottom: 16,
+                        marginBottom: 10,
                     }}>
                         Preferences
                     </Text>
@@ -284,84 +380,26 @@ export default function SettingsScreen() {
                     {renderSettingItem(
                         'language',
                         'Language',
-                        settings.preferences.language,
+                        true,
+                        'Coming Soon',
                         undefined,
-                        () => console.log('Change language')
-                    )}
-
-                    {renderSettingItem(
-                        'location',
-                        'Default Address',
-                        'Set your preferred delivery address',
-                        undefined,
-                        () => navigation.navigate('AddressManagement' as any)
-                    )}
-                </View>
-
-                {/* Help & Support */}
-                <View style={{ marginBottom: 24 }}>
-                    <Text style={{
-                        fontSize: 16,
-                        fontWeight: '600',
-                        color: theme.colors.text,
-                        marginBottom: 16,
-                    }}>
-                        Help & Support
-                    </Text>
-
-                    {renderSettingItem(
-                        'help-circle',
-                        'FAQ',
-                        'Frequently asked questions',
-                        undefined,
-                        () => console.log('Open FAQ')
-                    )}
-
-                    {renderSettingItem(
-                        'chatbubble-ellipses',
-                        'Contact Support',
-                        'Get help from our team',
-                        undefined,
-                        handleContactSupport
-                    )}
-                </View>
-
-                {/* About */}
-                <View style={{ marginBottom: 24 }}>
-                    <Text style={{
-                        fontSize: 16,
-                        fontWeight: '600',
-                        color: theme.colors.text,
-                        marginBottom: 16,
-                    }}>
-                        About
-                    </Text>
-
-                    {renderSettingItem(
-                        'information-circle',
-                        'App Version',
-                        '1.0.0',
-                        undefined,
-                        () => console.log('Show version info')
-                    )}
-
-                    {renderSettingItem(
-                        'document-text',
-                        'Terms of Service',
-                        'Read our terms and conditions',
-                        undefined,
-                        () => console.log('Open terms')
-                    )}
-
-                    {renderSettingItem(
-                        'shield-checkmark',
-                        'Privacy Policy',
-                        'How we protect your data',
-                        undefined,
-                        () => console.log('Open privacy policy')
+                        () => handleComingSoon('Language')
                     )}
                 </View>
             </ScrollView>
+
+            {/* AlertModal */}
+            <AlertModal
+                visible={alertModal.visible}
+                title={alertModal.title}
+                message={alertModal.message}
+                type={alertModal.type}
+                onConfirm={alertModal.onConfirm}
+                onCancel={alertModal.onCancel}
+                confirmText={alertModal.confirmText}
+                cancelText={alertModal.cancelText}
+                showCancel={alertModal.showCancel}
+            />
         </SafeAreaView>
     );
-}
+}   

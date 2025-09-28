@@ -29,7 +29,7 @@ export function SearchBar({ value, onChangeText, onFocus, placeholder = "Search 
                 style={{
                     flex: 1,
                     marginLeft: 12,
-                    fontSize: 16,
+                    fontSize: 14,
                     color: theme.colors.text
                 }}
             />

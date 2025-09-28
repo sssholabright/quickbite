@@ -30,6 +30,7 @@ import EditProfileScreen from '../screens/profile/EditProfileScreen';
 import ChangePasswordScreen from '../screens/profile/ChangePassword';
 import SupportScreen from '../screens/profile/SupportScreen';
 import LegalScreen from '../screens/profile/LegalScreen';
+import { useThemeStore } from '../stores/theme';
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
@@ -72,11 +73,15 @@ function AppTabs() {
 			<Tab.Navigator
 				id={undefined}
 				screenOptions={({ route }) => ({
-					headerShown: false,
-					headerStyle: { 
+					headerShown: route.name === "Profile",
+					headerStyle: route.name === "Profile" ? { 
 						backgroundColor: theme.colors.surface,
-						height: 100,
+						height: 85,
 						borderBottomWidth: 0,
+						elevation: 0,
+						shadowOpacity: 0,
+					} : {
+						height: 0,
 						elevation: 0,
 						shadowOpacity: 0,
 					},
@@ -92,11 +97,10 @@ function AppTabs() {
 					tabBarStyle: {
 						backgroundColor: theme.colors.surface,
 						borderTopColor: theme.colors.border,
-						height: 56 + insets.bottom,
-						paddingTop: 0,
-						paddingBottom: 8,
+						height: 60 + insets.bottom,
+						paddingTop: 8,
+						paddingBottom: insets.bottom,
 					},
-					tabBarSafeAreaInsets: { bottom: insets.bottom },
 					tabBarIcon: ({ color, size, focused }) => {
 						if (route.name === "Home") return <Icon set='ion' name={focused ? "home" : "home-outline"} color={color} size={size} />
 						if (route.name === "Orders") return <Icon set="mi" name={"receipt-long"} color={color} size={size} />
@@ -141,12 +145,10 @@ export default function RootNavigator() {
 	const appTheme = useTheme();
 
 	useEffect(() => { 
-		if (!hydrated) {
-			hydrate(); 
-		}
-	}, [hydrate, hydrated]);
+		void hydrate();
+	}, [hydrate]);
 
-	// Show loading screen while hydrating or loading
+	// Wait for auth to be hydrated
 	if (!hydrated || isLoading) {
 		return <LoadingScreen />;
 	}
@@ -221,5 +223,5 @@ export default function RootNavigator() {
 				/>
 			</RootStack.Navigator>
 		</NavigationContainer>
-	)
+	);
 }

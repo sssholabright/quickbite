@@ -37,19 +37,19 @@ export default function ProfileScreen() {
 			}}
 		>
 			<View style={{
-				width: 40,
-				height: 40,
+				width: 35,
+				height: 35,
 				borderRadius: 20,
 				backgroundColor: theme.colors.primary + '20',
 				alignItems: "center",
 				justifyContent: "center",
 				marginRight: 16,
 			}}>
-				<Icon name={icon} size={20} color={theme.colors.primary} />
+				<Icon name={icon} size={16} color={theme.colors.primary} />
 			</View>
 			<View style={{ flex: 1 }}>
 				<Text style={{
-					fontSize: 16,
+					fontSize: 14,
 					fontWeight: "600",
 					color: theme.colors.text,
 					marginBottom: subtitle ? 2 : 0,
@@ -58,7 +58,7 @@ export default function ProfileScreen() {
 				</Text>
 				{subtitle && (
 					<Text style={{
-						fontSize: 14,
+						fontSize: 12,
 						color: theme.colors.muted,
 					}}>
 						{subtitle}
@@ -66,14 +66,14 @@ export default function ProfileScreen() {
 				)}
 			</View>
 			{showArrow && onPress && (
-				<Icon name="chevron-forward" size={20} color={theme.colors.muted} />
+				<Icon name="chevron-forward" size={16} color={theme.colors.muted} />
 			)}
 		</Pressable>
 	);
 
 	return (
 		<View style={{ flex: 1, backgroundColor: theme.colors.background, paddingHorizontal: 5 }}>
-			<ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 32 }}>
+			<ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 32 }} showsVerticalScrollIndicator={false}>
 				{/* Header */}
 				<View style={{
 					flexDirection: "row",
@@ -81,19 +81,19 @@ export default function ProfileScreen() {
 					marginBottom: 24,
 				}}>
 					<View style={{
-						width: 60,
-						height: 60,
+						width: 50,
+						height: 50,
 						borderRadius: 30,
 						backgroundColor: theme.colors.primary + '20',
 						alignItems: "center",
 						justifyContent: "center",
 						marginRight: 16,
 					}}>
-						<Icon name="person" size={30} color={theme.colors.primary} />
+						<Icon name="person" size={25} color={theme.colors.primary} />
 					</View>
 					<View style={{ flex: 1 }}>
 						<Text style={{
-							fontSize: 20,
+							fontSize: 18,
 							fontWeight: "700",
 							color: theme.colors.text,
 							marginBottom: 4,
@@ -102,7 +102,7 @@ export default function ProfileScreen() {
 							{user?.name}
 						</Text>
 						<Text style={{
-							fontSize: 14,
+							fontSize: 12,
 							color: theme.colors.muted,
 						}}>
 							Phone: {user?.phone}
@@ -131,12 +131,12 @@ export default function ProfileScreen() {
 				</View>
 
 				{/* Profile Actions */}
-				<View style={{ marginBottom: 24 }}>
+				<View style={{ marginBottom: 5 }}>
 					<Text style={{
-						fontSize: 18,
+						fontSize: 16,
 						fontWeight: "600",
 						color: theme.colors.text,
-						marginBottom: 16,
+						marginBottom: 10,
 					}}>
 						Profile
 					</Text>
@@ -157,12 +157,12 @@ export default function ProfileScreen() {
 				</View>
 
 				{/* Account */}
-				<View style={{ marginBottom: 24 }}>
+				<View style={{ marginBottom: 5 }}>
 					<Text style={{
-						fontSize: 18,
+						fontSize: 16,
 						fontWeight: "600",
 						color: theme.colors.text,
-						marginBottom: 16,
+						marginBottom: 10,
 					}}>
 						Account
 					</Text>
@@ -178,12 +178,12 @@ export default function ProfileScreen() {
 				</View>
 
 				{/* Settings */}
-				<View style={{ marginBottom: 24 }}>
+				<View style={{ marginBottom: 5 }}>
 					<Text style={{
-						fontSize: 18,
+						fontSize: 16,
 						fontWeight: "600",
 						color: theme.colors.text,
-						marginBottom: 16,
+						marginBottom: 10,
 					}}>
 						Settings
 					</Text>
@@ -197,12 +197,12 @@ export default function ProfileScreen() {
 				</View>
 
 				{/* Support */}
-				<View style={{ marginBottom: 24 }}>
+				<View style={{ marginBottom: 5 }}>
 					<Text style={{
-						fontSize: 18,
+						fontSize: 16,
 						fontWeight: "600",
 						color: theme.colors.text,
-						marginBottom: 16,
+						marginBottom: 10,
 					}}>
 						Support
 					</Text>
@@ -223,7 +223,7 @@ export default function ProfileScreen() {
 				</View>
 
 				{/* App Info */}
-				<View style={{
+				{/* <View style={{
 					backgroundColor: theme.colors.surface,
 					borderRadius: 12,
 					borderWidth: 1,
@@ -232,27 +232,27 @@ export default function ProfileScreen() {
 					marginBottom: 16,
 				}}>
 					<Text style={{
-						fontSize: 16,
+						fontSize: 14,
 						fontWeight: "600",
 						color: theme.colors.text,
-						marginBottom: 8,
+						marginBottom: 4,
 					}}>
 						QuickBite
 					</Text>
 					<Text style={{
-						fontSize: 14,
+						fontSize: 12,
 						color: theme.colors.muted,
 						marginBottom: 4,
 					}}>
 						Version 1.0.0
 					</Text>
 					<Text style={{
-						fontSize: 14,
+						fontSize: 12,
 						color: theme.colors.muted,
 					}}>
 						Made with ❤️ for students
 					</Text>
-				</View>
+				</View> */}
 
 				{/* Logout */}
 				<CTAButton 
@@ -267,7 +267,7 @@ export default function ProfileScreen() {
 							]
 						);
 					}}
-					style={{ backgroundColor: "#EF4444" }}
+					style={{ backgroundColor: theme.colors.danger }}
 				/>
 			</ScrollView>
 		</View>

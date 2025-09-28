@@ -21,6 +21,10 @@ export interface Meal {
     category: string;
     popular: boolean;
     preparationTime?: number;
+    discount?: number;
+    reviewCount?: number;
+    rating?: number;
+    isAvailable?: boolean;
 }
   
 export interface Category {

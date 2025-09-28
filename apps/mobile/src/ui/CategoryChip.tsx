@@ -12,9 +12,9 @@ export function CategoryChip({ category, isSelected, onPress }: CategoryChipProp
             style={{
                 backgroundColor: isSelected ? category.color : theme.colors.surface,
                 paddingHorizontal: 16,
-                paddingVertical: 8,
+                paddingVertical: 4,
                 borderRadius: 20,
-                marginRight: 12,
+                marginRight: 6,
                 flexDirection: "row",
                 alignItems: "center",
                 borderWidth: 1,
@@ -23,14 +23,14 @@ export function CategoryChip({ category, isSelected, onPress }: CategoryChipProp
         >
             <Icon 
                 name={category.icon} 
-                size={16} 
+                size={14} 
                 color={isSelected ? "white" : category.color} 
                 style={{ marginRight: 6 }}
             />
             <Text style={{
                 color: isSelected ? "white" : theme.colors.text,
                 fontWeight: isSelected ? "600" : "500",
-                fontSize: 14
+                fontSize: 12
             }}>
                 {category.name}
             </Text>

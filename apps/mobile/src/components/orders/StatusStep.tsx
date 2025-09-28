@@ -9,11 +9,11 @@ export default function StatusStep({ step, currentStatus, statusSteps, pulseAnim
     const isCompleted = statusSteps.findIndex(s => s.key === step.key) < statusSteps.findIndex(s => s.key === currentStatus);
     
     return (
-        <View key={step.key} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 24 }}>
+        <View key={step.key} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 15 }}>
             {/* Status Icon */}
             <View style={{
-                width: 40,
-                height: 40,
+                width: 35,
+                height: 35,
                 borderRadius: 20,
                 backgroundColor: isCompleted ? theme.colors.primary : 
                                 isActive ? theme.colors.primary : theme.colors.surface,
@@ -24,11 +24,11 @@ export default function StatusStep({ step, currentStatus, statusSteps, pulseAnim
                 borderColor: isActive ? theme.colors.primary : theme.colors.border,
             }}>
                 {isCompleted ? (
-                    <Icon name="checkmark" size={20} color="white" />
+                    <Icon name="checkmark" size={16} color="white" />
                 ) : (
                     <Icon 
                         name={step.icon} 
-                        size={20} 
+                        size={16} 
                         color={isActive ? 'white' : theme.colors.muted} 
                     />
                 )}
@@ -37,7 +37,7 @@ export default function StatusStep({ step, currentStatus, statusSteps, pulseAnim
             {/* Status Info */}
             <View style={{ flex: 1 }}>
                 <Text style={{
-                    fontSize: 16,
+                    fontSize: 14,
                     fontWeight: isActive ? '600' : '500',
                     color: isActive ? theme.colors.text : theme.colors.muted,
                     marginBottom: 4,
@@ -45,7 +45,7 @@ export default function StatusStep({ step, currentStatus, statusSteps, pulseAnim
                     {step.label}
                 </Text>
                 <Text style={{
-                    fontSize: 14,
+                    fontSize: 12,
                     color: theme.colors.muted,
                 }}>
                     {step.time}
@@ -58,8 +58,8 @@ export default function StatusStep({ step, currentStatus, statusSteps, pulseAnim
                     style={{
                         position: 'absolute',
                         left: 0,
-                        width: 40,
-                        height: 40,
+                        width: 35,
+                        height: 35,
                         borderRadius: 20,
                         backgroundColor: theme.colors.primary,
                         opacity: 0.3,

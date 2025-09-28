@@ -90,20 +90,20 @@ export default function OrderCard({ order, onPress }: OrderCardProps) {
                 marginBottom: 12,
             }}>
                 <View style={{
-                    width: 40,
-                    height: 40,
+                    width: 35,
+                    height: 35,
                     borderRadius: 8,
                     backgroundColor: theme.colors.background,
                     alignItems: 'center',
                     justifyContent: 'center',
                     marginRight: 12,
                 }}>
-                    <Icon name="restaurant" size={20} color={theme.colors.primary} />
+                    <Icon name="restaurant" size={16} color={theme.colors.primary} />
                 </View>
 
                 <View style={{ flex: 1 }}>
                     <Text style={{
-                        fontSize: 16,
+                        fontSize: 14,
                         fontWeight: '600',
                         color: theme.colors.text,
                         marginBottom: 2,
@@ -111,7 +111,7 @@ export default function OrderCard({ order, onPress }: OrderCardProps) {
                         {order.vendor.name}
                     </Text>
                     <Text style={{
-                        fontSize: 12,
+                        fontSize: 10,
                         color: theme.colors.muted,
                     }}>
                         {order.orderId} • {formatTime(order.placedAt)}
@@ -125,7 +125,7 @@ export default function OrderCard({ order, onPress }: OrderCardProps) {
                     borderRadius: 12,
                 }}>
                     <Text style={{
-                        fontSize: 12,
+                        fontSize: 10,
                         fontWeight: '600',
                         color: 'white',
                     }}>
@@ -156,14 +156,14 @@ export default function OrderCard({ order, onPress }: OrderCardProps) {
                     </View>
                     <View style={{ flex: 1 }}>
                         <Text style={{
-                            fontSize: 14,
+                            fontSize: 12,
                             fontWeight: '600',
                             color: theme.colors.text,
                         }}>
                             {order.rider?.name}
                         </Text>
                         <Text style={{
-                            fontSize: 12,
+                            fontSize: 10,
                             color: theme.colors.muted,
                         }}>
                             {order.rider?.vehicleType} • {order.rider?.phone}
@@ -186,7 +186,7 @@ export default function OrderCard({ order, onPress }: OrderCardProps) {
                                 marginRight: 4,
                             }} />
                             <Text style={{
-                                fontSize: 10,
+                                fontSize: 8,
                                 fontWeight: '600',
                                 color: 'white',
                             }}>
@@ -214,7 +214,7 @@ export default function OrderCard({ order, onPress }: OrderCardProps) {
                         marginRight: 8,
                     }} />
                     <Text style={{
-                        fontSize: 13,
+                        fontSize: 12,
                         color: theme.colors.text,
                         flex: 1,
                     }}>
@@ -222,7 +222,7 @@ export default function OrderCard({ order, onPress }: OrderCardProps) {
                     </Text>
                     {order.estimatedDeliveryTime && isLiveTracking && (
                         <Text style={{
-                            fontSize: 12,
+                            fontSize: 10,
                             fontWeight: '600',
                             color: '#10b981',
                         }}>
@@ -239,21 +239,21 @@ export default function OrderCard({ order, onPress }: OrderCardProps) {
             }}>
                 <View>
                     <Text style={{
-                        fontSize: 14,
+                        fontSize: 12,
                         color: theme.colors.text,
                         marginBottom: 2,
                     }}>
                         {itemSummary}
                     </Text>
                     <Text style={{
-                        fontSize: 12,
+                        fontSize: 10,
                         color: theme.colors.muted,
                     }}>
                         {order.vendor.location}
                     </Text>
                     {hasAddOns && (
                         <Text style={{
-                            fontSize: 12,
+                            fontSize: 10,
                             color: theme.colors.muted,
                             marginTop: 4,
                         }}>
@@ -267,7 +267,7 @@ export default function OrderCard({ order, onPress }: OrderCardProps) {
                 </View>
                 
                 <Text style={{
-                    fontSize: 16,
+                    fontSize: 14,
                     fontWeight: '700',
                     color: theme.colors.primary,
                 }}>

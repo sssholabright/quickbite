@@ -531,10 +531,10 @@ export default function OrderDetailScreen() {
                 borderBottomColor: theme.colors.border,
             }}>
                 <Pressable onPress={() => navigation.goBack()} style={{ marginRight: 16 }}>
-                    <Icon name="arrow-back" size={24} color={theme.colors.text} />
+                    <Icon name="arrow-back" size={20} color={theme.colors.text} />
                 </Pressable>
                 <Text style={{
-                    fontSize: 18,
+                    fontSize: 16,
                     fontWeight: '600',
                     color: theme.colors.text,
                     flex: 1,
@@ -548,15 +548,15 @@ export default function OrderDetailScreen() {
                     alignItems: 'center',
                 }}>
                     <View style={{
-                        width: 8,
-                        height: 8,
+                        width: 6,
+                        height: 6,
                         borderRadius: 4,
                         backgroundColor: connectionStatus === 'connected' ? '#34C759' : '#FF3B30',
                         marginRight: 4,
                     }} />
                     {hasRealtimeUpdate && (
                         <Text style={{
-                            fontSize: 10,
+                            fontSize: 8,
                             color: theme.colors.primary,
                             fontWeight: '600',
                         }}>
@@ -583,7 +583,7 @@ export default function OrderDetailScreen() {
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
                         <Icon name={currentStep?.icon || 'time'} size={24} color={orderData.isLiveTracking ? '#3b82f6' : theme.colors.primary} />
                         <Text style={{
-                            fontSize: 18,
+                            fontSize: 16,
                             fontWeight: '600',
                             color: orderData.isLiveTracking ? '#3b82f6' : theme.colors.primary,
                             marginLeft: 12,
@@ -621,13 +621,13 @@ export default function OrderDetailScreen() {
                 <View style={{
                     backgroundColor: theme.colors.surface,
                     borderRadius: 12,
-                    padding: 20,
+                    padding: 16,
                     marginBottom: 20,
                     borderWidth: 1,
                     borderColor: theme.colors.border,
                 }}>
                     <Text style={{
-                        fontSize: 18,
+                        fontSize: 16,
                         fontWeight: '600',
                         color: theme.colors.text,
                         marginBottom: 20,
@@ -672,7 +672,7 @@ export default function OrderDetailScreen() {
                     borderColor: theme.colors.border,
                 }}>
                     <Text style={{
-                        fontSize: 18,
+                        fontSize: 16,
                         fontWeight: '600',
                         color: theme.colors.text,
                         marginBottom: 16,
@@ -685,7 +685,7 @@ export default function OrderDetailScreen() {
                         justifyContent: 'space-between',
                         marginBottom: 8,
                     }}>
-                        <Text style={{ fontSize: 14, color: theme.colors.muted }}>
+                        <Text style={{ fontSize: 12, color: theme.colors.muted }}>
                             Subtotal
                         </Text>
                         <Text style={{ fontSize: 14, color: theme.colors.text }}>
@@ -698,7 +698,7 @@ export default function OrderDetailScreen() {
                         justifyContent: 'space-between',
                         marginBottom: 8,
                     }}>
-                        <Text style={{ fontSize: 14, color: theme.colors.muted }}>
+                        <Text style={{ fontSize: 12, color: theme.colors.muted }}>
                             Delivery Fee
                         </Text>
                         <Text style={{ fontSize: 14, color: theme.colors.text }}>
@@ -711,7 +711,7 @@ export default function OrderDetailScreen() {
                         justifyContent: 'space-between',
                         marginBottom: 8,
                     }}>
-                        <Text style={{ fontSize: 14, color: theme.colors.muted }}>
+                        <Text style={{ fontSize: 12, color: theme.colors.muted }}>
                             Service Fee
                         </Text>
                         <Text style={{ fontSize: 14, color: theme.colors.text }}>
@@ -726,7 +726,7 @@ export default function OrderDetailScreen() {
                         borderTopWidth: 1,
                         borderTopColor: theme.colors.border,
                     }}>
-                        <Text style={{ fontSize: 16, fontWeight: '600', color: theme.colors.text }}>
+                        <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text }}>
                             Total
                         </Text>
                         <Text style={{ fontSize: 16, fontWeight: '600', color: theme.colors.primary }}>
@@ -746,7 +746,7 @@ export default function OrderDetailScreen() {
                         borderColor: theme.colors.border,
                     }}>
                         <Text style={{
-                            fontSize: 16,
+                            fontSize: 14,
                             fontWeight: '600',
                             color: theme.colors.text,
                             marginBottom: 8,
@@ -754,7 +754,7 @@ export default function OrderDetailScreen() {
                             Special Instructions
                         </Text>
                         <Text style={{
-                            fontSize: 14,
+                            fontSize: 12,
                             color: theme.colors.text,
                         }}>
                             {backendOrderData.specialInstructions}

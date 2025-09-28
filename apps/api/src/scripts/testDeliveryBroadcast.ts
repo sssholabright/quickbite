@@ -73,7 +73,7 @@ async function testDeliveryBroadcast() {
         
         // Add job to queue
         const job = await queueService.addDeliveryJob(jobData);
-        console.log(`✅ Delivery job added: ${job.id}`);
+        console.log(`✅ Delivery job added: ${job}`);
         
         // Wait a bit for processing
         await new Promise(resolve => setTimeout(resolve, 2000));

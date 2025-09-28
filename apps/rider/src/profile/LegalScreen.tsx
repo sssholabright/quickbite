@@ -139,7 +139,7 @@ export default function LegalScreen() {
 	const handleLastUpdated = () => {
 		showAlert(
 			"Last Updated",
-			"Last updated: December 2024\n\nThis version includes:\n• Push notifications\n• Real-time order tracking\n• Theme customization\n• Enhanced security",
+			"Last updated: September 2025\n\nThis version includes:\n• Push notifications\n• Real-time order tracking\n• Theme customization\n• Enhanced security",
 			'info'
 		);
 	};
@@ -226,7 +226,7 @@ export default function LegalScreen() {
 					{renderLegalItem(
 						"calendar",
 						"Last Updated",
-						"December 2024",
+						"September 2025",
 						handleLastUpdated,
 						false
 					)}

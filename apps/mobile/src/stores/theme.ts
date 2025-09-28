@@ -19,14 +19,27 @@ export const useThemeStore = create<ThemeStore>()(
             name: 'theme-storage',
             storage: {
                 getItem: async (name) => {
-                    const value = await SecureStore.getItemAsync(name);
-                    return value ? JSON.parse(value) : null;
+                    try {
+                        const value = await SecureStore.getItemAsync(name);
+                        return value ? JSON.parse(value) : null;
+                    } catch (error) {
+                        console.error('Theme storage getItem error:', error);
+                        return null;
+                    }
                 },
                 setItem: async (name, value) => {
-                    await SecureStore.setItemAsync(name, JSON.stringify(value));
+                    try {
+                        await SecureStore.setItemAsync(name, JSON.stringify(value));
+                    } catch (error) {
+                        console.error('Theme storage setItem error:', error);
+                    }
                 },
                 removeItem: async (name) => {
-                    await SecureStore.deleteItemAsync(name);
+                    try {
+                        await SecureStore.deleteItemAsync(name);
+                    } catch (error) {
+                        console.error('Theme storage removeItem error:', error);
+                    }
                 },
             },
         }

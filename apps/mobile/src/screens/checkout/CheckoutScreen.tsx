@@ -12,7 +12,6 @@ import { TextInput } from 'react-native'
 import * as Location from 'expo-location';
 import { useCartStore } from '../../stores/cart';
 import { useVendors } from '../../hooks/useMenu';
-import { useVendorMenuItems } from '../../hooks/useMenu';
 import { useCreateOrder } from '../../hooks/useOrders';
 import AlertModal from '../../ui/AlertModal';
 
@@ -60,8 +59,6 @@ export default function CheckoutScreen() {
     const { data: vendors = [] } = useVendors();
     const vendor = vendors.find(v => v.id === vendorId) || vendors[0];
 
-    // Get menu items for calculating add-on totals
-    const { data: menuItems = [] } = useVendorMenuItems(vendorId);
 
     // Order creation mutation
     const createOrderMutation = useCreateOrder();
@@ -292,7 +289,6 @@ export default function CheckoutScreen() {
     };
 
     const renderCartItem = (item: any) => {
-        const menuItem = menuItems.find(mi => mi.id === item.id);
         const itemTotal = getItemTotal(item.id);
 
         return (
@@ -322,7 +318,7 @@ export default function CheckoutScreen() {
                 
                 <View style={{ flex: 1 }}>
                     <Text style={{ 
-                        fontSize: 16, 
+                        fontSize: 14, 
                         fontWeight: '600', 
                         color: theme.colors.text,
                         marginBottom: 4
@@ -331,7 +327,7 @@ export default function CheckoutScreen() {
                     </Text>
                     
                     <Text style={{ 
-                        fontSize: 14, 
+                        fontSize: 12, 
                         color: theme.colors.muted,
                         marginBottom: 4
                     }}>
@@ -348,7 +344,7 @@ export default function CheckoutScreen() {
                                 
                                 return (
                                     <Text key={addOnId} style={{ 
-                                        fontSize: 12, 
+                                        fontSize: 10, 
                                         color: theme.colors.muted,
                                         marginBottom: 2
                                     }}>
@@ -361,7 +357,7 @@ export default function CheckoutScreen() {
                 </View>
                 
                 <Text style={{ 
-                    fontSize: 16, 
+                    fontSize: 14, 
                     fontWeight: '700', 
                     color: theme.colors.text
                 }}>
@@ -387,13 +383,13 @@ export default function CheckoutScreen() {
                     borderBottomColor: theme.colors.border
                 }}>
                     <Pressable onPress={() => navigation.goBack()}>
-                        <Icon name="arrow-left" size={24} color={theme.colors.text} />
+                        <Icon name="arrow-left" size={20} color={theme.colors.text} />
                     </Pressable>
                     <Text style={{ 
-                        fontSize: 18, 
+                        fontSize: 16, 
                         fontWeight: '700', 
                         color: theme.colors.text,
-                        marginLeft: 12
+                        marginLeft: 6
                     }}>
                         Checkout
                     </Text>
@@ -403,7 +399,7 @@ export default function CheckoutScreen() {
                     {/* Delivery Address */}
                     <View style={{ padding: 16 }}>
                         <Text style={{ 
-                            fontSize: 16, 
+                            fontSize: 14, 
                             fontWeight: '600', 
                             color: theme.colors.text,
                             marginBottom: 12
@@ -419,9 +415,9 @@ export default function CheckoutScreen() {
                             padding: 16
                         }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                                <Icon name="map-pin" size={20} color={theme.colors.primary} />
+                                <Icon name="map-pin" size={16} color={theme.colors.primary} />
                                 <Text style={{ 
-                                    fontSize: 14, 
+                                    fontSize: 12, 
                                     fontWeight: '600', 
                                     color: theme.colors.text,
                                     marginLeft: 8
@@ -430,7 +426,7 @@ export default function CheckoutScreen() {
                                 </Text>
                             </View>
                             <Text style={{ 
-                                fontSize: 14, 
+                                fontSize: 12, 
                                 color: theme.colors.muted,
                                 marginLeft: 28
                             }}>
@@ -442,7 +438,7 @@ export default function CheckoutScreen() {
                     {/* Order Summary */}
                     <View style={{ padding: 16 }}>
                         <Text style={{ 
-                            fontSize: 16, 
+                            fontSize: 14, 
                             fontWeight: '600', 
                             color: theme.colors.text,
                             marginBottom: 12
@@ -464,7 +460,7 @@ export default function CheckoutScreen() {
                     {/* Special Instructions */}
                     <View style={{ padding: 16 }}>
                         <Text style={{ 
-                            fontSize: 16, 
+                            fontSize: 14, 
                             fontWeight: '600', 
                             color: theme.colors.text,
                             marginBottom: 12
@@ -479,7 +475,7 @@ export default function CheckoutScreen() {
                                 borderColor: theme.colors.border,
                                 borderRadius: 12,
                                 padding: 16,
-                                fontSize: 14,
+                                fontSize: 12,
                                 color: theme.colors.text,
                                 minHeight: 80,
                                 textAlignVertical: 'top'
@@ -495,7 +491,7 @@ export default function CheckoutScreen() {
                     {/* Payment Method */}
                     <View style={{ padding: 16 }}>
                         <Text style={{ 
-                            fontSize: 16, 
+                            fontSize: 14, 
                             fontWeight: '600', 
                             color: theme.colors.text,
                             marginBottom: 12
@@ -518,7 +514,7 @@ export default function CheckoutScreen() {
                             >
                                 <Icon name="dollar-sign" size={24} color={paymentMethod === 'cash' ? theme.colors.primary : theme.colors.muted} />
                                 <Text style={{ 
-                                    fontSize: 14, 
+                                    fontSize: 12, 
                                     fontWeight: '600', 
                                     color: paymentMethod === 'cash' ? theme.colors.primary : theme.colors.text,
                                     marginTop: 8
@@ -541,7 +537,7 @@ export default function CheckoutScreen() {
                             >
                                 <Icon name="credit-card" size={24} color={paymentMethod === 'card' ? theme.colors.primary : theme.colors.muted} />
                                 <Text style={{ 
-                                    fontSize: 14, 
+                                    fontSize: 12, 
                                     fontWeight: '600', 
                                     color: paymentMethod === 'card' ? theme.colors.primary : theme.colors.text,
                                     marginTop: 8
@@ -562,16 +558,16 @@ export default function CheckoutScreen() {
                             padding: 16
                         }}>
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-                                <Text style={{ fontSize: 14, color: theme.colors.muted }}>Subtotal</Text>
-                                <Text style={{ fontSize: 14, color: theme.colors.text }}>₦{subtotal.toLocaleString('en-NG')}</Text>
+                                <Text style={{ fontSize: 12, color: theme.colors.muted }}>Subtotal</Text>
+                                <Text style={{ fontSize: 12, color: theme.colors.text }}>₦{subtotal.toLocaleString('en-NG')}</Text>
                             </View>
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-                                <Text style={{ fontSize: 14, color: theme.colors.muted }}>Delivery Fee</Text>
-                                <Text style={{ fontSize: 14, color: theme.colors.text }}>₦{deliveryFee.toLocaleString('en-NG')}</Text>
+                                <Text style={{ fontSize: 12, color: theme.colors.muted }}>Delivery Fee</Text>
+                                <Text style={{ fontSize: 12, color: theme.colors.text }}>₦{deliveryFee.toLocaleString('en-NG')}</Text>
                             </View>
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
-                                <Text style={{ fontSize: 14, color: theme.colors.muted }}>Service Fee</Text>
-                                <Text style={{ fontSize: 14, color: theme.colors.text }}>₦{serviceFee.toLocaleString('en-NG')}</Text>
+                                <Text style={{ fontSize: 12, color: theme.colors.muted }}>Service Fee</Text>
+                                <Text style={{ fontSize: 12, color: theme.colors.text }}>₦{serviceFee.toLocaleString('en-NG')}</Text>
                             </View>
                             <View style={{ 
                                 height: 1, 
@@ -579,8 +575,8 @@ export default function CheckoutScreen() {
                                 marginBottom: 12 
                             }} />
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                                <Text style={{ fontSize: 16, fontWeight: '700', color: theme.colors.text }}>Total</Text>
-                                <Text style={{ fontSize: 16, fontWeight: '700', color: theme.colors.text }}>₦{total.toLocaleString('en-NG')}</Text>
+                                <Text style={{ fontSize: 14, fontWeight: '700', color: theme.colors.text }}>Total</Text>
+                                <Text style={{ fontSize: 14, fontWeight: '700', color: theme.colors.text }}>₦{total.toLocaleString('en-NG')}</Text>
                             </View>
                         </View>
                     </View>

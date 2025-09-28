@@ -10,14 +10,14 @@ export function VendorCard({ vendor }: VendorCardProps) {
     const theme = useTheme();
     const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
-      // Get price indicator based on average meal price (mock logic)
+    // Get price indicator based on average meal price (mock logic)
     const getPriceIndicator = (rating: number) => {
         if (rating >= 4.8) return "₦₦₦";
         if (rating >= 4.5) return "₦₦";
         return "₦";
     };    
 
-      // Get cuisine tags based on category
+    // Get cuisine tags based on category
     const getCuisineTags = (category: string) => {
         const tagMap: Record<string, string[]> = {
             lunch: ["Rice", "Main Course", "Healthy"],
@@ -29,11 +29,19 @@ export function VendorCard({ vendor }: VendorCardProps) {
         return tagMap[category] || [category];
     };
 
-    const priceIndicator = getPriceIndicator(vendor.rating);
-    const cuisineTags = getCuisineTags(vendor.category);
+    // Create a local copy to avoid mutating props
+    const vendorData = {
+        ...vendor,
+        isOpen: vendor.isOpen ?? true // Use nullish coalescing to provide default
+    };
+
+    const priceIndicator = getPriceIndicator(vendorData.rating);
+    const cuisineTags = getCuisineTags(vendorData.category);
     
     const handlePress = () => {
-        navigation.navigate("Menu", { vendorId: vendor.id });
+        // Don't navigate if vendor is closed
+        if (!vendorData.isOpen) return;
+        navigation.navigate("Menu", { vendorId: vendorData.id });
     };
     
     return (
@@ -50,29 +58,36 @@ export function VendorCard({ vendor }: VendorCardProps) {
                 shadowOffset: { width: 0, height: 2 },
                 shadowOpacity: 0.1,
                 shadowRadius: 4,
-                elevation: 3
+                elevation: 3,
+                // Add opacity when closed
+                opacity: vendorData.isOpen ? 1 : 0.6
             }}
         >
-            {/* �� TOP: Vendor Image / Banner */}
+            {/* 🖼️ TOP: Vendor Image / Banner */}
             <View style={{ position: "relative" }}>
                 <Image
-                    source={{ uri: vendor.image }}
-                    style={{ width: "100%", height: 180 }}
+                    source={{ uri: vendorData.image }}
+                    style={{ 
+                        width: "100%", 
+                        height: 160,
+                        // Add grayscale filter when closed
+                        opacity: vendorData.isOpen ? 1 : 0.7
+                    }}
                     resizeMode="cover"
                 />
 
                 {/* Badge / Status */}
                 <View style={{
                     position: "absolute",
-                    top: 12,
+                    top: 8,
                     left: 12,
                     flexDirection: "row",
-                    gap: 8
+                    gap: 6
                 }}>
-                    {vendor.featured && (
+                    {vendorData.featured && (
                         <View style={{
                             backgroundColor: theme.colors.primary,
-                            paddingHorizontal: 8,
+                            paddingHorizontal: 6,
                             paddingVertical: 4,
                             borderRadius: 12
                         }}>
@@ -82,13 +97,13 @@ export function VendorCard({ vendor }: VendorCardProps) {
                         </View>
                     )}
                     <View style={{
-                        backgroundColor: vendor.isOpen ? theme.colors.primary : theme.colors.danger,
-                        paddingHorizontal: 8,
+                        backgroundColor: vendorData.isOpen ? theme.colors.primary : theme.colors.danger,
+                        paddingHorizontal: 6,
                         paddingVertical: 4,
                         borderRadius: 12
                     }}>
-                        <Text style={{ color: "white", fontSize: 12, fontWeight: "600" }}>
-                            {vendor.isOpen ? "Open" : "Closed"}
+                        <Text style={{ color: "white", fontSize: 10, fontWeight: "600" }}>
+                            {vendorData.isOpen ? "Open" : "Closed"}
                         </Text>
                     </View>
                 </View>
@@ -96,14 +111,14 @@ export function VendorCard({ vendor }: VendorCardProps) {
                 {/* Price Indicator */}
                 <View style={{
                     position: "absolute",
-                    top: 12,
+                    top: 8,
                     right: 12,
                     backgroundColor: "rgba(0,0,0,0.8)",
-                    paddingHorizontal: 8,
+                    paddingHorizontal: 6,
                     paddingVertical: 4,
                     borderRadius: 12
                 }}>
-                    <Text style={{ color: "white", fontSize: 14, fontWeight: "700" }}>
+                    <Text style={{ color: "white", fontSize: 12, fontWeight: "700" }}>
                         {priceIndicator}
                     </Text>
                 </View>
@@ -113,19 +128,19 @@ export function VendorCard({ vendor }: VendorCardProps) {
             <View style={{ padding: 16 }}>
                 {/* Vendor Name */}
                 <Text style={{
-                    fontSize: 20,
+                    fontSize: 16,
                     fontWeight: "700",
-                    color: theme.colors.text,
-                    marginBottom: 8
+                    color: vendorData.isOpen ? theme.colors.text : theme.colors.muted,
+                    marginBottom: 5
                 }}>
-                    {vendor.name}
+                    {vendorData.name}
                 </Text>
 
                 {/* Cuisine / Category Tags */}
                 <View style={{
                     flexDirection: "row",
                     flexWrap: "wrap",
-                    marginBottom: 12,
+                    marginBottom: 5,
                     gap: 6
                 }}>
                     {cuisineTags.map((tag, index) => (
@@ -133,15 +148,16 @@ export function VendorCard({ vendor }: VendorCardProps) {
                             key={index}
                             style={{
                                 backgroundColor: theme.colors.background,
-                                paddingHorizontal: 8,
-                                paddingVertical: 4,
+                                paddingVertical: 2,
                                 borderRadius: 8,
                                 borderWidth: 1,
                                 borderColor: theme.colors.border
                             }}
                         >
                             <Text style={{
-                                fontSize: 12,
+                                fontSize: 10,
+                                paddingHorizontal: 6,
+                                textTransform: "capitalize",
                                 color: theme.colors.muted,
                                 fontWeight: "500"
                             }}>
@@ -155,88 +171,95 @@ export function VendorCard({ vendor }: VendorCardProps) {
                 <View style={{
                     flexDirection: "row",
                     alignItems: "center",
-                    marginBottom: 12
+                    marginBottom: 5
                 }}>
-                    <Icon name="time" size={16} color={theme.colors.primary} />
+                    <Icon name="time" size={16} color={vendorData.isOpen ? theme.colors.primary : theme.colors.muted} />
                     <Text style={{
                         marginLeft: 6,
-                        fontSize: 14,
-                        color: theme.colors.text,
+                        fontSize: 12,
+                        color: vendorData.isOpen ? theme.colors.text : theme.colors.muted,
                         fontWeight: "600"
                     }}>
-                        Ready in {vendor.eta}
+                        {vendorData.isOpen ? `Ready in ${vendorData.eta}` : "Currently Closed"}
                     </Text>
-                    <Text style={{
-                        marginLeft: 8,
-                        fontSize: 12,
-                        color: theme.colors.muted
-                    }}>
-                        • {vendor.distance}
-                    </Text>
+                    {vendorData.isOpen && (
+                        <Text style={{
+                            marginLeft: 8,
+                            fontSize: 10,
+                            color: theme.colors.muted
+                        }}>
+                            • {vendorData.distance}
+                        </Text>
+                    )}
                 </View>
 
                 {/* ⭐ Rating + Reviews */}
-                <View style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                }}>
+                {/* {!vendorData?.rating && (
                     <View style={{
                         flexDirection: "row",
                         alignItems: "center",
-                        backgroundColor: theme.colors.background,
-                        paddingHorizontal: 8,
-                        paddingVertical: 4,
-                        borderRadius: 8,
-                        marginRight: 8
                     }}>
-                        <Icon name="star" size={14} color="#fbbf24" />
-                        <Text style={{
-                            marginLeft: 4,
-                            fontSize: 14,
-                            fontWeight: "600",
-                            color: theme.colors.text
+                        <View style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            backgroundColor: theme.colors.background,
+                            paddingHorizontal: 6,
+                            paddingVertical: 4,
+                            borderRadius: 8,
+                            marginRight: 8
                         }}>
-                            {vendor.rating}
-                        </Text>
-                        <Text style={{
-                            marginLeft: 4,
-                            fontSize: 12,
-                            color: theme.colors.muted
-                        }}>
-                            (200+)
-                        </Text>
+                            <Icon name="star" size={14} color="#fbbf24" />
+                            <Text style={{
+                                marginLeft: 4,
+                                fontSize: 12,
+                                fontWeight: "600",
+                                color: theme.colors.text
+                            }}>
+                                {vendorData.rating}
+                            </Text>
+                            <Text style={{
+                                marginLeft: 4,
+                                fontSize: 10,
+                                color: theme.colors.muted
+                            }}>
+                                (200+)
+                            </Text>
+                        </View>
                     </View>
-                </View>
+                )} */}
             </View>
             
             {/* 🔽 BOTTOM: Call-to-action */}
             <View style={{
-                // borderTopWidth: 1,
                 borderTopColor: theme.colors.border,
-                padding: 16,
+                padding: 12,
                 backgroundColor: theme.colors.background
             }}>
                 <Pressable
                     onPress={handlePress}
+                    disabled={!vendorData.isOpen}
                     style={{
-                        backgroundColor: theme.colors.primary,
-                        paddingVertical: 12,
+                        backgroundColor: vendorData.isOpen ? theme.colors.primary : theme.colors.muted,
+                        paddingVertical: 10,
                         paddingHorizontal: 24,
                         borderRadius: 8,
                         alignItems: "center",
                         flexDirection: "row",
-                        justifyContent: "center"
+                        justifyContent: "center",
+                        opacity: vendorData.isOpen ? 1 : 0.6
                     }}
                 >
                     <Text style={{
                         color: "white",
-                        fontSize: 16,
+                        fontSize: 14,
                         fontWeight: "600",
                         marginRight: 8
                     }}>
-                        View Menu
+                        {vendorData.isOpen ? "View Menu" : "Currently Closed"}
                     </Text>
-                    <Icon name="arrow-forward" size={16} color="white" />
+                    {vendorData.isOpen && (
+                        <Icon name="arrow-forward" size={14} color="white" />
+                    )}
                 </Pressable>
             </View>
         </View>

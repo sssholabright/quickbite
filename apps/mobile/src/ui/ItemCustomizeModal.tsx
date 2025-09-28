@@ -85,10 +85,10 @@ export default function ItemCustomizeModal({ visible, onClose, item, onConfirm }
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
                         <Image
                             source={{ uri: item.image || 'https://via.placeholder.com/120' }}
-                            style={{ width: 64, height: 64, borderRadius: 8, marginRight: 12 }}
+                            style={{ width: 64, height: 64, borderRadius: 8, marginRight: 6 }}
                         />
                         <View style={{ flex: 1 }}>
-                            <Text style={{ fontSize: 18, fontWeight: '700', color: theme.colors.text }}>{item.name}</Text>
+                            <Text style={{ fontSize: 16, fontWeight: '700', color: theme.colors.text }}>{item.name}</Text>
                             <Text style={{ marginTop: 4, color: theme.colors.muted }}>
                                 Base: ₦{item.price.toLocaleString('en-NG')} • Add‑ons: ₦{addOnSubtotal.toLocaleString('en-NG')}
                             </Text>
@@ -99,7 +99,7 @@ export default function ItemCustomizeModal({ visible, onClose, item, onConfirm }
                             )} */}
                         </View>
                         <Pressable onPress={onClose}>
-                            <Icon name="close" size={20} color={theme.colors.muted} />
+                            <Icon name="close" size={16} color={theme.colors.muted} />
                         </Pressable>
                     </View>
 
@@ -111,10 +111,10 @@ export default function ItemCustomizeModal({ visible, onClose, item, onConfirm }
                                 return (
                                     <View key={ao.id} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8 }}>
                                         <View style={{ flexShrink: 1, marginRight: 8 }}>
-                                            <Text style={{ fontWeight: '600', color: theme.colors.text }}>
+                                            <Text style={{ fontWeight: '600', fontSize: 12, color: theme.colors.text }}>
                                                 {ao.name} {ao.isRequired ? '• Required' : ''}
                                             </Text>
-                                            <Text style={{ color: theme.colors.muted }}>
+                                            <Text style={{ color: theme.colors.muted, fontSize: 10 }}>
                                                 ₦{ao.price.toLocaleString('en-NG')} • Max {ao.maxQuantity}
                                             </Text>
                                         </View>
@@ -124,7 +124,7 @@ export default function ItemCustomizeModal({ visible, onClose, item, onConfirm }
                                                 style={{ width: 28, height: 28, borderRadius: 14, borderWidth: 1, borderColor: theme.colors.border, alignItems: 'center', justifyContent: 'center' }}>
                                                 <Icon name="minus" size={14} color={theme.colors.muted} />
                                             </Pressable>
-                                            <Text style={{ width: 26, textAlign: 'center', fontWeight: '700', color: theme.colors.text }}>{qty}</Text>
+                                            <Text style={{ width: 26, textAlign: 'center', fontWeight: '700', color: theme.colors.text, fontSize: 12 }}>{qty}</Text>
                                             <Pressable
                                                 onPress={() => updateAddOn(ao, +1)}
                                                 style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: theme.colors.primary, alignItems: 'center', justifyContent: 'center' }}>
@@ -142,18 +142,18 @@ export default function ItemCustomizeModal({ visible, onClose, item, onConfirm }
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                             <Pressable
                                 onPress={() => setQuantity(q => Math.max(1, q - 1))}
-                                style={{ width: 32, height: 32, borderRadius: 16, borderWidth: 1, borderColor: theme.colors.border, alignItems: 'center', justifyContent: 'center' }}>
+                                style={{ width: 28, height: 28, borderRadius: 16, borderWidth: 1, borderColor: theme.colors.border, alignItems: 'center', justifyContent: 'center' }}>
                                 <Icon name="minus" size={16} color={theme.colors.muted} />
                             </Pressable>
                             <Text style={{ width: 30, textAlign: 'center', fontWeight: '700', color: theme.colors.text }}>{quantity}</Text>
                             <Pressable
                                 onPress={() => setQuantity(q => q + 1)}
-                                style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: theme.colors.primary, alignItems: 'center', justifyContent: 'center' }}>
+                                style={{ width: 28, height: 28, borderRadius: 16, backgroundColor: theme.colors.primary, alignItems: 'center', justifyContent: 'center' }}>
                                 <Icon name="plus" size={16} color="white" />
                             </Pressable>
                         </View>
 
-                        <Text style={{ fontSize: 16, fontWeight: '700', color: theme.colors.text }}>
+                        <Text style={{ fontSize: 14, fontWeight: '700', color: theme.colors.text }}>
                             Total: ₦{lineTotal.toLocaleString('en-NG')}
                         </Text>
 
@@ -161,7 +161,7 @@ export default function ItemCustomizeModal({ visible, onClose, item, onConfirm }
                             disabled={!canConfirm}
                             onPress={() => onConfirm({ itemId: item.id, quantity, addOns: selected })}
                             style={{
-                                paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10,
+                                paddingHorizontal: 16, paddingVertical: 6, borderRadius: 10,
                                 backgroundColor: canConfirm ? theme.colors.primary : theme.colors.border
                             }}>
                             <Text style={{ color: 'white', fontWeight: '700' }}>
@@ -171,7 +171,7 @@ export default function ItemCustomizeModal({ visible, onClose, item, onConfirm }
                     </View>
                 </View>
             </View>
-            <View style={{ height: 30 }} /> 
+            <View style={{ height: 50 }} /> 
         </Modal>
     )
 }

@@ -28,7 +28,7 @@ export default function OrderConfirmationScreen() {
     const theme = useTheme();
     const navigation = useNavigation<OrderConfirmationScreenNavigationProp>();
     const route = useRoute<OrderConfirmationRouteProp>();
-    const { orderId, pickupCode, vendor, items, total } = route.params;
+    const { orderId, pickupCode, total } = route.params;
 
     // Alert modal state
     const [alert, setAlert] = useState<AlertState>({
@@ -94,19 +94,19 @@ export default function OrderConfirmationScreen() {
                     marginBottom: 32
                 }}>
                     <View style={{
-                        width: 120,
-                        height: 120,
+                        width: 100,
+                        height: 100,
                         borderRadius: 60,
                         backgroundColor: theme.colors.primary + '20',
                         alignItems: 'center',
                         justifyContent: 'center',
                         marginBottom: 24
                     }}>
-                        <Icon name="check" size={60} color={theme.colors.primary} />
+                        <Icon name="check" size={40} color={theme.colors.primary} />
                     </View>
 
                     <Text style={{
-                        fontSize: 24,
+                        fontSize: 20,
                         fontWeight: '700',
                         color: theme.colors.text,
                         textAlign: 'center',
@@ -116,7 +116,7 @@ export default function OrderConfirmationScreen() {
                     </Text>
 
                     <Text style={{
-                        fontSize: 16,
+                        fontSize: 14,
                         color: theme.colors.muted,
                         textAlign: 'center',
                         lineHeight: 24
@@ -136,7 +136,7 @@ export default function OrderConfirmationScreen() {
                 }}>
                     <View style={{ alignItems: 'center', marginBottom: 20 }}>
                         <Text style={{
-                            fontSize: 18,
+                            fontSize: 16,
                             fontWeight: '700',
                             color: theme.colors.text,
                             marginBottom: 4
@@ -144,7 +144,7 @@ export default function OrderConfirmationScreen() {
                             {pickupCode}
                         </Text>
                         <Text style={{
-                            fontSize: 14,
+                            fontSize: 12,
                             color: theme.colors.muted
                         }}>
                             Order ID: {pickupCode}
@@ -152,8 +152,8 @@ export default function OrderConfirmationScreen() {
                     </View>
 
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
-                        <Text style={{ fontSize: 14, color: theme.colors.muted }}>Total Amount</Text>
-                        <Text style={{ fontSize: 16, fontWeight: '700', color: theme.colors.text }}>
+                        <Text style={{ fontSize: 12, color: theme.colors.muted }}>Total Amount</Text>
+                        <Text style={{ fontSize: 14, fontWeight: '700', color: theme.colors.text }}>
                             ₦{total.toLocaleString('en-NG')}
                         </Text>
                     </View>
@@ -167,7 +167,7 @@ export default function OrderConfirmationScreen() {
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
                         <Icon name="clock" size={16} color={theme.colors.muted} />
                         <Text style={{
-                            fontSize: 14,
+                            fontSize: 12,
                             color: theme.colors.muted,
                             marginLeft: 8
                         }}>
@@ -178,7 +178,7 @@ export default function OrderConfirmationScreen() {
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
                         <Icon name="map-pin" size={16} color={theme.colors.muted} />
                         <Text style={{
-                            fontSize: 14,
+                            fontSize: 12,
                             color: theme.colors.muted,
                             marginLeft: 8
                         }}>
@@ -202,7 +202,7 @@ export default function OrderConfirmationScreen() {
                     >
                         <Icon name="share" size={16} color={theme.colors.primary} />
                         <Text style={{
-                            fontSize: 14,
+                            fontSize: 12,
                             color: theme.colors.primary,
                             fontWeight: '600',
                             marginLeft: 6

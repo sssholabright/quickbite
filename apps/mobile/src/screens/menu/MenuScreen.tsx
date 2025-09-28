@@ -1,27 +1,24 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useState } from 'react'
 import { FlatList, Image, Pressable, ScrollView, Text, View } from 'react-native'
 import { useTheme } from '../../theme/theme'
-import { RouteProp, useRoute, useNavigation } from '@react-navigation/native'
+import { RouteProp, useRoute } from '@react-navigation/native'
 import { Icon } from '../../ui/Icon'
 import { SearchBar } from '../../ui/SearchBar'
 import { SafeAreaWrapper } from '../../ui/SafeAreaWrapper'
 import MealGridCard from '../../ui/MealGridCard'
 import MealListCard from '../../ui/MealListCard'
 import { RootStackParamList } from '../../navigation/types'
-// import CartBottomSheet from '../../ui/CartBottomSheet'
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useVendors, useVendorCategories, useVendorMenuItems } from '../../hooks/useMenu'
 import ItemCustomizeModal from '../../ui/ItemCustomizeModal'
 import { useCartStore } from '../../stores/cart'
 import CartScreen from '../cart/CartScreen'
 
 type MenuScreenRouteProp = RouteProp<RootStackParamList, 'Menu'>;
-type MenuScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Menu'>;
 
 export default function MenuScreen() {
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedCategory, setSelectedCategory] = useState<string>("all");
-    const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+    const [viewMode, setViewMode] = useState<"grid" | "list">("list");
     const [showCart, setShowCart] = useState(false);
     const [customizeOpen, setCustomizeOpen] = useState(false)
     const [customizeItem, setCustomizeItem] = useState<any>(null)
@@ -29,17 +26,13 @@ export default function MenuScreen() {
     // Cart store
     const { 
         items: cartItems, 
-        updateQuantity, 
         removeItem, 
         getTotalItems, 
-        addItem,
-        addOrUpdateItem, // Add this new function
-        getSubtotal
+        addOrUpdateItem,
     } = useCartStore()
 
     const theme = useTheme()
     const route = useRoute<MenuScreenRouteProp>();
-    const navigation = useNavigation<MenuScreenNavigationProp>();
     const vendorId = route.params?.vendorId as string;
 
     // Vendors (for header)
@@ -129,10 +122,6 @@ export default function MenuScreen() {
         setCustomizeOpen(false)
     }
 
-    const cartTotal = useMemo(() => {
-        return getSubtotal();
-    }, [cartItems, getSubtotal]);
-      
     const cartItemCount = getTotalItems()
 
     const addToCart = (mealId: string) => {
@@ -157,35 +146,10 @@ export default function MenuScreen() {
         removeItem(mealId)
     };
 
-    const handleUpdateQuantity = (mealId: string, quantity: number) => {
-        updateQuantity(mealId, quantity)
-    };
-
-    const handleRemoveItem = (mealId: string) => {
-        removeItem(mealId)
-    };
-
-    const handleProceedToCheckout = () => {
-        setShowCart(false);
-        const itemsArr = Object.entries(cartItems).map(([mealId, cartItem]) => {
-            return {
-                id: mealId,
-                name: cartItem.name,
-                price: cartItem.price,
-                quantity: cartItem.quantity
-            };
-        });
-        navigation.navigate('Checkout', {
-            vendorId,
-            items: itemsArr,
-            total: cartTotal
-        });
-    };
-
     const renderMealGrid = ({ item }: { item: typeof items[0] }) => (
         <MealGridCard
             meal={{
-                id: item.id, name: item.name, description: item.description || '', price: item.price,
+                id: item.id, name: item.name, description: item.description || '', price: item.price, isAvailable: item.isAvailable,
                 image: item.image || '', vendorId: vendorId, preparationTime: item.preparationTime, category: item.category.id, popular: false
             }}
             onAddToCart={() => {
@@ -202,7 +166,7 @@ export default function MenuScreen() {
     const renderMealList = ({ item }: { item: typeof items[0] }) => (
         <MealListCard
             meal={{
-                id: item.id, name: item.name, description: item.description || '', price: item.price,
+                id: item.id, name: item.name, description: item.description || '', price: item.price, isAvailable: item.isAvailable,
                 image: item.image || '', vendorId: vendorId, preparationTime: item.preparationTime, category: item.category.id, popular: false
             }}
             onAddToCart={() => {
@@ -236,7 +200,7 @@ export default function MenuScreen() {
                             />
                             <View style={{ flex: 1 }}>
                                 <Text style={{
-                                    fontSize: 20,
+                                    fontSize: 16,
                                     fontWeight: "700",
                                     color: theme.colors.text,
                                     marginBottom: 4
@@ -245,30 +209,35 @@ export default function MenuScreen() {
                                 </Text>
                                 {!!vendor?.description && (
                                     <Text style={{
-                                        fontSize: 14,
+                                        fontSize: 12,
                                         color: theme.colors.muted,
                                         marginBottom: 8
                                     }}>
-                                        {vendor.description}
+                                        {vendor?.description}
                                     </Text>
                                 )}
                                 <View style={{ flexDirection: "row", alignItems: "center" }}>
-                                    <Icon name="star" size={14} color="#fbbf24" />
-                                    <Text style={{
-                                        marginLeft: 4,
-                                        fontSize: 12,
-                                        color: theme.colors.text,
-                                        fontWeight: "600"
-                                    }}>
-                                        {vendor?.rating ?? 0}
-                                    </Text>
-                                    <View style={{
-                                        width: 4,
-                                        height: 4,
-                                        borderRadius: 2,
-                                        backgroundColor: theme.colors.muted,
-                                        marginHorizontal: 8
-                                    }} />
+                                    {vendor?.rating && (
+                                        <>
+                                            <Icon name="star" size={14} color="#fbbf24" />
+                                            <Text style={{
+                                                marginLeft: 4,
+                                                fontSize: 10,
+                                                color: theme.colors.text,
+                                                fontWeight: "600"
+                                            }}>
+                                                {vendor?.rating ?? 0}
+                                            </Text>
+                                            <View style={{
+                                                width: 4,
+                                                height: 4,
+                                                borderRadius: 2,
+                                                backgroundColor: theme.colors.muted,
+                                                marginHorizontal: 8
+                                            }} />
+                                        </>
+                                    )}
+                                    
                                     <View style={{
                                         backgroundColor: vendor?.isOpen ? theme.colors.primary : theme.colors.danger,
                                         paddingHorizontal: 6,
@@ -277,7 +246,7 @@ export default function MenuScreen() {
                                     }}>
                                         <Text style={{
                                             color: "white",
-                                            fontSize: 10,
+                                            fontSize: 8,
                                             fontWeight: "600"
                                         }}>
                                             {vendor?.isOpen ? "Open" : "Closed"}
@@ -299,16 +268,16 @@ export default function MenuScreen() {
                     <ScrollView
                         horizontal
                         showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={{ paddingHorizontal: 16 }}
+                        contentContainerStyle={{ paddingHorizontal: 12 }}
                     >
                         <Pressable
                             onPress={() => setSelectedCategory('all')}
                             style={{
                                 backgroundColor: selectedCategory === 'all' ? theme.colors.primary : theme.colors.background,
-                                paddingHorizontal: 16,
-                                paddingVertical: 8,
-                                borderRadius: 20,
-                                marginRight: 12,
+                                paddingHorizontal: 12,
+                                // paddingVertical: 2,
+                                borderRadius: 16,
+                                marginRight: 6,
                                 flexDirection: "row",
                                 alignItems: "center",
                                 borderWidth: 1,
@@ -318,7 +287,7 @@ export default function MenuScreen() {
                             <Text style={{
                                 color: selectedCategory === 'all' ? "white" : theme.colors.text,
                                 fontWeight: selectedCategory === 'all' ? "600" : "500",
-                                fontSize: 14
+                                fontSize: 12
                             }}>
                                 All
                             </Text>
@@ -330,10 +299,10 @@ export default function MenuScreen() {
                                 onPress={() => setSelectedCategory(category.id)}
                                 style={{
                                     backgroundColor: selectedCategory === category.id ? theme.colors.primary : theme.colors.background,
-                                    paddingHorizontal: 16,
-                                    paddingVertical: 8,
+                                    paddingHorizontal: 12,
+                                    paddingVertical: 6,
                                     borderRadius: 20,
-                                    marginRight: 12,
+                                    marginRight: 6,
                                     flexDirection: "row",
                                     alignItems: "center",
                                     borderWidth: 1,
@@ -343,7 +312,7 @@ export default function MenuScreen() {
                                 <Text style={{
                                     color: selectedCategory === category.id ? "white" : theme.colors.text,
                                     fontWeight: selectedCategory === category.id ? "600" : "500",
-                                    fontSize: 14
+                                    fontSize: 12
                                 }}>
                                     {category.name}
                                 </Text>
@@ -359,20 +328,21 @@ export default function MenuScreen() {
                         justifyContent: "space-between",
                         alignItems: "center",
                         paddingHorizontal: 16,
-                        marginBottom: 16
+                        marginTop: 8,
+                        marginBottom: 12
                     }}>
                         <Text style={{
-                            fontSize: 18,
+                            fontSize: 14,
                             fontWeight: "700",
                             color: theme.colors.text
                         }}>
                             Menu ({items.length} items)
                         </Text>
-                        <View style={{ flexDirection: "row", gap: 8 }}>
+                        <View style={{ flexDirection: "row-reverse", gap: 6 }}>
                             <Pressable
                                 onPress={() => setViewMode("grid")}
                                 style={{
-                                    padding: 8,
+                                    padding: 6,
                                     borderRadius: 8,
                                     backgroundColor: viewMode === "grid" ? theme.colors.primary : theme.colors.surface,
                                     borderWidth: 1,
@@ -381,14 +351,14 @@ export default function MenuScreen() {
                             >
                                 <Icon
                                     name="grid"
-                                    size={16}
+                                    size={14}
                                     color={viewMode === "grid" ? "white" : theme.colors.muted}
                                 />
                             </Pressable>
                             <Pressable
                                 onPress={() => setViewMode("list")}
                                 style={{
-                                    padding: 8,
+                                    padding: 6,
                                     borderRadius: 8,
                                     backgroundColor: viewMode === "list" ? theme.colors.primary : theme.colors.surface,
                                     borderWidth: 1,
@@ -397,7 +367,7 @@ export default function MenuScreen() {
                             >
                                 <Icon
                                     name="list"
-                                    size={16}
+                                    size={14}
                                     color={viewMode === "list" ? "white" : theme.colors.muted}
                                 />
                             </Pressable>
@@ -412,7 +382,7 @@ export default function MenuScreen() {
                         numColumns={viewMode === "grid" ? 2 : 1}
                         key={viewMode}
                         scrollEnabled={false}
-                        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }}
+                        contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 100 }}
                     />
                 </ScrollView>
 
@@ -431,10 +401,10 @@ export default function MenuScreen() {
                         onPress={() => setShowCart(true)}
                         style={{
                             position: 'absolute',
-                            bottom: 10,
+                            bottom: 20,
                             right: 20,
-                            width: 60,
-                            height: 60,
+                            width: 50,
+                            height: 50,
                             borderRadius: 30,
                             backgroundColor: theme.colors.primary,
                             alignItems: 'center',
@@ -449,7 +419,7 @@ export default function MenuScreen() {
                             elevation: 8,
                         }}
                     >
-                        <Icon name="cart" size={24} color="white" />
+                        <Icon name="cart" size={20} color="white" />
                         {cartItemCount > 0 && (
                             <View style={{
                                 position: 'absolute',

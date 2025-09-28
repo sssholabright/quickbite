@@ -221,7 +221,7 @@ export default function OrdersScreen() {
         }}>
             <Icon name="package" size={64} color={theme.colors.muted} />
             <Text style={{
-                fontSize: 18,
+                fontSize: 16,
                 fontWeight: '600',
                 color: theme.colors.text,
                 marginTop: 16,
@@ -230,7 +230,7 @@ export default function OrdersScreen() {
                 No orders yet
             </Text>
             <Text style={{
-                fontSize: 14,
+                fontSize: 12,
                 color: theme.colors.muted,
                 textAlign: 'center',
                 lineHeight: 20
@@ -255,7 +255,7 @@ export default function OrdersScreen() {
         }}>
             <Icon name="alert-circle" size={64} color={theme.colors.danger} />
             <Text style={{
-                fontSize: 18,
+                fontSize: 16,
                 fontWeight: '600',
                 color: theme.colors.text,
                 marginTop: 16,
@@ -264,7 +264,7 @@ export default function OrdersScreen() {
                 Something went wrong
             </Text>
             <Text style={{
-                fontSize: 14,
+                fontSize: 12,
                 color: theme.colors.muted,
                 textAlign: 'center',
                 lineHeight: 20,
@@ -296,7 +296,7 @@ export default function OrdersScreen() {
                     borderRadius: 12
                 }}>
                     <Text style={{
-                        fontSize: 16,
+                        fontSize: 14,
                         fontWeight: '600',
                         color: theme.colors.primary
                     }}>
@@ -308,7 +308,10 @@ export default function OrdersScreen() {
     );
 
     return (
-        <SafeAreaWrapper>
+        <SafeAreaWrapper 
+            edges={["top"]} // Only apply top padding
+            backgroundColor={theme.colors.background}
+        >
             <View style={{ flex: 1 }}>
                 {/* Header with connection status */}
                 <View style={{ 
@@ -323,7 +326,7 @@ export default function OrdersScreen() {
                         <Icon name="arrow-left" size={24} color={theme.colors.text} />
                     </Pressable>
                     <Text style={{ 
-                        fontSize: 18, 
+                        fontSize: 16, 
                         fontWeight: '700', 
                         color: theme.colors.text,
                         marginLeft: 12,
@@ -386,7 +389,7 @@ export default function OrdersScreen() {
                             }}
                         >
                             <Text style={{
-                                fontSize: 14,
+                                fontSize: 12,
                                 fontWeight: '600',
                                 color: filter === tab.key ? 'white' : theme.colors.muted,
                                 textAlign: 'center'
@@ -405,7 +408,7 @@ export default function OrdersScreen() {
                         data={orders}
                         renderItem={renderOrderItem}
                         keyExtractor={(item) => item.id}
-                        contentContainerStyle={{ flexGrow: 1 }}
+                        contentContainerStyle={{ flexGrow: 1, marginTop: 16 }}
                         refreshControl={
                             <RefreshControl
                                 refreshing={isRefreshing}

@@ -19,7 +19,7 @@ export default function OrderSummary({ items, vendor, total}: OrderSummaryProps)
             borderColor: theme.colors.border,
         }}>
             <Text style={{
-                fontSize: 18,
+                fontSize: 16,
                 fontWeight: '600',
                 color: theme.colors.text,
                 marginBottom: 16,
@@ -49,7 +49,7 @@ export default function OrderSummary({ items, vendor, total}: OrderSummaryProps)
                 </View>
                 <View style={{ flex: 1 }}>
                     <Text style={{
-                        fontSize: 16,
+                        fontSize: 14,
                         fontWeight: '600',
                         color: theme.colors.text,
                         marginBottom: 2,
@@ -57,7 +57,7 @@ export default function OrderSummary({ items, vendor, total}: OrderSummaryProps)
                         {vendor.name}
                     </Text>
                     <Text style={{
-                        fontSize: 14,
+                        fontSize: 12,
                         color: theme.colors.muted,
                     }}>
                         {vendor.distance} • {vendor.eta}
@@ -77,14 +77,14 @@ export default function OrderSummary({ items, vendor, total}: OrderSummaryProps)
                         }}
                     >
                         <Text style={{
-                            fontSize: 14,
+                            fontSize: 12,
                             color: theme.colors.text,
                             flex: 1,
                         }}>
                             {item.quantity}x {item.name}
                         </Text>
                         <Text style={{
-                            fontSize: 14,
+                            fontSize: 12,
                             fontWeight: '600',
                             color: theme.colors.text,
                         }}>
@@ -106,14 +106,14 @@ export default function OrderSummary({ items, vendor, total}: OrderSummaryProps)
                                     }}
                                 >
                                     <Text style={{
-                                        fontSize: 12,
+                                        fontSize: 10,
                                         color: theme.colors.muted,
                                         flex: 1,
                                     }}>
                                         + {addOn.addOn.name} x{addOn.quantity}
                                     </Text>
                                     <Text style={{
-                                        fontSize: 12,
+                                        fontSize: 10,
                                         color: theme.colors.muted,
                                     }}>
                                         {formatNaira(addOn.price * addOn.quantity)}
@@ -136,14 +136,14 @@ export default function OrderSummary({ items, vendor, total}: OrderSummaryProps)
                 borderTopColor: theme.colors.border,
             }}>
                 <Text style={{
-                    fontSize: 18,
+                    fontSize: 16,
                     fontWeight: '700',
                     color: theme.colors.text,
                 }}>
                     Total
                 </Text>
                 <Text style={{
-                    fontSize: 18,
+                    fontSize: 16,
                     fontWeight: '700',
                     color: theme.colors.primary,
                 }}>

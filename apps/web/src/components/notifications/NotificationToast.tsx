@@ -25,22 +25,24 @@ const NotificationToast: React.FC<NotificationToastProps> = ({
             : 5000;
             
         const timer = setTimeout(() => {
-            handleClose();
+            handleClose(false); // Don't mark as read when auto-closing
         }, timeout);
 
         return () => clearTimeout(timer);
     }, []);
 
-    const handleClose = () => {
+    const handleClose = (markAsRead: boolean = true) => {
         setIsVisible(false);
-        setTimeout(onClose, 300); // Wait for animation to complete
+        if (markAsRead) {
+            setTimeout(onClose, 300); // Wait for animation to complete
+        }
     };
 
     const handleAction = (action: string, data?: any) => {
         if (onAction) {
             onAction(action, data);
         }
-        handleClose();
+        handleClose(true); // Mark as read when action is taken
     };
 
     const getIcon = () => {
@@ -99,7 +101,7 @@ const NotificationToast: React.FC<NotificationToastProps> = ({
                         </div>
                     </div>
                     <button
-                        onClick={handleClose}
+                        onClick={() => handleClose(true)} // Mark as read when manually closed
                         className="ml-2 flex-shrink-0 text-gray-400 hover:text-gray-600"
                     >
                         <FaTimes className="w-4 h-4" />

@@ -84,7 +84,7 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
                 shadowOffset: { width: 0, height: 2 },
                 shadowOpacity: 0.1,
                 shadowRadius: 8,
-                elevation: 3,
+                elevation: 1,
             }}>
                 <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
                     {/* Image Container */}
@@ -159,7 +159,7 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
                                                             backgroundColor: theme.colors.primary,
                                                             marginRight: 6
                                                         }} />
-                                                        <Text style={{ fontSize: 11, color: theme.colors.muted }}>
+                                                        <Text style={{ fontSize: 10, color: theme.colors.muted }}>
                                                             {qty}x {addOnDetail?.name || `Add-on #${addOnId.slice(-4)}`}
                                                         </Text>
                                                     </View>
@@ -191,22 +191,22 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
                                 <Pressable
                                     onPress={() => updateQuantity(item.id, item.quantity - 1)}
                                     style={{
-                                        width: 28,
-                                        height: 28,
+                                        width: 20,
+                                        height: 20,
                                         borderRadius: 10,
                                         backgroundColor: theme.colors.background,
                                         alignItems: 'center',
                                         justifyContent: 'center',
                                     }}
                                 >
-                                    <Icon name="minus" size={14} color={theme.colors.muted} />
+                                    <Icon name="minus" size={12} color={theme.colors.muted} />
                                 </Pressable>
                                 
                                 <Text style={{
-                                    fontSize: 12,
+                                    fontSize: 10,
                                     fontWeight: '600',
                                     color: theme.colors.text,
-                                    marginHorizontal: 12,
+                                    marginHorizontal: 6,
                                     minWidth: 20,
                                     textAlign: 'center',
                                 }}>
@@ -216,15 +216,15 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
                                 <Pressable
                                     onPress={() => updateQuantity(item.id, item.quantity + 1)}
                                     style={{
-                                        width: 28,
-                                        height: 28,
+                                        width: 20,
+                                        height: 20,
                                         borderRadius: 10,
                                         backgroundColor: theme.colors.primary,
                                         alignItems: 'center',
                                         justifyContent: 'center',
                                     }}
                                 >
-                                    <Icon name="plus" size={14} color="white" />
+                                    <Icon name="plus" size={12} color="white" />
                                 </Pressable>
                             </View>
                         </View>
@@ -267,23 +267,23 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
             paddingHorizontal: 32,
         }}>
             <View style={{
-                width: 120,
-                height: 120,
+                width: 100,
+                height: 100,
                 borderRadius: 60,
                 backgroundColor: theme.colors.surface,
                 alignItems: 'center',
                 justifyContent: 'center',
-                marginBottom: 24,
+                marginBottom: 16,
                 shadowColor: '#000',
                 shadowOffset: { width: 0, height: 4 },
                 shadowOpacity: 0.1,
                 shadowRadius: 12,
                 elevation: 4,
             }}>
-                <Icon name="shopping-cart" size={48} color={theme.colors.muted} />
+                <Icon name="shopping-cart" size={40} color={theme.colors.muted} />
             </View>
             <Text style={{
-                fontSize: 18,
+                fontSize: 16,
                 fontWeight: '700',
                 color: theme.colors.text,
                 marginBottom: 8,
@@ -292,7 +292,7 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
                 Your cart is empty
             </Text>
             <Text style={{
-                fontSize: 14,
+                fontSize: 12,
                 color: theme.colors.muted,
                 textAlign: 'center',
                 lineHeight: 24,
@@ -323,7 +323,7 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
                     backgroundColor: theme.colors.background,
                     borderTopLeftRadius: 20,
                     borderTopRightRadius: 20,
-                    marginTop: 100,
+                    marginTop: 120,
                 }}>
                     {/* Header with Gradient */}
                     <LinearGradient
@@ -344,7 +344,7 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
                         }}>
                             <View>
                                 <Text style={{
-                                    fontSize: 20,
+                                    fontSize: 16,
                                     fontWeight: '800',
                                     color: 'white',
                                     marginBottom: 4,
@@ -352,7 +352,7 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
                                     Your Cart
                                 </Text>
                                 <Text style={{
-                                    fontSize: 12,
+                                    fontSize: 10,
                                     color: 'rgba(255,255,255,0.8)',
                                 }}>
                                     {cartItemsList.length} {cartItemsList.length === 1 ? 'item' : 'items'}
@@ -361,15 +361,15 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
                             <Pressable
                                 onPress={onClose}
                                 style={{
-                                    width: 36,
-                                    height: 40,
+                                    width: 28,
+                                    height: 28,
                                     borderRadius: 18,
                                     backgroundColor: 'rgba(255,255,255,0.2)',
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                 }}
                             >
-                                <Icon name="close" size={20} color="white" />
+                                <Icon name="close" size={16} color="white" />
                             </Pressable>
                         </View>
 
@@ -387,15 +387,16 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
                             }}>
                                 <View>
                                     <Text style={{
-                                        fontSize: 10,
+                                        fontSize: 12,
+                                        fontWeight: '600',
                                         color: 'rgba(255,255,255,0.8)',
                                         marginBottom: 2,
                                     }}>
                                         Total Amount
                                     </Text>
                                     <Text style={{
-                                        fontSize: 16,
-                                        fontWeight: '800',
+                                        fontSize: 12,
+                                        fontWeight: '700',
                                         color: 'white',
                                     }}>
                                         ₦{total?.toLocaleString()}
@@ -454,10 +455,10 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
                                         justifyContent: 'space-between',
                                         marginBottom: 4,
                                     }}>
-                                        <Text style={{ fontSize: 12, color: theme.colors.muted }}>
+                                        <Text style={{ fontSize: 12, color: theme.colors.muted, fontWeight: '600' }}>
                                             Subtotal
                                         </Text>
-                                        <Text style={{ fontSize: 12, color: theme.colors.text }}>
+                                        <Text style={{ fontSize: 12, color: theme.colors.text, fontWeight: '700' }}>
                                             ₦{subtotal?.toLocaleString()}
                                         </Text>
                                     </View>
@@ -466,10 +467,10 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
                                         justifyContent: 'space-between',
                                         marginBottom: 4,
                                     }}>
-                                        <Text style={{ fontSize: 12, color: theme.colors.muted }}>
+                                        <Text style={{ fontSize: 12, color: theme.colors.muted, fontWeight: '600' }}>
                                             Delivery Fee
                                         </Text>
-                                        <Text style={{ fontSize: 12, color: theme.colors.text }}>
+                                        <Text style={{ fontSize: 12, color: theme.colors.text, fontWeight: '700' }}>
                                             ₦{deliveryFee?.toLocaleString()}
                                         </Text>
                                     </View>
@@ -478,10 +479,10 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
                                         justifyContent: 'space-between',
                                         marginBottom: 12,
                                     }}>
-                                        <Text style={{ fontSize: 12, color: theme.colors.muted }}>
+                                        <Text style={{ fontSize: 12, color: theme.colors.muted, fontWeight: '600' }}>
                                             Service Fee
                                         </Text>
-                                        <Text style={{ fontSize: 12, color: theme.colors.text }}>
+                                        <Text style={{ fontSize: 12, color: theme.colors.text, fontWeight: '700' }}>
                                             ₦{serviceFee?.toLocaleString()}
                                         </Text>
                                     </View>
@@ -495,7 +496,7 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
                                         justifyContent: 'space-between',
                                     }}>
                                         <Text style={{
-                                            fontSize: 16,
+                                            fontSize: 12,
                                             fontWeight: '700',
                                             color: theme.colors.text,
                                         }}>
@@ -517,7 +518,8 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
                                     onPress={handleProceedToCheckout}
                                     style={{
                                         borderRadius: 12,
-                                        paddingVertical: 12,
+                                        paddingVertical: 10,
+                                        marginBottom: 10
                                     }}
                                 />
                             </View>
