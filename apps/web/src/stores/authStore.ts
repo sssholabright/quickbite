@@ -32,7 +32,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         }
     },
     
-    logout: async (redirectTo = '/auth/vendor/login') => {
+    logout: async (redirectTo = '/vendor/auth/login') => {
         try {
             // Clear user state immediately for better UX
             set({ user: null })

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { ResponseHandler } from '../../utils/response.js';
 import MenuService from './menu.service.js';
 import { logger } from '../../utils/logger.js';
+import { CloudinaryService } from '../../services/cloudinary.service.js';
 import { 
     createMenuItemSchema, 
     updateMenuItemSchema, 
@@ -32,8 +33,23 @@ export class MenuController {
             // Validate request body
             const validatedData = createMenuItemSchema.parse(req.body);
             
-            // Create menu item
-            const menuItem = await MenuService.createMenuItem(vendorId, validatedData);
+            // 🚀 NEW: Handle image upload if present
+            let imageUrl = validatedData.image;
+            if (req.file) {
+                try {
+                    const uploadResult = await CloudinaryService.uploadMenuItemImage(req.file.buffer, 'temp');
+                    imageUrl = uploadResult.secure_url;
+                    logger.info(`Menu item image uploaded: ${uploadResult.public_id}`);
+                } catch (uploadError) {
+                    logger.error({ uploadError }, 'Failed to upload menu item image');
+                    ResponseHandler.error(res as any, 'Failed to upload image');
+                    return;
+                }
+            }
+            
+            // Create menu item with image URL
+            const menuItemData = { ...validatedData, image: imageUrl };
+            const menuItem = await MenuService.createMenuItem(vendorId, menuItemData);
             
             logger.info(`Menu item created: ${menuItem.id} for vendor: ${vendorId}`);
             
@@ -119,16 +135,26 @@ export class MenuController {
                 return;
             }
 
-            if (!menuItemId) {
-                ResponseHandler.badRequest(res as any, 'Menu item ID is required');
-                return;
-            }
-
             // Validate request body
             const validatedData = updateMenuItemSchema.parse(req.body);
             
-            // Update menu item
-            const menuItem = await MenuService.updateMenuItem(vendorId, menuItemId, validatedData);
+            // 🚀 NEW: Handle image upload if present
+            let imageUrl = validatedData.image;
+            if (req.file) {
+                try {
+                    const uploadResult = await CloudinaryService.uploadMenuItemImage(req.file.buffer, menuItemId || '');
+                    imageUrl = uploadResult.secure_url;
+                    logger.info(`Menu item image uploaded: ${uploadResult.public_id}`);
+                } catch (uploadError) {
+                    logger.error({ uploadError }, 'Failed to upload menu item image');
+                    ResponseHandler.error(res as any, 'Failed to upload image');
+                    return;
+                }
+            }
+            
+            // Update menu item with image URL
+            const menuItemData = { ...validatedData, image: imageUrl };
+            const menuItem = await MenuService.updateMenuItem(vendorId, menuItemId || '', menuItemData);
             
             logger.info(`Menu item updated: ${menuItemId} for vendor: ${vendorId}`);
             
@@ -220,8 +246,23 @@ export class MenuController {
             // Validate request body
             const validatedData = createCategorySchema.parse(req.body);
             
-            // Create category
-            const category = await MenuService.createCategory(vendorId, validatedData);
+            // 🚀 NEW: Handle image upload if present
+            let imageUrl = validatedData.image;
+            if (req.file) {
+                try {
+                    const uploadResult = await CloudinaryService.uploadCategoryImage(req.file.buffer, 'temp');
+                    imageUrl = uploadResult.secure_url;
+                    logger.info(`Category image uploaded: ${uploadResult.public_id}`);
+                } catch (uploadError) {
+                    logger.error({ uploadError }, 'Failed to upload category image');
+                    ResponseHandler.error(res as any, 'Failed to upload image');
+                    return;
+                }
+            }
+            
+            // Create category with image URL
+            const categoryData = { ...validatedData, image: imageUrl };
+            const category = await MenuService.createCategory(vendorId, categoryData);
             
             logger.info(`Category created: ${category.id} for vendor: ${vendorId}`);
             
@@ -256,20 +297,36 @@ export class MenuController {
 
     static async updateCategory(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
         try {
+            const vendorId = req.user?.userId;
             const { categoryId } = req.params;
             
-            // Validate request body
-            const validatedData = updateCategorySchema.parse(req.body);
-
-            if (!categoryId) {
-                ResponseHandler.badRequest(res as any, 'Category ID is required');
+            if (!vendorId || req.user?.role !== 'VENDOR') {
+                ResponseHandler.unauthorized(res as any, 'Vendor access required');
                 return;
             }
+
+            // Validate request body
+            const validatedData = updateCategorySchema.parse(req.body);
             
-            // Update category
-            const category = await MenuService.updateCategory(categoryId, validatedData);
+            // 🚀 NEW: Handle image upload if present
+            let imageUrl = validatedData.image;
+            if (req.file) {
+                try {
+                    const uploadResult = await CloudinaryService.uploadCategoryImage(req.file.buffer, categoryId || '');
+                    imageUrl = uploadResult.secure_url;
+                    logger.info(`Category image uploaded: ${uploadResult.public_id}`);
+                } catch (uploadError) {
+                    logger.error({ uploadError }, 'Failed to upload category image');
+                    ResponseHandler.error(res as any, 'Failed to upload image');
+                    return;
+                }
+            }
             
-            logger.info(`Category updated: ${categoryId}`);
+            // Update category with image URL
+            const categoryData = { ...validatedData, image: imageUrl };
+            const category = await MenuService.updateCategory(categoryId || '', categoryData);
+            
+            logger.info(`Category updated: ${categoryId} for vendor: ${vendorId}`);
             
             ResponseHandler.success(res as any, category, 'Category updated successfully');
         } catch (error) {

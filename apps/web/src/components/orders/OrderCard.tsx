@@ -122,7 +122,7 @@ export default function OrderCard({
     }
 
     return (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="bg-white rounded-xl shadow-sm border m-4 border-gray-200 overflow-hidden">
             {/* Order Header */}
             <div className="p-6">
                 <div className="flex items-center justify-between mb-4">
@@ -137,7 +137,7 @@ export default function OrderCard({
                     </div>
                     <div className="flex items-center space-x-3">
                         <div className="text-right">
-                            <p className="text-lg font-bold text-gray-900">{formatNaira(order.total)}</p>
+                            <p className="text-lg font-bold text-gray-900">{formatNaira(order.items.reduce((acc, item) => acc + item.totalPrice, 0))}</p>
                             <p className="text-sm text-gray-500">{order.items.length} items</p>
                         </div>
                         <button
@@ -156,12 +156,13 @@ export default function OrderCard({
                             <FaClock className="w-4 h-4 mr-2" />
                             {new Date(order.createdAt).toLocaleTimeString('en-NG', { 
                                 hour: '2-digit', 
-                                minute: '2-digit' 
-                            })}
+                                minute: '2-digit',
+                                hour12: true
+                            }).toUpperCase()}
                         </div>
                         <div className="flex items-center">
                             <FaMapMarkerAlt className="w-4 h-4 mr-2" />
-                            {order.deliveryAddress.title}
+                            {order.deliveryAddress.address}
                         </div>
                         {order.rider && (
                             <div className="flex items-center">
@@ -246,24 +247,12 @@ export default function OrderCard({
                     </div>
 
                     {/* Order Summary */}
-                    <div className="mt-6 pt-4 border-t border-gray-200">
-                        <div className="flex justify-between items-center text-sm">
-                            <span className="text-gray-600">Subtotal:</span>
-                            <span className="text-gray-900">{formatNaira(order.subtotal)}</span>
-                        </div>
-                        <div className="flex justify-between items-center text-sm">
-                            <span className="text-gray-600">Delivery Fee:</span>
-                            <span className="text-gray-900">{formatNaira(order.deliveryFee)}</span>
-                        </div>
-                        <div className="flex justify-between items-center text-sm">
-                            <span className="text-gray-600">Service Fee:</span>
-                            <span className="text-gray-900">{formatNaira(order.serviceFee)}</span>
-                        </div>
+                    {/* <div className="mt-6 pt-4 border-t border-gray-200"> */}
                         <div className="flex justify-between items-center text-base font-semibold pt-2 border-t border-gray-200">
                             <span className="text-gray-900">Total:</span>
-                            <span className="text-gray-900">{formatNaira(order.total)}</span>
+                            <span className="text-gray-900">{formatNaira(order.items.reduce((acc, item) => acc + item.totalPrice, 0))}</span>
                         </div>
-                    </div>
+                    {/* </div> */}
                 </div>
             )}
         </div>

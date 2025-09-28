@@ -59,7 +59,6 @@ export default function CheckoutScreen() {
     const { data: vendors = [] } = useVendors();
     const vendor = vendors.find(v => v.id === vendorId) || vendors[0];
 
-
     // Order creation mutation
     const createOrderMutation = useCreateOrder();
 
@@ -71,11 +70,11 @@ export default function CheckoutScreen() {
         isCurrentLocation: true
     });
 
+    // 🚀 NEW: State for editable address
+    const [editableAddress, setEditableAddress] = useState('');
+
     // State for special instructions
     const [specialInstructions, setSpecialInstructions] = useState('');
-
-    // State for payment method
-    const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card'>('cash');
 
     // Alert modal state
     const [alert, setAlert] = useState<AlertState>({
@@ -84,6 +83,13 @@ export default function CheckoutScreen() {
         message: '',
         type: 'info'
     });
+
+    // Update editable address when delivery address changes
+    useEffect(() => {
+        if (deliveryAddress.address && deliveryAddress.address !== 'Getting your location...') {
+            setEditableAddress(deliveryAddress.address);
+        }
+    }, [deliveryAddress.address]);
 
     // Helper function to show alert
     const showAlert = (alertData: Omit<AlertState, 'visible'>) => {
@@ -160,8 +166,12 @@ export default function CheckoutScreen() {
     const cartItems = getItemsList();
     const subtotal = getSubtotal();
     const deliveryFee = 200; // ₦2.00 in kobo
-    const serviceFee = Math.round(subtotal * 0.05); // 5% service fee
+    const serviceFee = 50; // ₦0.50 service fee
     const total = subtotal + deliveryFee + serviceFee;
+
+    const formatNaira = (amount: number): string => {
+        return `₦${amount.toLocaleString('en-NG')}`
+    }
 
     // Format order data for API
     const formatOrderData = () => {
@@ -177,6 +187,7 @@ export default function CheckoutScreen() {
             return {
                 menuItemId: cartItem.id,
                 quantity: cartItem.quantity,
+                serviceFee: serviceFee,
                 addOns: addOns.length > 0 ? addOns : undefined
             };
         });
@@ -186,9 +197,9 @@ export default function CheckoutScreen() {
             items: orderItems,
             deliveryAddress: {
                 label: deliveryAddress.name,
-                address: deliveryAddress.address,
-                city: 'Lagos', // You might want to extract this from the address
-                state: 'Lagos',
+                address: editableAddress.trim() || deliveryAddress.address, // 🚀 FIX: Use editable address
+                city: 'null', // You might want to extract this from the address
+                state: 'null',
                 coordinates: {
                     lat: deliveryAddress.coordinates?.latitude || 0,
                     lng: deliveryAddress.coordinates?.longitude || 0
@@ -211,6 +222,17 @@ export default function CheckoutScreen() {
             return;
         }
 
+        if (!editableAddress.trim()) {
+            showAlert({
+                title: 'Address Required',
+                message: 'Please enter your delivery address.',
+                type: 'warning',
+                confirmText: 'OK',
+                onConfirm: hideAlert
+            });
+            return;
+        }
+
         if (cartItems.length === 0) {
             showAlert({
                 title: 'Empty Cart',
@@ -225,7 +247,7 @@ export default function CheckoutScreen() {
         // Show confirmation dialog
         showAlert({
             title: 'Confirm Order',
-            message: `Are you sure you want to place this order for ₦${total.toLocaleString('en-NG')}?`,
+            message: `Are you sure you want to place this order for ${formatNaira(total)}?`,
             type: 'info',
             confirmText: 'Place Order',
             cancelText: 'Cancel',
@@ -242,7 +264,6 @@ export default function CheckoutScreen() {
     const placeOrder = async () => {
         try {
             const orderData = formatOrderData();
-            console.log('orderData', JSON.stringify(orderData, null, 2));
             const order = await createOrderMutation.mutateAsync(orderData);
             
             // Clear cart after successful order
@@ -264,7 +285,7 @@ export default function CheckoutScreen() {
                             name: order.vendor.businessName
                         },
                         items: order.items,
-                        total: order.pricing.total
+                        total: total
                     });
                 }
             });
@@ -348,7 +369,7 @@ export default function CheckoutScreen() {
                                         color: theme.colors.muted,
                                         marginBottom: 2
                                     }}>
-                                        + {addOnDetail.name} x{quantity} (₦{(addOnDetail.price * quantity).toLocaleString('en-NG')})
+                                        + {addOnDetail.name} x{quantity} ({formatNaira(addOnDetail.price * quantity)})
                                     </Text>
                                 );
                             })}
@@ -361,7 +382,7 @@ export default function CheckoutScreen() {
                     fontWeight: '700', 
                     color: theme.colors.text
                 }}>
-                    ₦{itemTotal.toLocaleString('en-NG')}
+                    {formatNaira(itemTotal)}
                 </Text>
             </View>
         );
@@ -425,13 +446,46 @@ export default function CheckoutScreen() {
                                     {deliveryAddress.name}
                                 </Text>
                             </View>
-                            <Text style={{ 
-                                fontSize: 12, 
-                                color: theme.colors.muted,
+                            
+                            {/* 🚀 NEW: Editable Address Input */}
+                            <TextInput
+                                style={{
+                                    backgroundColor: theme.colors.surface,
+                                    borderWidth: 1,
+                                    borderColor: theme.colors.border,
+                                    borderRadius: 8,
+                                    padding: 12,
+                                    fontSize: 12,
+                                    color: theme.colors.text,
+                                    marginLeft: 28,
+                                    marginTop: 8,
+                                    minHeight: 40,
+                                }}
+                                placeholder="Enter your delivery address"
+                                placeholderTextColor={theme.colors.muted}
+                                value={editableAddress}
+                                onChangeText={setEditableAddress}
+                                multiline
+                                numberOfLines={2}
+                            />
+                            
+                            {/* 🚀 NEW: Location Info */}
+                            <View style={{ 
+                                flexDirection: 'row', 
+                                alignItems: 'center', 
+                                marginTop: 8,
                                 marginLeft: 28
                             }}>
-                                {deliveryAddress.address}
-                            </Text>
+                                <Icon name="info" size={12} color={theme.colors.muted} />
+                                <Text style={{ 
+                                    fontSize: 10, 
+                                    color: theme.colors.muted,
+                                    marginLeft: 4,
+                                    flex: 1
+                                }}>
+                                    Location coordinates will be used for delivery tracking
+                                </Text>
+                            </View>
                         </View>
                     </View>
 
@@ -488,66 +542,6 @@ export default function CheckoutScreen() {
                         />
                     </View>
 
-                    {/* Payment Method */}
-                    <View style={{ padding: 16 }}>
-                        <Text style={{ 
-                            fontSize: 14, 
-                            fontWeight: '600', 
-                            color: theme.colors.text,
-                            marginBottom: 12
-                        }}>
-                            Payment Method
-                        </Text>
-
-                        <View style={{ flexDirection: 'row', gap: 12 }}>
-                            <Pressable
-                                onPress={() => setPaymentMethod('cash')}
-                                style={{
-                                    flex: 1,
-                                    backgroundColor: theme.colors.background,
-                                    borderWidth: 2,
-                                    borderColor: paymentMethod === 'cash' ? theme.colors.primary : theme.colors.border,
-                                    borderRadius: 12,
-                                    padding: 16,
-                                    alignItems: 'center'
-                                }}
-                            >
-                                <Icon name="dollar-sign" size={24} color={paymentMethod === 'cash' ? theme.colors.primary : theme.colors.muted} />
-                                <Text style={{ 
-                                    fontSize: 12, 
-                                    fontWeight: '600', 
-                                    color: paymentMethod === 'cash' ? theme.colors.primary : theme.colors.text,
-                                    marginTop: 8
-                                }}>
-                                    Cash
-                                </Text>
-                            </Pressable>
-
-                            <Pressable
-                                onPress={() => setPaymentMethod('card')}
-                                style={{
-                                    flex: 1,
-                                    backgroundColor: theme.colors.background,
-                                    borderWidth: 2,
-                                    borderColor: paymentMethod === 'card' ? theme.colors.primary : theme.colors.border,
-                                    borderRadius: 12,
-                                    padding: 16,
-                                    alignItems: 'center'
-                                }}
-                            >
-                                <Icon name="credit-card" size={24} color={paymentMethod === 'card' ? theme.colors.primary : theme.colors.muted} />
-                                <Text style={{ 
-                                    fontSize: 12, 
-                                    fontWeight: '600', 
-                                    color: paymentMethod === 'card' ? theme.colors.primary : theme.colors.text,
-                                    marginTop: 8
-                                }}>
-                                    Card
-                                </Text>
-                            </Pressable>
-                        </View>
-                    </View>
-
                     {/* Order Total */}
                     <View style={{ padding: 16 }}>
                         <View style={{ 
@@ -559,15 +553,15 @@ export default function CheckoutScreen() {
                         }}>
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
                                 <Text style={{ fontSize: 12, color: theme.colors.muted }}>Subtotal</Text>
-                                <Text style={{ fontSize: 12, color: theme.colors.text }}>₦{subtotal.toLocaleString('en-NG')}</Text>
+                                <Text style={{ fontSize: 12, color: theme.colors.text }}>{formatNaira(subtotal)}</Text>
                             </View>
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
                                 <Text style={{ fontSize: 12, color: theme.colors.muted }}>Delivery Fee</Text>
-                                <Text style={{ fontSize: 12, color: theme.colors.text }}>₦{deliveryFee.toLocaleString('en-NG')}</Text>
+                                <Text style={{ fontSize: 12, color: theme.colors.text }}>{formatNaira(deliveryFee)}</Text>
                             </View>
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
                                 <Text style={{ fontSize: 12, color: theme.colors.muted }}>Service Fee</Text>
-                                <Text style={{ fontSize: 12, color: theme.colors.text }}>₦{serviceFee.toLocaleString('en-NG')}</Text>
+                                <Text style={{ fontSize: 12, color: theme.colors.text }}>{formatNaira(serviceFee)}</Text>
                             </View>
                             <View style={{ 
                                 height: 1, 
@@ -576,7 +570,7 @@ export default function CheckoutScreen() {
                             }} />
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                                 <Text style={{ fontSize: 14, fontWeight: '700', color: theme.colors.text }}>Total</Text>
-                                <Text style={{ fontSize: 14, fontWeight: '700', color: theme.colors.text }}>₦{total.toLocaleString('en-NG')}</Text>
+                                <Text style={{ fontSize: 14, fontWeight: '700', color: theme.colors.text }}>{formatNaira(total)}</Text>
                             </View>
                         </View>
                     </View>

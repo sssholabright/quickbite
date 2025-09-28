@@ -1,20 +1,54 @@
-import React from "react";
-import { View, Text, ScrollView, Pressable, Alert } from "react-native";
+import React, { useState } from "react";
+import { View, Text, ScrollView, Pressable } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useTheme } from "../../theme/theme";
 import { useAuthStore } from "../../stores/auth";
 import { Icon } from "../../ui/Icon";
 import { CTAButton } from "../../ui/CTAButton";
+import AlertModal from "../../ui/AlertModal";
 import type { RootStackParamList } from "../../navigation/types";
 
 type ProfileNav = NativeStackNavigationProp<RootStackParamList>;
+
+interface AlertState {
+    visible: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'error' | 'warning' | 'info';
+    onConfirm?: () => void;
+    onCancel?: () => void;
+    showCancel?: boolean;
+    confirmText?: string;
+    cancelText?: string;
+}
 
 export default function ProfileScreen() {
 	const theme = useTheme();
 	const navigation = useNavigation<ProfileNav>();
 	const logout = useAuthStore((s) => s.logout);
-	const { user } = useAuthStore()
+	const { user } = useAuthStore();
+
+	// Alert modal state
+	const [alert, setAlert] = useState<AlertState>({
+		visible: false,
+		title: '',
+		message: '',
+		type: 'info'
+	});
+
+	// Helper function to show alert
+	const showAlert = (alertData: Omit<AlertState, 'visible'>) => {
+		setAlert({
+			...alertData,
+			visible: true
+		});
+	};
+
+	// Helper function to hide alert
+	const hideAlert = () => {
+		setAlert(prev => ({ ...prev, visible: false }));
+	};
 
 	const renderProfileItem = (
 		icon: string,
@@ -70,6 +104,22 @@ export default function ProfileScreen() {
 			)}
 		</Pressable>
 	);
+
+	const handleLogout = () => {
+		showAlert({
+			title: 'Logout',
+			message: 'Are you sure you want to logout?',
+			type: 'warning',
+			confirmText: 'Logout',
+			cancelText: 'Cancel',
+			showCancel: true,
+			onConfirm: () => {
+				hideAlert();
+				logout();
+			},
+			onCancel: hideAlert
+		});
+	};
 
 	return (
 		<View style={{ flex: 1, backgroundColor: theme.colors.background, paddingHorizontal: 5 }}>
@@ -173,8 +223,6 @@ export default function ProfileScreen() {
 						"Manage your delivery addresses",
 						() => navigation.navigate("AddressManagement")
 					)}
-
-					
 				</View>
 
 				{/* Settings */}
@@ -222,54 +270,26 @@ export default function ProfileScreen() {
 					)}
 				</View>
 
-				{/* App Info */}
-				{/* <View style={{
-					backgroundColor: theme.colors.surface,
-					borderRadius: 12,
-					borderWidth: 1,
-					borderColor: theme.colors.border,
-					padding: 16,
-					marginBottom: 16,
-				}}>
-					<Text style={{
-						fontSize: 14,
-						fontWeight: "600",
-						color: theme.colors.text,
-						marginBottom: 4,
-					}}>
-						QuickBite
-					</Text>
-					<Text style={{
-						fontSize: 12,
-						color: theme.colors.muted,
-						marginBottom: 4,
-					}}>
-						Version 1.0.0
-					</Text>
-					<Text style={{
-						fontSize: 12,
-						color: theme.colors.muted,
-					}}>
-						Made with ❤️ for students
-					</Text>
-				</View> */}
-
 				{/* Logout */}
 				<CTAButton 
 					title="Logout" 
-					onPress={() => {
-						Alert.alert(
-							"Logout",
-							"Are you sure you want to logout?",
-							[
-								{ text: "Cancel", style: "cancel" },
-								{ text: "Logout", style: "destructive", onPress: logout }
-							]
-						);
-					}}
+					onPress={handleLogout}
 					style={{ backgroundColor: theme.colors.danger }}
 				/>
 			</ScrollView>
+
+			{/* Alert Modal */}
+			<AlertModal
+				visible={alert.visible}
+				title={alert.title}
+				message={alert.message}
+				type={alert.type}
+				onConfirm={alert.onConfirm || hideAlert}
+				onCancel={alert.onCancel}
+				confirmText={alert.confirmText}
+				cancelText={alert.cancelText}
+				showCancel={alert.showCancel}
+			/>
 		</View>
 	);
 }

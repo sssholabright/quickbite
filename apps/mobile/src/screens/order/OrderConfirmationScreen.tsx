@@ -84,6 +84,10 @@ export default function OrderConfirmationScreen() {
         });
     };
 
+    const formatNaira = (amount: number): string => {
+        return `₦${amount.toLocaleString('en-NG')}`
+    }
+
     return (
         <SafeAreaWrapper>
             <View style={{ flex: 1, padding: 16 }}>
@@ -154,7 +158,7 @@ export default function OrderConfirmationScreen() {
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
                         <Text style={{ fontSize: 12, color: theme.colors.muted }}>Total Amount</Text>
                         <Text style={{ fontSize: 14, fontWeight: '700', color: theme.colors.text }}>
-                            ₦{total.toLocaleString('en-NG')}
+                            {formatNaira(total)}
                         </Text>
                     </View>
 

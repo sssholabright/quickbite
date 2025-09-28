@@ -859,7 +859,7 @@ export class OrderService {
         }, 0);
 
         const deliveryFee = 200; // Fixed delivery fee in kobo
-        const serviceFee = Math.round(subtotal * 0.05); // 5% service fee
+        const serviceFee = 50; // 5% service fee
         const total = subtotal + deliveryFee + serviceFee;
 
         return {

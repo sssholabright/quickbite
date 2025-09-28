@@ -23,13 +23,18 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
     const insets = useSafeAreaInsets();
     const navigation = useNavigation<CartScreenNavigationProp>();
 
+    const formatNaira = (amount: number): string => {
+        return `₦${amount.toLocaleString('en-NG')}`
+    }
+
     // Cart store
     const { 
         items: cartItems, 
         updateQuantity, 
         removeItem, 
         getItemsList, 
-        getSubtotal
+        getSubtotal,
+        getItemTotal
     } = useCartStore();
 
     // Get vendors to resolve cart items
@@ -73,7 +78,7 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
         const hasAddOns = Object.values(item.addOns || {}).some(qty => qty > 0)
         
         return (
-            <View style={{
+            <Pressable style={{
                 backgroundColor: theme.colors.background,
                 borderRadius: 16,
                 padding: 8,
@@ -84,7 +89,7 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
                 shadowOffset: { width: 0, height: 2 },
                 shadowOpacity: 0.1,
                 shadowRadius: 8,
-                elevation: 1,
+                elevation: 3, // 🚀 FIX: Increased elevation for better shadow
             }}>
                 <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
                     {/* Image Container */}
@@ -97,6 +102,10 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
                                 borderRadius: 12,
                             }}
                             resizeMode="cover"
+                            onError={() => {
+                                // 🚀 FIX: Handle image loading errors gracefully
+                                console.log('Image failed to load:', item.image);
+                            }}
                         />
                         {/* Preparation Time Badge */}
                         {item.preparationTime && (
@@ -128,14 +137,14 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
                                     fontWeight: '700',
                                     color: theme.colors.text,
                                     marginBottom: 2,
-                                }}>
-                                    {item.name}
+                                }} numberOfLines={2}> {/* 🚀 FIX: Prevent text overflow */}
+                                    {item.name} <Text style={{ fontSize: 8, color: theme.colors.muted }}>x{formatNaira(item.price * item.quantity)}</Text>
                                 </Text>
                                 <Text style={{
                                     fontSize: 10,
                                     color: theme.colors.muted,
                                     marginBottom: 4,
-                                }}>
+                                }} numberOfLines={1}> {/* 🚀 FIX: Prevent text overflow */}
                                     {item.vendorName}
                                 </Text>
 
@@ -159,12 +168,12 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
                                                             backgroundColor: theme.colors.primary,
                                                             marginRight: 6
                                                         }} />
-                                                        <Text style={{ fontSize: 10, color: theme.colors.muted }}>
-                                                            {qty}x {addOnDetail?.name || `Add-on #${addOnId.slice(-4)}`}
+                                                        <Text style={{ fontSize: 10, color: theme.colors.muted }} numberOfLines={1}>
+                                                            {qty}x {addOnDetail?.name || `Add-on #${addOnId.slice(-4)}`} +{formatNaira(addOnDetail?.price * qty || 0)}
                                                         </Text>
                                                     </View>
                                                 )
-                                            })}
+                                        })}
                                     </View>
                                 )}
 
@@ -174,7 +183,7 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
                                     fontWeight: '700',
                                     color: theme.colors.primary,
                                 }}>
-                                    ₦{(item.price || 0).toLocaleString()}
+                                    {formatNaira(getItemTotal(item.id))}
                                 </Text>
                             </View>
 
@@ -189,25 +198,25 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
                                 borderColor: theme.colors.border,
                             }}>
                                 <Pressable
-                                    onPress={() => updateQuantity(item.id, item.quantity - 1)}
-                                    style={{
-                                        width: 20,
+                                    onPress={() => updateQuantity(item.id, Math.max(1, item.quantity - 1))} // 🚀 FIX: Prevent quantity below 1
+                                    style={({ pressed }) => ({
+                                        width: 20, // 🚀 FIX: Larger touch target
                                         height: 20,
-                                        borderRadius: 10,
-                                        backgroundColor: theme.colors.background,
+                                        borderRadius: 12,
+                                        backgroundColor: pressed ? theme.colors.border : theme.colors.background,
                                         alignItems: 'center',
                                         justifyContent: 'center',
-                                    }}
+                                    })}
                                 >
                                     <Icon name="minus" size={12} color={theme.colors.muted} />
                                 </Pressable>
                                 
                                 <Text style={{
-                                    fontSize: 10,
+                                    fontSize: 10, // 🚀 FIX: Slightly larger text
                                     fontWeight: '600',
                                     color: theme.colors.text,
-                                    marginHorizontal: 6,
-                                    minWidth: 20,
+                                    marginHorizontal: 8, // 🚀 FIX: More spacing
+                                    minWidth: 24,
                                     textAlign: 'center',
                                 }}>
                                     {item.quantity}
@@ -215,14 +224,14 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
                                 
                                 <Pressable
                                     onPress={() => updateQuantity(item.id, item.quantity + 1)}
-                                    style={{
-                                        width: 20,
+                                    style={({ pressed }) => ({
+                                        width: 20, // 🚀 FIX: Larger touch target
                                         height: 20,
-                                        borderRadius: 10,
-                                        backgroundColor: theme.colors.primary,
+                                        borderRadius: 12,
+                                        backgroundColor: pressed ? theme.colors.primary + 'DD' : theme.colors.primary,
                                         alignItems: 'center',
                                         justifyContent: 'center',
-                                    }}
+                                    })}
                                 >
                                     <Icon name="plus" size={12} color="white" />
                                 </Pressable>
@@ -232,20 +241,20 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
                         {/* Remove Button */}
                         <Pressable
                             onPress={() => removeItem(item.id)}
-                            style={{
+                            style={({ pressed }) => ({
                                 flexDirection: 'row',
                                 alignItems: 'center',
                                 marginTop: 8,
-                                paddingVertical: 4,
-                                paddingHorizontal: 8,
+                                paddingVertical: 6, // 🚀 FIX: Larger touch target
+                                paddingHorizontal: 10,
                                 borderRadius: 6,
-                                backgroundColor: theme.colors.danger + '10',
+                                backgroundColor: pressed ? theme.colors.danger + '20' : theme.colors.danger + '10',
                                 alignSelf: 'flex-start'
-                            }}
+                            })}
                         >
-                            <Icon name="trash" size={10} color={theme.colors.danger} />
+                            <Icon name="trash" size={12} color={theme.colors.danger} /> {/* 🚀 FIX: Slightly larger icon */}
                             <Text style={{
-                                fontSize: 10,
+                                fontSize: 11, // 🚀 FIX: Slightly larger text
                                 color: theme.colors.danger,
                                 marginLeft: 4,
                                 fontWeight: '500'
@@ -255,10 +264,10 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
                         </Pressable>
                     </View>
                 </View>
-            </View>
+            </Pressable>
         );
     };
-
+    
     const renderEmptyState = () => (
         <View style={{
             flex: 1,
@@ -318,18 +327,21 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
                 }}
                 onPress={onClose}
             >
-                <Pressable style={{ 
-                    flex: 1, 
-                    backgroundColor: theme.colors.background,
-                    borderTopLeftRadius: 20,
-                    borderTopRightRadius: 20,
-                    marginTop: 120,
-                }}>
+                <Pressable 
+                    style={{ 
+                        flex: 1, 
+                        backgroundColor: theme.colors.background,
+                        borderTopLeftRadius: 20,
+                        borderTopRightRadius: 20,
+                        marginTop: 120,
+                    }}
+                    onPress={(e) => e.stopPropagation()} // 🚀 FIX: Prevent closing when tapping inside
+                >
                     {/* Header with Gradient */}
                     <LinearGradient
                         colors={[theme.colors.primary, theme.colors.primary + 'DD']}
                         style={{
-                            paddingTop: 20, // Reduced padding since we have marginTop
+                            paddingTop: 20,
                             paddingBottom: 20,
                             paddingHorizontal: 20,
                             borderTopLeftRadius: 20,
@@ -399,7 +411,7 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
                                         fontWeight: '700',
                                         color: 'white',
                                     }}>
-                                        ₦{total?.toLocaleString()}
+                                        {formatNaira(total)}
                                     </Text>
                                 </View>
                                 <View style={{
@@ -430,9 +442,10 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
                                 style={{ flex: 1 }}
                                 contentContainerStyle={{ 
                                     padding: 20,
-                                    paddingBottom: 50
+                                    paddingBottom: 220 // 🚀 FIX: Increased padding to account for fixed bottom
                                 }}
                                 showsVerticalScrollIndicator={false}
+                                nestedScrollEnabled={true} // 🚀 FIX: Enable nested scrolling
                             />
 
                             {/* Fixed Bottom Summary */}
@@ -459,7 +472,7 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
                                             Subtotal
                                         </Text>
                                         <Text style={{ fontSize: 12, color: theme.colors.text, fontWeight: '700' }}>
-                                            ₦{subtotal?.toLocaleString()}
+                                            {formatNaira(subtotal)}
                                         </Text>
                                     </View>
                                     <View style={{
@@ -471,7 +484,7 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
                                             Delivery Fee
                                         </Text>
                                         <Text style={{ fontSize: 12, color: theme.colors.text, fontWeight: '700' }}>
-                                            ₦{deliveryFee?.toLocaleString()}
+                                            {formatNaira(deliveryFee)}
                                         </Text>
                                     </View>
                                     <View style={{
@@ -483,7 +496,7 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
                                             Service Fee
                                         </Text>
                                         <Text style={{ fontSize: 12, color: theme.colors.text, fontWeight: '700' }}>
-                                            ₦{serviceFee?.toLocaleString()}
+                                            {formatNaira(serviceFee)}
                                         </Text>
                                     </View>
                                     <View style={{
@@ -500,14 +513,14 @@ export default function CartScreen({ visible, onClose }: CartScreenProps) {
                                             fontWeight: '700',
                                             color: theme.colors.text,
                                         }}>
-                                            Total
+                                            Total 
                                         </Text>
                                         <Text style={{
                                             fontSize: 16,
                                             fontWeight: '700',
                                             color: theme.colors.primary,
                                         }}>
-                                            ₦{total?.toLocaleString()}
+                                            {formatNaira(total)}
                                         </Text>
                                     </View>
                                 </View>

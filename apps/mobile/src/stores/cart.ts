@@ -153,7 +153,7 @@ export const useCartStore = create<CartState>()(
                         Object.entries(item.addOns).forEach(([addOnId, qty]) => {
                             const addOnDetail = item.addOnDetails[addOnId];
                             if (addOnDetail && qty > 0) {
-                                itemTotal += addOnDetail.price * qty * item.quantity;
+                                itemTotal += addOnDetail.price * qty; // 🚀 FIX: Remove * item.quantity
                             }
                         });
                     }
@@ -178,7 +178,7 @@ export const useCartStore = create<CartState>()(
                     Object.entries(item.addOns).forEach(([addOnId, qty]) => {
                         const addOnDetail = item.addOnDetails[addOnId];
                         if (addOnDetail && qty > 0) {
-                            total += addOnDetail.price * qty * item.quantity;
+                            total += addOnDetail.price * qty; // 🚀 FIX: Remove * item.quantity
                         }
                     });
                 }

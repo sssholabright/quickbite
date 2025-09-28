@@ -1,29 +1,80 @@
 import { Router } from 'express';
 import { MenuController } from './menu.controller.js';
 import { authGuard } from '../../middlewares/authGuard.js';
+import { uploadSingleImage, handleUploadError } from '../../middlewares/upload.middleware.js';
+import { fileUploadRateLimit } from '../../middlewares/rateLimiter.js';
 
 const router = Router();
 
-// Public routes
-router.get('/public/:vendorId/categories', MenuController.getCustomerCategories);
-router.get('/public/:vendorId/items', MenuController.getCustomerMenuItems);
-router.get('/public/vendors', MenuController.getCustomerVendors);
+// Menu item routes with image upload support
+router.post('/menu-items', 
+    fileUploadRateLimit,
+    authGuard({ requiredRoles: ['VENDOR'] }),
+    uploadSingleImage,
+    handleUploadError,
+    MenuController.createMenuItem
+);
 
-// Apply authentication with VENDOR and ADMIN roles
-router.use(authGuard({ requiredRoles: ['VENDOR', 'ADMIN'] }));
+router.put('/menu-items/:menuItemId', 
+    fileUploadRateLimit,
+    authGuard({ requiredRoles: ['VENDOR'] }),
+    uploadSingleImage,
+    handleUploadError,
+    MenuController.updateMenuItem
+);
 
-// Menu Item routes
-router.post('/items', MenuController.createMenuItem);
-router.get('/items', MenuController.getVendorMenuItems);
-router.get('/items/:menuItemId', MenuController.getMenuItem);
-router.put('/items/:menuItemId', MenuController.updateMenuItem);
-router.delete('/items/:menuItemId', MenuController.deleteMenuItem);
-router.patch('/items/:menuItemId/toggle-availability', MenuController.toggleMenuItemAvailability);
+// 🚀 FIX: Add auth guards to GET routes
+router.get('/menu-items', 
+    authGuard({ requiredRoles: ['VENDOR'] }),
+    MenuController.getVendorMenuItems
+);
 
-// Category routes
-router.post('/categories', MenuController.createCategory);
-router.get('/categories', MenuController.getVendorCategories);
-router.put('/categories/:categoryId', MenuController.updateCategory);
-router.delete('/categories/:categoryId', MenuController.deleteCategory);
+router.get('/menu-items/:menuItemId', 
+    authGuard({ requiredRoles: ['VENDOR'] }),
+    MenuController.getMenuItem
+);
+
+router.delete('/menu-items/:menuItemId', 
+    authGuard({ requiredRoles: ['VENDOR'] }),
+    MenuController.deleteMenuItem
+);
+
+router.patch('/menu-items/:menuItemId/toggle', 
+    authGuard({ requiredRoles: ['VENDOR'] }),
+    MenuController.toggleMenuItemAvailability
+);
+
+// Category routes with image upload support
+router.post('/categories', 
+    fileUploadRateLimit,
+    authGuard({ requiredRoles: ['VENDOR'] }),
+    uploadSingleImage,
+    handleUploadError,
+    MenuController.createCategory
+);
+
+router.put('/categories/:categoryId', 
+    fileUploadRateLimit,
+    authGuard({ requiredRoles: ['VENDOR'] }),
+    uploadSingleImage,
+    handleUploadError,
+    MenuController.updateCategory
+);
+
+// 🚀 FIX: Add auth guards to GET routes
+router.get('/categories', 
+    authGuard({ requiredRoles: ['VENDOR'] }),
+    MenuController.getVendorCategories
+);
+
+router.delete('/categories/:categoryId', 
+    authGuard({ requiredRoles: ['VENDOR'] }),
+    MenuController.deleteCategory
+);
+
+// Public routes (no auth required)
+router.get('/vendors', MenuController.getCustomerVendors);
+router.get('/vendors/:vendorId/categories', MenuController.getCustomerCategories);
+router.get('/vendors/:vendorId/menu-items', MenuController.getCustomerMenuItems);
 
 export default router;

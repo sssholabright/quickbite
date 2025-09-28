@@ -26,6 +26,7 @@ interface FormData {
 export default function AddMenuItemModal({ isOpen, onClose, editingItem }: AddMenuItemModalProps) {
     const [currentStep, setCurrentStep] = useState(1)
     const [imagePreview, setImagePreview] = useState<string>('')
+    const [imageFile, setImageFile] = useState<File | null>(null)
     
     // React Query hooks
     const createMenuItem = useCreateMenuItem()
@@ -63,12 +64,14 @@ export default function AddMenuItemModal({ isOpen, onClose, editingItem }: AddMe
         } else {
             reset()
             setImagePreview('')
+            setImageFile(null)
         }
     }, [editingItem, setValue, reset])
 
     const onDrop = (acceptedFiles: File[]) => {
         const file = acceptedFiles[0]
         if (file) {
+            setImageFile(file)
             const reader = new FileReader()
             reader.onload = (e) => {
                 setImagePreview(e.target?.result as string)
@@ -114,9 +117,9 @@ export default function AddMenuItemModal({ isOpen, onClose, editingItem }: AddMe
 
     const updateAddOn = (index: number, field: keyof MenuAddOn, value: any) => {
         const updatedAddOns = watchedAddOns.map((addOn, i) => 
-        i === index ? { ...addOn, [field]: value } : addOn
-    )
-    setValue('addOns', updatedAddOns, { shouldDirty: true, shouldValidate: true })
+            i === index ? { ...addOn, [field]: value } : addOn
+        )
+        setValue('addOns', updatedAddOns, { shouldDirty: true, shouldValidate: true })
     }
 
     const onSubmit = async (data: FormData) => {
@@ -159,28 +162,26 @@ export default function AddMenuItemModal({ isOpen, onClose, editingItem }: AddMe
                 return
             }
 
+            const menuItemData = {
+                name: data.name,
+                description: data.description,
+                price: Number(data.price),
+                image: data.image,
+                categoryId: data.categoryId,
+                preparationTime: Number(data.preparationTime),
+                addOns: addOnsData
+            }
+
             if (editingItem) {
                 await updateMenuItem.mutateAsync({
                     id: editingItem.id,
-                    data: {
-                        name: data.name,
-                        description: data.description,
-                        price: Number(data.price),
-                        image: data.image,
-                        categoryId: data.categoryId,
-                        preparationTime: Number(data.preparationTime),
-                        addOns: addOnsData
-                    }
+                    data: menuItemData,
+                    imageFile: imageFile || undefined
                 })
             } else {
                 await createMenuItem.mutateAsync({
-                    name: data.name,
-                    description: data.description,
-                    price: Number(data.price),
-                    image: data.image,
-                    categoryId: data.categoryId,
-                    preparationTime: Number(data.preparationTime),
-                    addOns: addOnsData
+                    data: menuItemData,
+                    imageFile: imageFile || undefined
                 })
             }
 
@@ -207,6 +208,7 @@ export default function AddMenuItemModal({ isOpen, onClose, editingItem }: AddMe
         reset()
         setCurrentStep(1)
         setImagePreview('')
+        setImageFile(null)
         onClose()
     }
 
@@ -229,9 +231,9 @@ export default function AddMenuItemModal({ isOpen, onClose, editingItem }: AddMe
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
                 {/* Header */}
-                <div className="bg-gradient-to-r from-primary-600 to-primary-700 text-white p-6">
+                <div className="bg-gradient-to-r from-primary-600 to-primary-700 text-white p-6 flex-shrink-0">
                     <div className="flex items-center justify-between">
                         <h2 className="text-2xl font-bold">
                             {isEditing ? 'Edit Menu Item' : 'Add Menu Item'}
@@ -265,6 +267,8 @@ export default function AddMenuItemModal({ isOpen, onClose, editingItem }: AddMe
                     </div>
                 </div>
 
+                {/* 🚀 FIX: Scrollable content area */}
+                <div className="flex-1 overflow-y-auto">
                 <form onSubmit={handleSubmit(onSubmit)} className="p-6">
                     {/* Step 1: Basic Info */}
                     {currentStep === 1 && (
@@ -575,9 +579,11 @@ export default function AddMenuItemModal({ isOpen, onClose, editingItem }: AddMe
                             </div>
                         </div>
                     )}
+                    </form>
+                </div>
 
-                    {/* Navigation Buttons */}
-                    <div className="flex items-center justify-between pt-6 border-t border-gray-200">
+                {/* 🚀 FIX: Fixed navigation buttons */}
+                <div className="flex items-center justify-between p-6 border-t border-gray-200 bg-white flex-shrink-0">
                         <button
                             type="button"
                             onClick={prevStep}
@@ -627,7 +633,6 @@ export default function AddMenuItemModal({ isOpen, onClose, editingItem }: AddMe
                             )}
                         </div>
                     </div>
-                </form>
             </div>
         </div>
     )

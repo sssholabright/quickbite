@@ -43,7 +43,7 @@ export interface PublicMenuItem {
 export const menuService = {
     getVendors: async (params?: { search?: string; hasAvailableItems?: boolean }) => {
         try {
-            const res = await apiClient.get<ApiResponse<PublicVendor[]>>('/menu/public/vendors', { params });
+            const res = await apiClient.get<ApiResponse<PublicVendor[]>>('/menu/vendors', { params });
             return res.data.data;
         } catch (error) {
             console.error('Error fetching vendors:', error);
@@ -52,7 +52,7 @@ export const menuService = {
     },
     getVendorCategories: async (vendorId: string) => {
         try {
-            const res = await apiClient.get<ApiResponse<PublicCategory[]>>(`/menu/public/${vendorId}/categories`);
+            const res = await apiClient.get<ApiResponse<PublicCategory[]>>(`/menu/vendors/${vendorId}/categories`);
             return res.data.data;
         } catch (error) {
             console.error('Error fetching vendor categories:', error);
@@ -61,7 +61,7 @@ export const menuService = {
     },
     getVendorItems: async (vendorId: string, params?: { categoryId?: string; search?: string }) => {
         try {
-            const res = await apiClient.get<ApiResponse<PublicMenuItem[]>>(`/menu/public/${vendorId}/items`, { params });
+            const res = await apiClient.get<ApiResponse<PublicMenuItem[]>>(`/menu/vendors/${vendorId}/menu-items`, { params });
             return res.data.data;
         } catch (error) {
             console.error('Error fetching vendor items:', error);

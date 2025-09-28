@@ -225,8 +225,8 @@ export default function MealGridCard({ meal, onAddToCart, onRemoveFromCart, quan
                             alignItems: "center",
                             backgroundColor: theme.colors.primary,
                             borderRadius: 20,
-                            paddingHorizontal: 12,
-                            paddingVertical: 6,
+                            paddingHorizontal: 2,
+                            // paddingVertical: 4,
                             shadowColor: theme.colors.primary,
                             shadowOffset: { width: 0, height: 2 },
                             shadowOpacity: 0.3,
@@ -245,9 +245,9 @@ export default function MealGridCard({ meal, onAddToCart, onRemoveFromCart, quan
                             </Pressable>
                             <Text style={{
                                 color: "white",
-                                fontSize: 14,
+                                fontSize: 12,
                                 fontWeight: "700",
-                                marginHorizontal: 8,
+                                marginHorizontal: 4,
                                 minWidth: 20,
                                 textAlign: "center"
                             }}>
@@ -271,8 +271,8 @@ export default function MealGridCard({ meal, onAddToCart, onRemoveFromCart, quan
                             style={{
                                 backgroundColor: meal.isAvailable ? theme.colors.primary : theme.colors.muted,
                                 borderRadius: 20,
-                                paddingHorizontal: 16,
-                                paddingVertical: 8,
+                                paddingHorizontal: 10,
+                                paddingVertical: 6,
                                 shadowColor: meal.isAvailable ? theme.colors.primary : theme.colors.muted,
                                 shadowOffset: { width: 0, height: 2 },
                                 shadowOpacity: 0.3,

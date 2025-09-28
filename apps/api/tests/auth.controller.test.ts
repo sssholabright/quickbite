@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import { Request, Response, NextFunction } from 'express';
 import { AuthController } from '../src/modules/auth/auth.controller.js';
+import { AuthResult } from '../src/types/auth.js';
 
 // Mock the auth service
 jest.mock('../src/modules/auth/auth.service.js', () => ({
@@ -70,7 +71,7 @@ describe('AuthController', () => {
         }
       };
 
-      (AuthService.register as jest.MockedFunction<typeof AuthService.register>).mockResolvedValue(mockResult);
+      (AuthService.register as jest.MockedFunction<typeof AuthService.register>).mockResolvedValue(mockResult as AuthResult);
       mockReq.body = mockUserData;
 
       await AuthController.register(mockReq as Request, mockRes as Response, mockNext);
@@ -120,7 +121,7 @@ describe('AuthController', () => {
         }
       };
 
-      (AuthService.login as jest.MockedFunction<typeof AuthService.login>).mockResolvedValue(mockResult);
+      (AuthService.login as jest.MockedFunction<typeof AuthService.login>).mockResolvedValue(mockResult as AuthResult);
       mockReq.body = mockCredentials;
 
       await AuthController.login(mockReq as Request, mockRes as Response, mockNext);

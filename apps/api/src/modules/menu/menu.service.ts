@@ -2,6 +2,7 @@ import { UpdateMenuItemData, CategoryData } from './../../types/menu.js';
 import { logger } from './../../utils/logger.js';
 import { MenuItemData } from "../../types/menu.js";
 import { PrismaClient } from "@prisma/client";
+import { CloudinaryService } from './../../services/cloudinary.service.js';
 
 const prisma = new PrismaClient();
 
@@ -211,10 +212,41 @@ class MenuService {
 
             // Update add-ons if provided
             if (data.addOns) {
-                // Delete existing add-ons
-                await prisma.menuAddOn.deleteMany({
+                // 🚀 FIX: Safer add-on update approach - only check active orders
+                const existingAddOns = await prisma.menuAddOn.findMany({
                     where: { menuItemId }
                 });
+
+                // Check which add-ons are referenced by ACTIVE (non-delivered) orders only
+                const referencedAddOns = await prisma.orderItemAddOn.findMany({
+                    where: {
+                        addOnId: {
+                            in: existingAddOns.map(addOn => addOn.id)
+                        },
+                        orderItem: {
+                            order: {
+                                status: {
+                                    not: 'DELIVERED' // Only check non-delivered orders
+                                }
+                            }
+                        }
+                    },
+                    select: { addOnId: true }
+                });
+
+                const referencedAddOnIds = new Set(referencedAddOns.map(ref => ref.addOnId));
+
+                // Delete only add-ons that are not referenced by active orders
+                const addOnsToDelete = existingAddOns.filter(addOn => !referencedAddOnIds.has(addOn.id));
+                if (addOnsToDelete.length > 0) {
+                    await prisma.menuAddOn.deleteMany({
+                        where: {
+                            id: {
+                                in: addOnsToDelete.map(addOn => addOn.id)
+                            }
+                        }
+                    });
+                }
 
                 // Create new add-ons
                 if (data.addOns.length > 0) {
@@ -230,15 +262,6 @@ class MenuService {
                         }))
                     });
                 }
-
-                // Fetch updated menu item with add-ons
-                return await prisma.menuItem.findUnique({
-                    where: { id: menuItemId },
-                    include: {
-                        category: true,
-                        addOns: true
-                    }
-                });
             }
 
             logger.info(`Menu item updated: ${menuItemId} for vendor: ${vendor.id}`);
@@ -271,6 +294,45 @@ class MenuService {
 
             if (!existingItem) {
                 throw new Error('Menu item not found');
+            }
+
+            // 🚀 FIX: Check if menu item is referenced by non-delivered orders
+            const activeOrders = await prisma.orderItem.findMany({
+                where: {
+                    menuItemId: menuItemId,
+                    order: {
+                        status: {
+                            not: 'DELIVERED' // Only check non-delivered orders
+                        }
+                    }
+                },
+                include: {
+                    order: {
+                        select: {
+                            id: true,
+                            status: true,
+                            orderNumber: true
+                        }
+                    }
+                }
+            });
+
+            if (activeOrders.length > 0) {
+                const orderNumbers = activeOrders.map(item => item.order.orderNumber).join(', ');
+                throw new Error(`Cannot delete menu item. It is referenced by active orders: ${orderNumbers}. Only items from delivered orders can be deleted.`);
+            }
+
+            // Delete associated image from Cloudinary if exists
+            if (existingItem.image) {
+                try {
+                    const publicId = CloudinaryService.extractPublicId(existingItem.image);
+                    if (publicId) {
+                        await CloudinaryService.deleteImage(publicId);
+                        logger.info(`Deleted image from Cloudinary: ${publicId}`);
+                    }
+                } catch (imageError) {
+                    logger.warn({ imageError }, 'Failed to delete image from Cloudinary, continuing with menu item deletion');
+                }
             }
 
             // Delete menu item (add-ons will be deleted due to cascade)

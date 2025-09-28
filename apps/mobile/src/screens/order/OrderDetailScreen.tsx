@@ -659,7 +659,7 @@ export default function OrderDetailScreen() {
                             `Ready by ${orderData.estimatedReadyAt.toLocaleTimeString()}` :
                             'ASAP'
                     }}
-                    total={orderData.total}
+                    total={orderData.items.reduce((acc, item) => acc + item.price * item.quantity + (item.addOns || []).reduce((acc, addOn) => acc + addOn.price * addOn.quantity, 0), 0)}
                 />
 
                 {/* Payment Info - Use backend pricing data */}

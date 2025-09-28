@@ -22,10 +22,40 @@ class AuthService {
     // Get current user profile
     async getProfile(): Promise<UserProfile> {
         try {
-            const response = await api.get<ApiResponse<UserProfile>>('/auth/me')
+            const response = await api.get<ApiResponse<UserProfile>>('/auth/profile')
             return response.data.data as UserProfile
         } catch (error: any) {
             throw new Error(error.response?.data?.message || 'Failed to get profile')
+        }
+    }
+
+    // Update user profile
+    async updateProfile(data: Partial<UserProfile> & { currentLat?: number; currentLng?: number }, imageFile?: File): Promise<UserProfile> {
+        try {
+            const formData = new FormData()
+            
+            // Add text fields
+            if (data.name) formData.append('name', data.name)
+            if (data.phone) formData.append('phone', data.phone)
+            if (data.currentLat !== undefined) formData.append('currentLat', data.currentLat.toString())
+            if (data.currentLng !== undefined) formData.append('currentLng', data.currentLng.toString())
+            
+            // Add image file if provided
+            if (imageFile) {
+                formData.append('image', imageFile)
+            } else if (data.avatar) {
+                // If avatar is a URL (from editing), add it as a field
+                formData.append('avatar', data.avatar)
+            }
+
+            const response = await api.put<ApiResponse<UserProfile>>('/auth/profile', formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data'
+                }
+            })
+            return response.data.data as UserProfile
+        } catch (error: any) {
+            throw new Error(error.response?.data?.message || 'Failed to update profile')
         }
     }
 

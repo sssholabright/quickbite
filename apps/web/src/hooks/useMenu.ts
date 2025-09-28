@@ -1,149 +1,108 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import MenuService from '../services/menuService'
-import { CreateMenuItemData, UpdateMenuItemData, MenuFilters, CreateCategoryData } from '../types/menu'
-import { showSuccess, showError } from '../utils/sweetAlert'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { MenuService } from '../services/menuService'
+import { CreateMenuItemData, UpdateMenuItemData, CreateCategoryData, MenuFilters } from '../types/menu'
 
-// Query Keys
-export const menuKeys = {
-    all: ['menu'] as const,
-    items: () => [...menuKeys.all, 'items'] as const,
-    list: (filters?: MenuFilters) => [...menuKeys.items(), 'list', filters] as const,
-    item: (id: string) => [...menuKeys.items(), 'detail', id] as const,
-    categories: () => [...menuKeys.all, 'categories'] as const,
-}
-
-// Menu Items Hooks
-export const useMenuItems = (filters?: MenuFilters) => {
-    return useQuery({
-        queryKey: menuKeys.list(filters || {}),
-        queryFn: () => MenuService.getMenuItems(filters),
-        staleTime: 1000 * 60 * 5, // 5 minutes
-    })
-}
-
-export const useMenuItem = (id: string) => {
-    return useQuery({
-        queryKey: menuKeys.item(id),
-        queryFn: () => MenuService.getMenuItem(id),
-        enabled: !!id,
-    })
-}
-
-export const useCreateMenuItem = () => {
+export function useCreateMenuItem() {
     const queryClient = useQueryClient()
-
+    
     return useMutation({
-        mutationFn: (data: CreateMenuItemData) => MenuService.createMenuItem(data),
+        mutationFn: ({ data, imageFile }: { data: CreateMenuItemData; imageFile?: File }) => 
+            MenuService.createMenuItem(data, imageFile),
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: menuKeys.items() })
-            showSuccess('Menu item created successfully!')
-        },
-        onError: (error: any) => {
-            showError(error?.response?.data?.message || 'Failed to create menu item')
-        },
+            queryClient.invalidateQueries({ queryKey: ['menu-items'] })
+            queryClient.invalidateQueries({ queryKey: ['categories'] })
+        }
     })
 }
 
-export const useUpdateMenuItem = () => {
+export function useUpdateMenuItem() {
     const queryClient = useQueryClient()
-
+    
     return useMutation({
-        mutationFn: ({ id, data }: { id: string; data: UpdateMenuItemData }) => 
-            MenuService.updateMenuItem(id, data),
-            onSuccess: (updatedItem) => {
-                queryClient.setQueryData(menuKeys.item(updatedItem.id), updatedItem)
-                queryClient.invalidateQueries({ queryKey: menuKeys.items() })
-                showSuccess('Menu item updated successfully!')
-            },
-            onError: (error: any) => {
-            showError(error?.response?.data?.message || 'Failed to update menu item')
-        },
+        mutationFn: ({ id, data, imageFile }: { id: string; data: UpdateMenuItemData; imageFile?: File }) => 
+            MenuService.updateMenuItem(id, data, imageFile),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['menu-items'] })
+            queryClient.invalidateQueries({ queryKey: ['categories'] })
+        }
     })
 }
 
-export const useDeleteMenuItem = () => {
+export function useCreateCategory() {
     const queryClient = useQueryClient()
-
+    
     return useMutation({
-        mutationFn: (id: string) => MenuService.deleteMenuItem(id),
-        onSuccess: (_, deletedId) => {
-            queryClient.removeQueries({ queryKey: menuKeys.item(deletedId) })
-            queryClient.invalidateQueries({ queryKey: menuKeys.items() })
-            showSuccess('Menu item deleted successfully!')
-        },
-        onError: (error: any) => {
-            showError(error?.response?.data?.message || 'Failed to delete menu item')
-        },
+        mutationFn: ({ data, imageFile }: { data: CreateCategoryData; imageFile?: File }) => 
+            MenuService.createCategory(data, imageFile),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['categories'] })
+        }
     })
 }
 
-export const useToggleMenuItemAvailability = () => {
+export function useUpdateCategory() {
     const queryClient = useQueryClient()
-
+    
     return useMutation({
-        mutationFn: (id: string) => MenuService.toggleMenuItemAvailability(id),
-        onSuccess: (updatedItem) => {
-            queryClient.setQueryData(menuKeys.item(updatedItem.id), updatedItem)
-            queryClient.invalidateQueries({ queryKey: menuKeys.items() })
-            showSuccess('Menu item availability updated!')
-        },
-        onError: (error: any) => {
-            showError(error?.response?.data?.message || 'Failed to update availability')
-        },
+        mutationFn: ({ id, data, imageFile }: { id: string; data: Partial<CreateCategoryData>; imageFile?: File }) => 
+            MenuService.updateCategory(id, data, imageFile),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['categories'] })
+        }
     })
 }
 
-// Categories Hooks
-export const useCategories = () => {
+export function useMenuItems(filters?: MenuFilters) {
     return useQuery({
-        queryKey: menuKeys.categories(),
-        queryFn: () => MenuService.getCategories(),
-        staleTime: 10 * 60 * 1000, // 10 minutes
+        queryKey: ['menu-items', filters],
+        queryFn: () => MenuService.getMenuItems(filters)
     })
 }
 
-export const useCreateCategory = () => {
-    const queryClient = useQueryClient()
+export function useCategories() {
+    return useQuery({
+        queryKey: ['categories'],
+        queryFn: () => MenuService.getCategories()
+    })
+}
 
+export function useMenuItem(menuItemId: string) {
+    return useQuery({
+        queryKey: ['menu-item', menuItemId],
+        queryFn: () => MenuService.getMenuItem(menuItemId),
+        enabled: !!menuItemId
+    })
+}
+
+export function useDeleteMenuItem() {
+    const queryClient = useQueryClient()
+    
     return useMutation({
-        mutationFn: (data: CreateCategoryData) => MenuService.createCategory(data),
+        mutationFn: (menuItemId: string) => MenuService.deleteMenuItem(menuItemId),
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: menuKeys.categories() })
-            showSuccess('Category created successfully!')
-        },
-        onError: (error: any) => {
-            showError(error?.response?.data?.message || 'Failed to create category')
-        },
+            queryClient.invalidateQueries({ queryKey: ['menu-items'] })
+        }
     })
 }
 
-export const useUpdateCategory = () => {
+export function useDeleteCategory() {
     const queryClient = useQueryClient()
-
+    
     return useMutation({
-        mutationFn: ({ id, data }: { id: string; data: Partial<CreateCategoryData> }) => 
-            MenuService.updateCategory(id, data),
-            onSuccess: () => {
-                queryClient.invalidateQueries({ queryKey: menuKeys.categories() })
-                showSuccess('Category updated successfully!')
-            },
-            onError: (error: any) => {
-                showError(error?.response?.data?.message || 'Failed to update category')
-            },
-    })
-}
-
-export const useDeleteCategory = () => {
-    const queryClient = useQueryClient()
-
-    return useMutation({
-        mutationFn: (id: string) => MenuService.deleteCategory(id),
+        mutationFn: (categoryId: string) => MenuService.deleteCategory(categoryId),
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: menuKeys.categories() })
-            showSuccess('Category deleted successfully!')
-        },
-        onError: (error: any) => {
-            showError(error?.response?.data?.message || 'Failed to delete category')
-        },
+            queryClient.invalidateQueries({ queryKey: ['categories'] })
+        }
+    })
+}
+
+export function useToggleMenuItemAvailability() {
+    const queryClient = useQueryClient()
+    
+    return useMutation({
+        mutationFn: (menuItemId: string) => MenuService.toggleMenuItemAvailability(menuItemId),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['menu-items'] })
+        }
     })
 }

@@ -25,7 +25,7 @@ export default function VendorDashboard() {
             const today = new Date()
             return orderDate.toDateString() === today.toDateString()
         })
-        .reduce((total, order) => total + order.total, 0)
+        .reduce((total, order) => order.items.reduce((acc, item) => acc + item.totalPrice, 0), 0)
 
     const getStatusColor = (status: string) => {
         switch (status) {
@@ -228,7 +228,7 @@ export default function VendorDashboard() {
                                         </div>
                                     </div>
                                     <div className="text-right">
-                                        <p className="font-semibold text-gray-900">{formatNaira(order.total)}</p>
+                                        <p className="font-semibold text-gray-900">{formatNaira(order.items.reduce((acc, item) => acc + item.totalPrice, 0))}</p>
                                         <p className="text-sm text-gray-500">{formatTimeAgo(order.createdAt)}</p>
                                     </div>
                                 </div>

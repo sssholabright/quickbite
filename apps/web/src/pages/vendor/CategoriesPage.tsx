@@ -9,8 +9,7 @@ export default function CategoriesPage() {
     const [editingCategory, setEditingCategory] = useState<any>(null)
     const [formData, setFormData] = useState({
         name: '',
-        description: '',
-        image: ''
+        description: ''
     })
 
     // React Query hooks
@@ -34,7 +33,9 @@ export default function CategoriesPage() {
                     data: formData
                 })
             } else {
-                await createCategory.mutateAsync(formData)
+                await createCategory.mutateAsync({
+                    data: formData
+                })
             }
             
             handleClose()
@@ -47,8 +48,7 @@ export default function CategoriesPage() {
         setEditingCategory(category)
         setFormData({
             name: category.name,
-            description: category.description || '',
-            image: category.image || ''
+            description: category.description || ''
         })
         setShowAddModal(true)
     }
@@ -73,7 +73,10 @@ export default function CategoriesPage() {
     const handleClose = () => {
         setShowAddModal(false)
         setEditingCategory(null)
-        setFormData({ name: '', description: '', image: '' })
+        setFormData({
+            name: '',
+            description: ''
+        })
     }
 
     if (isLoading) {
@@ -126,24 +129,6 @@ export default function CategoriesPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                         {categories.map((category) => (
                             <div key={category.id} className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow">
-                                {/* Category Image */}
-                                <div className="h-48 bg-gray-100 flex items-center justify-center">
-                                    {category.image ? (
-                                        <img
-                                            src={category.image}
-                                            alt={category.name}
-                                            className="w-full h-full object-cover"
-                                        />
-                                    ) : (
-                                        <div className="text-center text-gray-400">
-                                            <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-2">
-                                                <span className="text-2xl font-bold">{category.name.charAt(0)}</span>
-                                            </div>
-                                            <p className="text-sm">No Image</p>
-                                        </div>
-                                    )}
-                                </div>
-
                                 {/* Category Info */}
                                 <div className="p-4">
                                     <h3 className="text-lg font-semibold text-gray-900 mb-1">
@@ -239,19 +224,6 @@ export default function CategoriesPage() {
                                             rows={3}
                                             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                                             placeholder="Enter category description"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            Image URL
-                                        </label>
-                                        <input
-                                            type="url"
-                                            value={formData.image}
-                                            onChange={(e) => setFormData({ ...formData, image: e.target.value })}
-                                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                                            placeholder="https://example.com/image.jpg"
                                         />
                                     </div>
                                 </div>

@@ -1,10 +1,11 @@
+import { LoginCredentials, RegisterData } from './../../types/auth.js';
+import { changePasswordSchema, loginSchema, refreshTokenSchema, registerSchema } from './../../validations/auth.js';
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { RegisterData, LoginCredentials } from './../../types/auth.js';
-import { registerSchema, loginSchema, refreshTokenSchema, updateProfileSchema, changePasswordSchema } from './../../validations/auth.js';
 import { AuthService } from './auth.service.js';
 import { ResponseHandler } from '../../utils/response.js';
 import { logger } from '../../utils/logger.js';
+import { CloudinaryService } from '../../services/cloudinary.service.js';
 
 interface AuthenticatedRequest extends Request {
     user?: {
@@ -137,12 +138,33 @@ export class AuthController {
             }
 
             // Validate request body
+            const updateProfileSchema = z.object({
+                name: z.string().min(2, 'Name must be at least 2 characters').optional(),
+                phone: z.string().min(10, 'Phone must be at least 10 characters').optional(),
+                avatar: z.string().url('Invalid avatar URL').optional(),
+                currentLat: z.number().optional(),
+                currentLng: z.number().optional(),
+            });
+
             const validatedData = updateProfileSchema.parse(req.body);
             
-            // Update user profile
-            const user = await AuthService.updateUserProfile(userId, validatedData);
+            // 🚀 NEW: Handle avatar upload if present
+            let avatarUrl = validatedData.avatar;
+            if (req.file) {
+                try {
+                    const uploadResult = await CloudinaryService.uploadAvatar(req.file.buffer, userId);
+                    avatarUrl = uploadResult.secure_url;
+                    logger.info(`Avatar uploaded: ${uploadResult.public_id}`);
+                } catch (uploadError) {
+                    logger.error({ uploadError }, 'Failed to upload avatar');
+                    ResponseHandler.error(res as any, 'Failed to upload avatar');
+                    return;
+                }
+            }
             
-            logger.info(`User profile updated: ${user.email}`);
+            // Update profile with avatar URL
+            const profileData = { ...validatedData, avatar: avatarUrl };
+            const user = await AuthService.updateUserProfile(userId, profileData);
             
             ResponseHandler.success(res as any, user, 'Profile updated successfully');
         } catch (error) {

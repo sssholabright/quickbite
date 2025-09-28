@@ -134,7 +134,7 @@ export default function VendorLogin() {
                                 <span className="ml-2 text-sm text-gray-600">Remember me</span>
                             </label>
                             <Link
-                                to="/auth/vendor/forgot-password"
+                                to="/vendor/auth/forgot-password"
                                 className="text-sm text-primary-600 hover:text-primary-700 font-medium transition-colors"
                             >
                                 Forgot password?
@@ -162,7 +162,7 @@ export default function VendorLogin() {
                     <div className="mt-8 text-center">
                         <p className="text-sm text-gray-600">
                             Don't have an account?{' '}
-                            <Link to="/auth/vendor/register" className="text-primary-600 hover:text-primary-700 font-medium">
+                            <Link to="/vendor/auth/register" className="text-primary-600 hover:text-primary-700 font-medium">
                                 Contact support
                             </Link>
                         </p>

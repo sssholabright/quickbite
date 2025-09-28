@@ -7,9 +7,35 @@ function logError(error: any, context: string) {
 
 export class MenuService {
     // Menu Items
-    static async createMenuItem(data: CreateMenuItemData): Promise<MenuItem> {
+    static async createMenuItem(data: CreateMenuItemData, imageFile?: File): Promise<MenuItem> {
         try {
-            const response = await api.post('/menu/items', data)
+            const formData = new FormData()
+            
+            // Add text fields
+            formData.append('name', data.name)
+            formData.append('description', data.description || '')
+            formData.append('price', data.price.toString())
+            formData.append('categoryId', data.categoryId)
+            formData.append('preparationTime', (data.preparationTime || 15).toString())
+            
+            // Add add-ons as JSON string
+            if (data.addOns && data.addOns.length > 0) {
+                formData.append('addOns', JSON.stringify(data.addOns))
+            }
+            
+            // Add image file if provided
+            if (imageFile) {
+                formData.append('image', imageFile)
+            } else if (data.image) {
+                // If image is a URL (from editing), add it as a field
+                formData.append('image', data.image)
+            }
+
+            const response = await api.post('/menu/menu-items', formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data'
+                }
+            })
             return response.data.data
         } catch (error) {
             logError(error, 'createMenuItem')
@@ -30,7 +56,7 @@ export class MenuService {
             if (filters?.page) params.append('page', filters.page.toString())
             if (filters?.limit) params.append('limit', filters.limit.toString())
 
-            const response = await api.get(`/menu/items?${params.toString()}`)
+            const response = await api.get(`/menu/menu-items?${params.toString()}`)
             return {
                 items: response.data.data.items.map(this.transformMenuItemResponse),
                 total: response.data.data.total,
@@ -45,7 +71,7 @@ export class MenuService {
 
     static async getMenuItem(menuItemId: string): Promise<MenuItem> {
         try {
-            const response = await api.get(`/menu/items/${menuItemId}`)
+            const response = await api.get(`/menu/menu-items/${menuItemId}`)
             return response.data.data
         } catch (error) {
             logError(error, 'getMenuItem')
@@ -53,9 +79,35 @@ export class MenuService {
         }
     }
 
-    static async updateMenuItem(menuItemId: string, data: UpdateMenuItemData): Promise<MenuItem> {
+    static async updateMenuItem(menuItemId: string, data: UpdateMenuItemData, imageFile?: File): Promise<MenuItem> {
         try {
-            const response = await api.put(`/menu/items/${menuItemId}`, data)
+            const formData = new FormData()
+            
+            // Add text fields
+            if (data.name) formData.append('name', data.name)
+            if (data.description !== undefined) formData.append('description', data.description)
+            if (data.price !== undefined) formData.append('price', data.price.toString())
+            if (data.categoryId) formData.append('categoryId', data.categoryId)
+            if (data.preparationTime !== undefined) formData.append('preparationTime', data.preparationTime.toString())
+            
+            // Add add-ons as JSON string
+            if (data.addOns) {
+                formData.append('addOns', JSON.stringify(data.addOns))
+            }
+            
+            // Add image file if provided
+            if (imageFile) {
+                formData.append('image', imageFile)
+            } else if (data.image) {
+                // If image is a URL (from editing), add it as a field
+                formData.append('image', data.image)
+            }
+
+            const response = await api.put(`/menu/menu-items/${menuItemId}`, formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data'
+                }
+            })
             return response.data.data
         } catch (error) {
             logError(error, 'updateMenuItem')
@@ -65,7 +117,7 @@ export class MenuService {
 
     static async deleteMenuItem(menuItemId: string): Promise<void> {
         try {
-            await api.delete(`/menu/items/${menuItemId}`)
+            await api.delete(`/menu/menu-items/${menuItemId}`)
         } catch (error) {
             logError(error, 'deleteMenuItem')
             throw error
@@ -74,7 +126,7 @@ export class MenuService {
 
     static async toggleMenuItemAvailability(menuItemId: string): Promise<MenuItem> {
         try {
-            const response = await api.patch(`/menu/items/${menuItemId}/toggle-availability`)
+            const response = await api.patch(`/menu/menu-items/${menuItemId}/toggle`)
             return response.data.data
         } catch (error) {
             logError(error, 'toggleMenuItemAvailability')
@@ -83,9 +135,27 @@ export class MenuService {
     }
 
     // Categories
-    static async createCategory(data: CreateCategoryData): Promise<MenuCategory> {
+    static async createCategory(data: CreateCategoryData, imageFile?: File): Promise<MenuCategory> {
         try {
-            const response = await api.post('/menu/categories', data)
+            const formData = new FormData()
+            
+            // Add text fields
+            formData.append('name', data.name)
+            if (data.description) formData.append('description', data.description)
+            
+            // Add image file if provided
+            if (imageFile) {
+                formData.append('image', imageFile)
+            } else if (data.image) {
+                // If image is a URL (from editing), add it as a field
+                formData.append('image', data.image)
+            }
+
+            const response = await api.post('/menu/categories', formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data'
+                }
+            })
             return response.data.data
         } catch (error) {
             logError(error, 'createCategory')
@@ -96,7 +166,6 @@ export class MenuService {
     static async getCategories(): Promise<MenuCategory[]> {
         try {
             const response = await api.get('/menu/categories')
-            console.log("first: ", response)
             return response.data.data
         } catch (error) {
             logError(error, 'getCategories')
@@ -104,9 +173,27 @@ export class MenuService {
         }
     }
 
-    static async updateCategory(categoryId: string, data: Partial<CreateCategoryData>): Promise<MenuCategory> {
+    static async updateCategory(categoryId: string, data: Partial<CreateCategoryData>, imageFile?: File): Promise<MenuCategory> {
         try {
-            const response = await api.put(`/menu/categories/${categoryId}`, data)
+            const formData = new FormData()
+            
+            // Add text fields
+            if (data.name) formData.append('name', data.name)
+            if (data.description !== undefined) formData.append('description', data.description)
+            
+            // Add image file if provided
+            if (imageFile) {
+                formData.append('image', imageFile)
+            } else if (data.image) {
+                // If image is a URL (from editing), add it as a field
+                formData.append('image', data.image)
+            }
+
+            const response = await api.put(`/menu/categories/${categoryId}`, formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data'
+                }
+            })
             return response.data.data
         } catch (error) {
             logError(error, 'updateCategory')
