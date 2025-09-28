@@ -1,9 +1,10 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { DefaultTheme, DarkTheme, NavigationContainer, Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { linking } from './Linking';
 import { useAuthStore } from '../stores/auth';
+import { useLocationStore, useIsLocationReady } from '../stores/location';
 import LoginScreen from '../screens/auth/LoginScreen';
 import HomeScreen from '../screens/home/HomeScreen';
 import OrdersScreen from '../screens/order/OrdersScreen';
@@ -31,10 +32,7 @@ import ChangePasswordScreen from '../screens/profile/ChangePassword';
 import SupportScreen from '../screens/profile/SupportScreen';
 import LegalScreen from '../screens/profile/LegalScreen';
 import { useThemeStore } from '../stores/theme';
-import * as Notifications from 'expo-notifications';
-import { useNavigation } from '@react-navigation/native';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useQueryClient } from '@tanstack/react-query';
+import LocationPermissionScreen from '../screens/auth/LocationPermissionScreen';
 import notificationService from '../services/notificationService';
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
@@ -147,16 +145,77 @@ function LoadingScreen() {
 
 export default function RootNavigator() {
 	const { isAuthenticated, isLoading, hydrated, hydrate } = useAuthStore();
+	const { checkLocationStatus, isLocationEnabled, isLocationPermissionGranted, currentLocation } = useLocationStore();
 	const appTheme = useTheme();
 	const navigationRef = useRef<any>(null);
+	
+	// 🚀 NEW: State to track location checking
+	const [isCheckingLocation, setIsCheckingLocation] = useState(true);
+	const [locationCheckTimeout, setLocationCheckTimeout] = useState(false);
 
 	useEffect(() => { 
 		void hydrate();
 	}, [hydrate]);
 
-	// 🚀 FIXED: Set navigation reference immediately when component mounts
+	// 🚀 ENHANCED: Background location check with timeout
 	useEffect(() => {
-		notificationService.setNavigationRef(navigationRef);
+		if (isAuthenticated && hydrated) {
+			checkLocationInBackground();
+		}
+	}, [isAuthenticated, hydrated]);
+
+	// 🚀 NEW: Background location check with timeout
+	const checkLocationInBackground = async () => {
+		try {
+			setIsCheckingLocation(true);
+			setLocationCheckTimeout(false);
+			
+			console.log('📍 Checking location in background...');
+			
+			// Check location status
+			await checkLocationStatus();
+			
+			// Set a timeout to show permission screen if location takes too long
+			const timeoutId = setTimeout(() => {
+				console.log('📍 Location check timeout, showing permission screen');
+				setLocationCheckTimeout(true);
+				setIsCheckingLocation(false);
+			}, 3000); // 3 second timeout
+			
+			// Clear timeout if location is ready quickly
+			const checkLocationReady = () => {
+				const { isLocationEnabled, isLocationPermissionGranted, currentLocation } = useLocationStore.getState();
+				if (isLocationEnabled && isLocationPermissionGranted && currentLocation) {
+					console.log('📍 Location ready quickly, clearing timeout');
+					clearTimeout(timeoutId);
+					setIsCheckingLocation(false);
+					setLocationCheckTimeout(false);
+				}
+			};
+			
+			// Check immediately and then every 500ms for 3 seconds
+			checkLocationReady();
+			const intervalId = setInterval(() => {
+				checkLocationReady();
+			}, 500);
+			
+			// Clean up interval after 3 seconds
+			setTimeout(() => {
+				clearInterval(intervalId);
+			}, 3000);
+			
+		} catch (error) {
+			console.error('❌ Background location check failed:', error);
+			setIsCheckingLocation(false);
+			setLocationCheckTimeout(true);
+		}
+	};
+
+	// 🚀 NEW: Set navigation reference for notifications
+	useEffect(() => {
+		if (navigationRef.current) {
+			notificationService.setNavigationRef(navigationRef);
+		}
 	}, []);
 
 	// Wait for auth to be hydrated
@@ -168,16 +227,19 @@ export default function RootNavigator() {
 		? { ...DarkTheme, colors: { ...DarkTheme.colors, background: appTheme.colors.background, card: appTheme.colors.surface, text: appTheme.colors.text, border: appTheme.colors.border, primary: appTheme.colors.primary } }
 		: { ...DefaultTheme, colors: { ...DefaultTheme.colors, background: appTheme.colors.background, card: appTheme.colors.surface, text: appTheme.colors.text, border: appTheme.colors.border, primary: appTheme.colors.primary } };
 
+	// 🚀 ENHANCED: Show loading while checking location, then decide
+	const shouldShowLocationPermission = isAuthenticated && 
+		(isCheckingLocation ? false : (!isLocationEnabled || !isLocationPermissionGranted || !currentLocation || locationCheckTimeout));
+
 	return (
-		<NavigationContainer 
-			linking={linking} 
-			theme={navTheme}
-			ref={navigationRef} // 🚀 NEW: Add ref to NavigationContainer
-		>
-			{/* Remove <NotificationHandler /> */}
+		<NavigationContainer linking={linking} theme={navTheme} ref={navigationRef}>
 			<RootStack.Navigator screenOptions={{ headerShown: false }}>
 				{isAuthenticated ? (
-					<RootStack.Screen name="AppTabs" component={AppTabs} />
+					shouldShowLocationPermission ? (
+						<RootStack.Screen name="LocationPermission" component={LocationPermissionScreen} />
+					) : (
+						<RootStack.Screen name="AppTabs" component={AppTabs} />
+					)
 				) : (
 					<RootStack.Screen name="AuthStack" component={AuthStackNavigator} />
 				)}
