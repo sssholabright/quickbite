@@ -145,13 +145,19 @@ function LoadingScreen() {
 
 export default function RootNavigator() {
 	const { isAuthenticated, isLoading, hydrated, hydrate } = useAuthStore();
-	const { checkLocationStatus, isLocationEnabled, isLocationPermissionGranted, currentLocation } = useLocationStore();
+	const { 
+		checkLocationStatus, 
+		isLocationEnabled, 
+		isLocationPermissionGranted, 
+		currentLocation
+	} = useLocationStore();
 	const appTheme = useTheme();
 	const navigationRef = useRef<any>(null);
 	
 	// 🚀 NEW: State to track location checking
 	const [isCheckingLocation, setIsCheckingLocation] = useState(true);
 	const [locationCheckTimeout, setLocationCheckTimeout] = useState(false);
+	const [hasNavigatedToApp, setHasNavigatedToApp] = useState(false);
 
 	useEffect(() => { 
 		void hydrate();
@@ -164,11 +170,25 @@ export default function RootNavigator() {
 		}
 	}, [isAuthenticated, hydrated]);
 
+	// 🚀 ENHANCED: Auto-navigate when location becomes ready (using individual states)
+	useEffect(() => {
+		const isLocationReady = isLocationEnabled && isLocationPermissionGranted && currentLocation;
+		
+		if (isAuthenticated && hydrated && isLocationReady && !hasNavigatedToApp) {
+			console.log('📍 Location ready, auto-navigating to app...');
+			console.log('📍 Location states:', { isLocationEnabled, isLocationPermissionGranted, currentLocation });
+			setHasNavigatedToApp(true);
+			setIsCheckingLocation(false);
+			setLocationCheckTimeout(false);
+		}
+	}, [isAuthenticated, hydrated, isLocationEnabled, isLocationPermissionGranted, currentLocation, hasNavigatedToApp]);
+
 	// 🚀 NEW: Background location check with timeout
 	const checkLocationInBackground = async () => {
 		try {
 			setIsCheckingLocation(true);
 			setLocationCheckTimeout(false);
+			setHasNavigatedToApp(false);
 			
 			console.log('📍 Checking location in background...');
 			

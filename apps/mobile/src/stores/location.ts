@@ -95,21 +95,41 @@ export const useLocationStore = create<LocationState>((set, get) => ({
         }
     },
 
+    // Update requestLocationPermission to also check and update location services status
     requestLocationPermission: async () => {
         try {
             set({ isLoading: true, error: null });
             
+            // 🚀 ENHANCED: Use the same approach as CheckoutScreen
             const { status } = await Location.requestForegroundPermissionsAsync();
             const isLocationPermissionGranted = status === 'granted';
             
+            // 🚀 NEW: Also check location services status after permission request
+            const isLocationEnabled = await Location.hasServicesEnabledAsync();
+            
             set({
+                isLocationEnabled,
                 isLocationPermissionGranted,
                 isLoading: false,
             });
             
-            if (isLocationPermissionGranted) {
+            if (isLocationPermissionGranted && isLocationEnabled) {
                 // Get current location after permission granted
-                await get().updateLocation(false);
+                try {
+                    const location = await Location.getCurrentPositionAsync({
+                        accuracy: Location.Accuracy.Balanced,
+                    });
+                    
+                    const { latitude, longitude } = location.coords;
+                    set({
+                        currentLocation: { latitude, longitude },
+                    });
+                    
+                    console.log('📍 Location obtained after permission:', { latitude, longitude });
+                } catch (error) {
+                    console.log('📍 Failed to get location after permission:', error);
+                    // Don't set error, just log it
+                }
             }
             
             return isLocationPermissionGranted;

@@ -1,254 +1,216 @@
-import React, { useEffect, useState } from 'react';
-import { Alert, Linking, Platform, Pressable, Text, View } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import * as Location from 'expo-location';
-import { useTheme } from '../../theme/theme';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, Alert, Linking } from 'react-native';
 import { SafeAreaWrapper } from '../../ui/SafeAreaWrapper';
 import { Icon } from '../../ui/Icon';
-import { CTAButton } from '../../ui/CTAButton';
-import { RootStackParamList } from '../../navigation/types';
+import { useTheme } from '../../theme/theme';
 import { useLocationStore } from '../../stores/location';
-
-type LocationPermissionNavigationProp = NativeStackNavigationProp<RootStackParamList, 'LocationPermission'>;
+import * as Location from 'expo-location';
+import { CTAButton } from '../../ui/CTAButton';
 
 export default function LocationPermissionScreen() {
     const theme = useTheme();
-    const navigation = useNavigation<LocationPermissionNavigationProp>();
     const { 
         isLocationEnabled, 
         isLocationPermissionGranted, 
-        checkLocationStatus,
+        currentLocation,
         requestLocationPermission,
-        isLocationReady
+        checkLocationStatus,
+        isLoading 
     } = useLocationStore();
     
-    const [locationStatus, setLocationStatus] = useState<'checking' | 'granted' | 'denied' | 'updating'>('checking');
+    const [isRequesting, setIsRequesting] = useState(false);
 
-    // Update the useEffect to auto-request permission immediately
+    // Check location status when component mounts
     useEffect(() => {
-        // Auto-request permission immediately when screen loads
-        handleRequestPermission();
-    }, []);
-
-    // Monitor location readiness and show granted state
-    useEffect(() => {
-        if (isLocationReady) {
-            setLocationStatus('granted');
-        }
-    }, [isLocationReady]);
+        checkLocationStatus();
+    }, [checkLocationStatus]);
 
     const handleRequestPermission = async () => {
         try {
-            setLocationStatus('checking');
+            setIsRequesting(true);
             
-            const granted = await requestLocationPermission();
+            console.log('📍 Requesting location permission...');
             
-            if (granted) {
-                setLocationStatus('updating');
-                // Location will be updated automatically in the store
-            } else {
-                setLocationStatus('denied');
+            // 🚀 ENHANCED: Use the same approach as CheckoutScreen
+            const { status } = await Location.requestForegroundPermissionsAsync();
+            
+            console.log('📍 Permission status:', status);
+            
+            if (status !== 'granted') {
+                Alert.alert(
+                    'Permission Required',
+                    'Location permission is required for delivery. Please enable location access in your device settings.',
+                    [
+                        {
+                            text: 'Cancel',
+                            style: 'cancel',
+                        },
+                        {
+                            text: 'Open Settings',
+                            onPress: () => Linking.openSettings(),
+                        },
+                    ]
+                );
+                return;
             }
+
+            console.log('📍 Permission granted, checking location services...');
+            
+            // 🚀 NEW: Refresh location status after permission granted
+            await checkLocationStatus();
+
+            console.log('📍 Getting current location...');
+            
+            // Get current location after permission granted
+            const location = await Location.getCurrentPositionAsync({
+                accuracy: Location.Accuracy.Balanced,
+            });
+            
+            const { latitude, longitude } = location.coords;
+            
+            console.log('📍 Location obtained:', { latitude, longitude });
+            
+            // Update location in store
+            useLocationStore.getState().setCurrentLocation(latitude, longitude);
+            
+            console.log('📍 Location stored, checking store state...');
+            
+            // Check final state
+            const finalState = useLocationStore.getState();
+            console.log('📍 Final location state:', {
+                isLocationEnabled: finalState.isLocationEnabled,
+                isLocationPermissionGranted: finalState.isLocationPermissionGranted,
+                currentLocation: finalState.currentLocation,
+                isLocationReady: finalState.isLocationReady
+            });
+            
         } catch (error) {
             console.error('Error requesting location permission:', error);
-            setLocationStatus('denied');
-        }
-    };
-
-    const openLocationSettings = () => {
-        if (Platform.OS === 'ios') {
-            Linking.openURL('app-settings:');
-        } else {
-            Linking.openSettings();
-        }
-    };
-
-    const renderContent = () => {
-        switch (locationStatus) {
-            case 'checking':
-                return (
-                    <View style={{ alignItems: 'center' }}>
-                        <View style={{
-                            width: 80,
-                            height: 80,
-                            borderRadius: 40,
-                            backgroundColor: theme.colors.surface,
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            marginBottom: 24,
-                            borderWidth: 2,
-                            borderColor: theme.colors.border
-                        }}>
-                            <Icon name="location" size={32} color={theme.colors.primary} />
-                        </View>
-                        <Text style={{
-                            fontSize: 18,
-                            fontWeight: '600',
-                            color: theme.colors.text,
-                            marginBottom: 8,
-                            textAlign: 'center'
-                        }}>
-                            Requesting Location Access...
-                        </Text>
-                        <Text style={{
-                            fontSize: 14,
-                            color: theme.colors.muted,
-                            textAlign: 'center',
-                            lineHeight: 20
-                        }}>
-                            Please allow location access to continue
-                        </Text>
-                    </View>
-                );
-
-            case 'updating':
-                return (
-                    <View style={{ alignItems: 'center' }}>
-                        <View style={{
-                            width: 80,
-                            height: 80,
-                            borderRadius: 40,
-                            backgroundColor: theme.colors.surface,
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            marginBottom: 24,
-                            borderWidth: 2,
-                            borderColor: theme.colors.border
-                        }}>
-                            <Icon name="location" size={32} color={theme.colors.primary} />
-                        </View>
-                        <Text style={{
-                            fontSize: 18,
-                            fontWeight: '600',
-                            color: theme.colors.text,
-                            marginBottom: 8,
-                            textAlign: 'center'
-                        }}>
-                            Getting Your Location...
-                        </Text>
-                        <Text style={{
-                            fontSize: 14,
-                            color: theme.colors.muted,
-                            textAlign: 'center',
-                            lineHeight: 20
-                        }}>
-                            Finding your current location
-                        </Text>
-                    </View>
-                );
-
-            case 'granted':
-                return (
-                    <View style={{ alignItems: 'center' }}>
-                        <View style={{
-                            width: 80,
-                            height: 80,
-                            borderRadius: 40,
-                            backgroundColor: '#10b981' + '15',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            marginBottom: 24,
-                            borderWidth: 2,
-                            borderColor: '#10b981'
-                        }}>
-                            <Icon name="checkmark-circle" size={32} color="#10b981" />
-                        </View>
-                        <Text style={{
-                            fontSize: 18,
-                            fontWeight: '600',
-                            color: theme.colors.text,
-                            marginBottom: 8,
-                            textAlign: 'center'
-                        }}>
-                            Location Enabled!
-                        </Text>
-                        <Text style={{
-                            fontSize: 14,
-                            color: theme.colors.muted,
-                            textAlign: 'center',
-                            lineHeight: 20
-                        }}>
-                            Redirecting to the app...
-                        </Text>
-                    </View>
-                );
-
-            case 'denied':
-                return (
-                    <View style={{ alignItems: 'center' }}>
-                        <View style={{
-                            width: 80,
-                            height: 80,
-                            borderRadius: 40,
-                            backgroundColor: '#ef4444' + '15',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            marginBottom: 24,
-                            borderWidth: 2,
-                            borderColor: '#ef4444'
-                        }}>
-                            <Icon name="location-off" size={32} color="#ef4444" />
-                        </View>
-                        <Text style={{
-                            fontSize: 18,
-                            fontWeight: '600',
-                            color: theme.colors.text,
-                            marginBottom: 8,
-                            textAlign: 'center'
-                        }}>
-                            Location Required
-                        </Text>
-                        <Text style={{
-                            fontSize: 14,
-                            color: theme.colors.muted,
-                            textAlign: 'center',
-                            lineHeight: 20,
-                            marginBottom: 24
-                        }}>
-                            Location access is required to use QuickBite. Please enable location services and allow access.
-                        </Text>
-                        
-                        <View style={{ width: '100%', gap: 12 }}>
-                            <CTAButton
-                                title="Enable Location Access"
-                                onPress={handleRequestPermission}
-                            />
-                            
-                            <Pressable
-                                onPress={openLocationSettings}
-                                style={{
-                                    paddingVertical: 12,
-                                    borderRadius: 12,
-                                    backgroundColor: theme.colors.background,
-                                    borderWidth: 1,
-                                    borderColor: theme.colors.border,
-                                    alignItems: 'center'
-                                }}
-                            >
-                                <Text style={{ color: theme.colors.text, fontWeight: '600' }}>
-                                    Open Settings
-                                </Text>
-                            </Pressable>
-                        </View>
-                    </View>
-                );
-
-            default:
-                return null;
+            Alert.alert(
+                'Location Error',
+                'Could not get your current location. Please check your location settings and try again.',
+                [{ text: 'OK' }]
+            );
+        } finally {
+            setIsRequesting(false);
         }
     };
 
     return (
-        <SafeAreaWrapper>
-            <View style={{ 
-                flex: 1, 
-                backgroundColor: theme.colors.background,
-                justifyContent: 'center',
-                paddingHorizontal: 24
-            }}>
-                {renderContent()}
+        <SafeAreaWrapper edges={["top", "bottom"]}>
+            <View style={styles.container}>
+                <View style={styles.content}>
+                    <View style={styles.iconContainer}>
+                        <Icon 
+                            name="location" 
+                            size={80} 
+                            color={theme.colors.primary} 
+                        />
+                    </View>
+                    
+                    <Text style={[styles.title, { color: theme.colors.text }]}>
+                        Location Access Required
+                    </Text>
+                    
+                    <Text style={[styles.description, { color: theme.colors.muted }]}>
+                        We need access to your location to provide accurate delivery services and show you nearby restaurants.
+                    </Text>
+                    
+                    <View style={styles.statusContainer}>
+                        <View style={styles.statusItem}>
+                            <Icon 
+                                name={isLocationEnabled ? "checkmark-circle" : "close-circle"} 
+                                size={20} 
+                                color={isLocationEnabled ? theme.colors.primary : theme.colors.danger} 
+                            />
+                            <Text style={[styles.statusText, { color: theme.colors.text }]}>
+                                Location Services: {isLocationEnabled ? 'Enabled' : 'Disabled'}
+                            </Text>
+                        </View>
+                        
+                        <View style={styles.statusItem}>
+                            <Icon 
+                                name={isLocationPermissionGranted ? "checkmark-circle" : "close-circle"} 
+                                size={20} 
+                                color={isLocationPermissionGranted ? theme.colors.primary : theme.colors.danger} 
+                            />
+                            <Text style={[styles.statusText, { color: theme.colors.text }]}>
+                                App Permission: {isLocationPermissionGranted ? 'Granted' : 'Denied'}
+                            </Text>
+                        </View>
+                        
+                        {currentLocation && (
+                            <View style={styles.statusItem}>
+                                <Icon 
+                                    name="checkmark-circle" 
+                                    size={20} 
+                                    color={theme.colors.primary} 
+                                />
+                                <Text style={[styles.statusText, { color: theme.colors.text }]}>
+                                    Current Location: Available
+                                </Text>
+                            </View>
+                        )}
+                    </View>
+                </View>
+                
+                <View style={styles.buttonContainer}>
+                    <CTAButton
+                        title={isRequesting ? "Requesting Permission..." : "Allow Location Access"}
+                        onPress={handleRequestPermission}
+                        disabled={isRequesting || isLoading}
+                        style={styles.primaryButton}
+                    />
+                </View>
             </View>
         </SafeAreaWrapper>
     );
 }
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        paddingHorizontal: 24,
+        paddingVertical: 32,
+    },
+    content: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    iconContainer: {
+        marginBottom: 32,
+    },
+    title: {
+        fontSize: 24,
+        fontWeight: '700',
+        textAlign: 'center',
+        marginBottom: 16,
+    },
+    description: {
+        fontSize: 16,
+        textAlign: 'center',
+        lineHeight: 24,
+        marginBottom: 32,
+    },
+    statusContainer: {
+        width: '100%',
+        marginBottom: 32,
+    },
+    statusItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 12,
+        paddingHorizontal: 16,
+    },
+    statusText: {
+        fontSize: 16,
+        marginLeft: 12,
+    },
+    buttonContainer: {
+        gap: 16,
+    },
+    primaryButton: {
+        marginBottom: 8,
+    },
+});
