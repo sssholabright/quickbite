@@ -1,17 +1,21 @@
 import { logger } from '../utils/logger.js';
 import { prisma } from '../config/db.js';
 import { env } from '../config/env.js';
-import path from 'path';
-import fs from 'fs';
-import admin, { ServiceAccount } from 'firebase-admin';
+import admin from 'firebase-admin';
 
-// Use fs.readFileSync with JSON.parse for ES modules
-const serviceAccount = JSON.parse(
-    fs.readFileSync(
-        path.resolve(process.cwd(), 'quickbite-33132-e91e6ba9ddf0.json'),
-        'utf-8'
-    )
-);
+// Instead of reading from file, use environment variables
+const serviceAccount = {
+    type: "service_account",
+    project_id: env.FCM_PROJECT_ID,
+    private_key_id: env.FCM_PRIVATE_KEY_ID,
+    private_key: env.FCM_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+    client_email: env.FCM_CLIENT_EMAIL,
+    client_id: env.FCM_CLIENT_ID,
+    auth_uri: "https://accounts.google.com/o/oauth2/auth",
+    token_uri: "https://oauth2.googleapis.com/token",
+    auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs",
+    client_x509_cert_url: `https://www.googleapis.com/robot/v1/metadata/x509/${env.FCM_CLIENT_EMAIL}`
+};
 
 interface FCMMessage {
     title: string;
@@ -54,7 +58,7 @@ export class FCMService {
             if (admin.apps.length === 0) {
                 logger.info(`🚀 Initializing Firebase app...`);
                 admin.initializeApp({
-                    credential: admin.credential.cert(serviceAccount),
+                    credential: admin.credential.cert(serviceAccount as admin.ServiceAccount),
                     projectId: env.FCM_PROJECT_ID
                 });
                 logger.info(`✅ Firebase app initialized`);
@@ -104,6 +108,74 @@ export class FCMService {
     }
 
     /**
+     * Send notification to specific customer - supports both FCM and Expo tokens
+     */
+    static async sendToCustomer(customerId: string, message: FCMMessage, options?: FCMSendOptions): Promise<boolean> {
+        try {
+            const customer = await prisma.customer.findUnique({
+                where: { id: customerId },
+                select: { pushToken: true, user: { select: { name: true } } }
+            });
+
+            if (!customer || !customer.pushToken) {
+                logger.warn(`No push token found for customer: ${customerId}`);
+                return false;
+            }
+
+            logger.info(`Push token for customer ${customerId}: ${customer.pushToken.substring(0, 20)}...`);
+            logger.info(`Push token length: ${customer.pushToken.length}`);
+            logger.info(`Push token starts with ExponentPushToken: ${customer.pushToken.startsWith('ExponentPushToken[')}`);
+
+            // Check token type and route accordingly
+            if (customer.pushToken.startsWith('ExponentPushToken[')) {
+                logger.info(`📱 Using Expo Push API for customer ${customerId}`);
+                return await this.sendExpoNotification(customer.pushToken, message, options);
+            } else {
+                logger.info(`🔥 Using FCM for customer ${customerId}`);
+                return await this.sendFCMNotification(customer.pushToken, message, options);
+            }
+
+        } catch (error) {
+            logger.error({ error, customerId }, 'Error sending notification to customer');
+            return false;
+        }
+    }
+
+    /**
+     * Send notification to specific vendor - supports Expo tokens only
+     */
+    static async sendToVendor(vendorId: string, message: FCMMessage, options?: FCMSendOptions): Promise<boolean> {
+        try {
+            const vendor = await prisma.vendor.findUnique({
+                where: { id: vendorId },
+                select: { pushToken: true, user: { select: { name: true } } }
+            });
+
+            if (!vendor || !vendor.pushToken) {
+                logger.warn(`No push token found for vendor: ${vendorId}`);
+                return false;
+            }
+
+            logger.info(`Push token for vendor ${vendorId}: ${vendor.pushToken.substring(0, 20)}...`);
+            logger.info(`Push token length: ${vendor.pushToken.length}`);
+
+            // 🚀 FIX: Only handle Expo tokens, skip everything else
+            if (vendor.pushToken.startsWith('ExponentPushToken[')) {
+                logger.info(`📱 Using Expo Push API for vendor ${vendorId}`);
+                return await this.sendExpoNotification(vendor.pushToken, message, options);
+            } else {
+                logger.info(`🌐 Non-Expo token detected for vendor ${vendorId} - skipping notification`);
+                logger.warn(`Only Expo push notifications are supported for vendor ${vendorId}`);
+                return false; // Skip non-Expo tokens
+            }
+
+        } catch (error) {
+            logger.error({ error, vendorId }, 'Error sending notification to vendor');
+            return false;
+        }
+    }
+
+    /**
      * Send notification via Expo Push API
      */
     private static async sendExpoNotification(token: string, message: FCMMessage, options?: FCMSendOptions): Promise<boolean> {
@@ -119,7 +191,9 @@ export class FCMService {
                 },
                 sound: 'default',
                 badge: 1,
-                priority: 'high'
+                priority: 'high',
+                channelId: 'order-updates', // 🚀 NEW: Use high-priority channel
+                projectId: env.FCM_PROJECT_ID
             };
 
             logger.info(`📱 Sending Expo push to: ${token.substring(0, 20)}...`);
@@ -171,6 +245,15 @@ export class FCMService {
                 return false;
             }
 
+            // 🚀 ENHANCED: Better token validation
+            logger.info(`🔥 Attempting FCM send to token: ${token.substring(0, 20)}...`);
+            
+            // Double-check this isn't an Expo token
+            if (token.startsWith('ExponentPushToken[')) {
+                logger.error(`❌ FCM received Expo token: ${token.substring(0, 20)}...`);
+                return false;
+            }
+
             const payload = {
                 token: token,
                 notification: {
@@ -211,7 +294,7 @@ export class FCMService {
             return true;
 
         } catch (error) {
-            logger.error({ error }, 'Error sending FCM notification');
+            logger.error({ error, token: token.substring(0, 20) }, 'Error sending FCM notification');
             return false;
         }
     }
@@ -222,6 +305,34 @@ export class FCMService {
     static async sendToMultipleRiders(riderIds: string[], message: FCMMessage, options?: FCMSendOptions): Promise<{ success: number; failed: number }> {
         const results = await Promise.allSettled(
             riderIds.map(riderId => this.sendToRider(riderId, message, options))
+        );
+
+        const success = results.filter(r => r.status === 'fulfilled' && r.value).length;
+        const failed = results.length - success;
+
+        return { success, failed };
+    }
+
+    /**
+     * Send notification to multiple customers
+     */
+    static async sendToMultipleCustomers(customerIds: string[], message: FCMMessage, options?: FCMSendOptions): Promise<{ success: number; failed: number }> {
+        const results = await Promise.allSettled(
+            customerIds.map(customerId => this.sendToCustomer(customerId, message, options))
+        );
+
+        const success = results.filter(r => r.status === 'fulfilled' && r.value).length;
+        const failed = results.length - success;
+
+        return { success, failed };
+    }
+
+    /**
+     * Send notification to multiple vendors
+     */
+    static async sendToMultipleVendors(vendorIds: string[], message: FCMMessage, options?: FCMSendOptions): Promise<{ success: number; failed: number }> {
+        const results = await Promise.allSettled(
+            vendorIds.map(vendorId => this.sendToVendor(vendorId, message, options))
         );
 
         const success = results.filter(r => r.status === 'fulfilled' && r.value).length;
@@ -307,14 +418,20 @@ export class FCMService {
                     return await this.sendToRider(order.riderId, message, options);
 
                 case 'CUSTOMER':
-                    // You'll need to implement customer push token storage
-                    logger.warn('Customer push notifications not implemented yet');
-                    return false;
+                    // 🚀 FIXED: Now supports customer push notifications
+                    if (!order.customerId) {
+                        logger.warn(`No customer assigned to order: ${orderId}`);
+                        return false;
+                    }
+                    return await this.sendToCustomer(order.customerId, message, options);
 
                 case 'VENDOR':
-                    // You'll need to implement vendor push token storage
-                    logger.warn('Vendor push notifications not implemented yet');
-                    return false;
+                    // 🚀 FIXED: Now supports vendor push notifications
+                    if (!order.vendorId) {
+                        logger.warn(`No vendor assigned to order: ${orderId}`);
+                        return false;
+                    }
+                    return await this.sendToVendor(order.vendorId, message, options);
 
                 default:
                     logger.warn(`Invalid target role: ${targetRole}`);

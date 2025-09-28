@@ -1,4 +1,4 @@
-import { FlatList, Pressable, ScrollView, Text, View } from 'react-native'
+import { Button, FlatList, Pressable, ScrollView, Text, View } from 'react-native'
 import { useTheme } from '../../theme/theme'
 import { SearchBar } from '../../ui/SearchBar'
 import { useMemo, useState } from 'react';
@@ -14,11 +14,14 @@ import { useVendors } from '../../hooks/useMenu'
 import { useNavigation } from '@react-navigation/native'
 import { useCartStore } from '../../stores/cart'
 import { SafeAreaWrapper } from '../../ui/SafeAreaWrapper'
+import { useCustomerStore } from '../../stores/customer';
+import notificationService from '../../services/notificationService';
 
 export default function HomeScreen() {
 	const [searchQuery, setSearchQuery] = useState("");
 	const [selectedCategory, setSelectedCategory] = useState("all");
 	const [showCart, setShowCart] = useState(false);
+	const { sendTestNotification, debugNotifications } = useCustomerStore()
 	
 	const theme = useTheme()
 	const navigation = useNavigation<any>()
@@ -147,6 +150,9 @@ export default function HomeScreen() {
 						</ScrollView>
 					</View>
 
+					<Button title="Send Test Notification" onPress={sendTestNotification} />
+					<Button title="Debug Notifications" onPress={debugNotifications} />
+					<Button title="Test Push Notification" onPress={() => notificationService.testExpoPushNotification()} />
 					{/* Promo Banner */}
 					{/* <PromoBanner
 						title="Get 20% off rice bowls today!"

@@ -44,8 +44,11 @@ const envSchema = z.object({
     SOCKET_CORS_ORIGINS: z.string().optional(),
 
     // 🚀 NEW: FCM configuration
-    FCM_PROJECT_ID: z.string().optional(),
-    FCM_SERVER_KEY: z.string().optional()
+    FCM_PROJECT_ID: z.string().default('quickbite-33132'),
+    FCM_PRIVATE_KEY_ID: z.string().optional(),
+    FCM_PRIVATE_KEY: z.string().optional(),
+    FCM_CLIENT_EMAIL: z.string().optional(),
+    FCM_CLIENT_ID: z.string().optional(),
 });
 
 // Validate and export environment variables

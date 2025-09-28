@@ -7,19 +7,22 @@ import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuthStore } from './src/stores/auth';
 import { useSocket } from './src/hooks/useSocket';
+import { useCustomerStore } from './src/stores/customer';
 
 const queryClient = new QueryClient();
 
 function AppContent() {
-  const { hydrate: hydrateAuth } = useAuthStore();
+  const { hydrate } = useAuthStore();
+  const { initializeNotifications } = useCustomerStore();
   
   // Initialize socket at app level - persists across navigation
   useSocket();
 
   useEffect(() => {
-    // Only hydrate auth store, theme store handles its own hydration
-    hydrateAuth();
-  }, [hydrateAuth]);
+    // Hydrate auth store and initialize notifications
+    hydrate();
+    initializeNotifications();
+  }, [hydrate, initializeNotifications]);
 
   return (
     <>

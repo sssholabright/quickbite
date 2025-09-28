@@ -5,6 +5,7 @@ import { logger } from '../../utils/logger.js';
 import { CustomError } from '../../middlewares/errorHandler.js';
 import { OrderFilters } from '../../types/order.js';
 import { prisma } from '../../config/db.js';
+import { FCMService } from '../../services/fcm.service.js';
 
 export class OrderController {
     // Create new order
@@ -84,15 +85,15 @@ export class OrderController {
             const socketManager = getSocketManager();
 
             const { orderId } = req.params;
-            const userId = (req.user as any).userId as string; // Change from 'id' to 'userId'
+            const userId = (req.user as any).userId as string;
             const userRole = (req.user as any).role as string;
             const validatedData = updateOrderStatusSchema.parse(req.body);
 
             const order = await OrderService.updateOrderStatus(orderId!, validatedData, userId, userRole);
 
-            // Emit socket events
-            // 🚀 FIXED: Only emit socket events for important status changes
+            // 🚀 ENHANCED: Send push notifications for important status changes
             const importantStatuses = ['ASSIGNED', 'PICKED_UP', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED'];
+            const notificationStatuses = ['CONFIRMED', 'PREPARING', 'READY_FOR_PICKUP', 'ASSIGNED', 'PICKED_UP', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED'];
 
             if (importantStatuses.includes(validatedData.status)) {
                 // Emit socket events only for important status changes
@@ -119,7 +120,9 @@ export class OrderController {
                 });
             }
 
-                // Emit notification based on status change
+            // 🚀 NEW: Send push notifications for notification-worthy status changes
+            if (notificationStatuses.includes(validatedData.status)) {
+                // Prepare notification content
                 let notificationTitle = '';
                 let notificationMessage = '';
                 let priority: 'low' | 'normal' | 'high' | 'urgent' = 'normal';
@@ -140,9 +143,14 @@ export class OrderController {
                         notificationMessage = `Order #${order.orderNumber} is ready for pickup`;
                         priority = 'high';
                         break;
+                    case 'ASSIGNED':
+                        notificationTitle = 'Rider Assigned';
+                        notificationMessage = `A rider has been assigned to your order #${order.orderNumber}`;
+                        priority = 'high';
+                        break;
                     case 'PICKED_UP':
                         notificationTitle = 'Order Picked Up';
-                        notificationMessage = `Order #${order.orderNumber} has been picked up`;
+                        notificationMessage = `Order #${order.orderNumber} has been picked up and is on the way`;
                         priority = 'high';
                         break;
                     case 'OUT_FOR_DELIVERY':
@@ -152,7 +160,7 @@ export class OrderController {
                         break;
                     case 'DELIVERED':
                         notificationTitle = 'Order Delivered';
-                        notificationMessage = `Order #${order.orderNumber} has been delivered`;
+                        notificationMessage = `Order #${order.orderNumber} has been delivered successfully`;
                         priority = 'high';
                         break;
                     case 'CANCELLED':
@@ -165,8 +173,63 @@ export class OrderController {
                         notificationMessage = `Order #${order.orderNumber} status changed to ${validatedData.status}`;
                         priority = 'normal';
                 }
-                
-                // Notify customer
+
+                // 🚀 NEW: Send push notifications to customer
+                if (order.customer) {
+                    try {
+                        await FCMService.sendOrderNotification(orderId!, {
+                            title: notificationTitle,
+                            body: notificationMessage,
+                            data: { 
+                                orderId: order.id, 
+                                status: validatedData.status,
+                                type: 'order_status_update'
+                            }
+                        }, 'CUSTOMER');
+                        
+                        logger.info(`Push notification sent to customer for order ${orderId}`);
+                    } catch (error) {
+                        logger.error({ error, orderId, customerId: order.customer.id }, 'Failed to send push notification to customer');
+                    }
+                }
+
+                // 🚀 NEW: Send push notifications to vendor
+                try {
+                    await FCMService.sendOrderNotification(orderId!, {
+                        title: notificationTitle,
+                        body: notificationMessage,
+                        data: { 
+                            orderId: order.id, 
+                            status: validatedData.status,
+                            type: 'order_status_update'
+                        }
+                    }, 'VENDOR');
+                    
+                    logger.info(`Push notification sent to vendor for order ${orderId}`);
+                } catch (error) {
+                    logger.error({ error, orderId, vendorId: order.vendor.id }, 'Failed to send push notification to vendor');
+                }
+
+                // 🚀 NEW: Send push notifications to rider (if assigned)
+                if (order.rider) {
+                    try {
+                        await FCMService.sendOrderNotification(orderId!, {
+                            title: notificationTitle,
+                            body: notificationMessage,
+                            data: { 
+                                orderId: order.id, 
+                                status: validatedData.status,
+                                type: 'order_status_update'
+                            }
+                        }, 'RIDER');
+                        
+                        logger.info(`Push notification sent to rider for order ${orderId}`);
+                    } catch (error) {
+                        logger.error({ error, orderId, riderId: order.rider.id }, 'Failed to send push notification to rider');
+                    }
+                }
+
+                // 🚀 ENHANCED: Also send in-app notifications via socket
                 if (order.customer) {
                     socketManager.emitToCustomer(order.customer.id, 'notification_received', {
                         id: `order-status-${order.id}-${Date.now()}`,
@@ -187,17 +250,17 @@ export class OrderController {
                     title: notificationTitle,
                     message: notificationMessage,
                     priority: priority,
-                        data: { orderId: order.id, status: validatedData.status },
+                    data: { orderId: order.id, status: validatedData.status },
                     timestamp: new Date().toISOString(),
                     read: false
                 });
+            }
 
             res.json({
                 success: true,
                 message: 'Order status updated successfully',
                 data: order
             });
-            return;
         } catch (error) {
             logger.error({ error }, 'Error updating order status');
             if (error instanceof CustomError) {

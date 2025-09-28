@@ -14,6 +14,7 @@ import authRoutes from './modules/auth/auth.routes.js';
 import orderRoutes from './modules/orders/order.routes.js';
 import menuRoutes from './modules/menu/menu.routes.js';
 import riderRoutes from './modules/riders/rider.routes.js';
+import customerRoutes from './modules/customers/customer.routes.js';
 // import userRoutes from './modules/users/routes.js';
 // import vendorRoutes from './modules/vendors/routes.js';
 // import riderRoutes from './modules/riders/routes.js';
@@ -59,8 +60,6 @@ if (env.NODE_ENV === 'development') {
 app.get('/health', (req, res) => {
     res.status(200).json({
         status: 'OK',
-        fcmProjectId: env.FCM_PROJECT_ID,
-        fcmServerKey: env.FCM_SERVER_KEY,
         timestamp: new Date().toISOString(),
         uptime: process.uptime(),
         environment: env.NODE_ENV,
@@ -74,7 +73,7 @@ app.use('/api/v1/auth', authRateLimit, authRoutes);
 app.use('/api/v1/orders', orderRoutes);
 app.use('/api/v1/menu', menuRoutes);
 app.use('/api/v1/riders', riderRoutes);
-// app.use('/api/v1/users', userRoutes);
+app.use('/api/v1/customers', customerRoutes);
 // app.use('/api/v1/vendors', vendorRoutes);
 // app.use('/api/v1/payments', paymentRoutes);
 

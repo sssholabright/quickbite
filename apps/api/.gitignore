@@ -82,6 +82,9 @@ out
 .nuxt
 dist
 
+# Firebase files
+quickbite-33132-e91e6ba9ddf0.json
+
 # Gatsby files
 .cache/
 # Comment in the public line in if your project uses Gatsby and not Next.js

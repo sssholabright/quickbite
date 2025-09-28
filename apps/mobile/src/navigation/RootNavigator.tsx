@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { DefaultTheme, DarkTheme, NavigationContainer, Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -31,6 +31,11 @@ import ChangePasswordScreen from '../screens/profile/ChangePassword';
 import SupportScreen from '../screens/profile/SupportScreen';
 import LegalScreen from '../screens/profile/LegalScreen';
 import { useThemeStore } from '../stores/theme';
+import * as Notifications from 'expo-notifications';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useQueryClient } from '@tanstack/react-query';
+import notificationService from '../services/notificationService';
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
@@ -143,10 +148,16 @@ function LoadingScreen() {
 export default function RootNavigator() {
 	const { isAuthenticated, isLoading, hydrated, hydrate } = useAuthStore();
 	const appTheme = useTheme();
+	const navigationRef = useRef<any>(null);
 
 	useEffect(() => { 
 		void hydrate();
 	}, [hydrate]);
+
+	// 🚀 FIXED: Set navigation reference immediately when component mounts
+	useEffect(() => {
+		notificationService.setNavigationRef(navigationRef);
+	}, []);
 
 	// Wait for auth to be hydrated
 	if (!hydrated || isLoading) {
@@ -158,7 +169,12 @@ export default function RootNavigator() {
 		: { ...DefaultTheme, colors: { ...DefaultTheme.colors, background: appTheme.colors.background, card: appTheme.colors.surface, text: appTheme.colors.text, border: appTheme.colors.border, primary: appTheme.colors.primary } };
 
 	return (
-		<NavigationContainer linking={linking} theme={navTheme}>
+		<NavigationContainer 
+			linking={linking} 
+			theme={navTheme}
+			ref={navigationRef} // 🚀 NEW: Add ref to NavigationContainer
+		>
+			{/* Remove <NotificationHandler /> */}
 			<RootStack.Navigator screenOptions={{ headerShown: false }}>
 				{isAuthenticated ? (
 					<RootStack.Screen name="AppTabs" component={AppTabs} />
