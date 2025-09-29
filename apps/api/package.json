@@ -9,7 +9,11 @@
   "scripts": {
     "dev": "nodemon --watch src --ext ts,js --exec node --loader ts-node/esm src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js",
+    "start": "pm2 start dist/index.js --name quickbite-api",
+    "start:prod": "pm2 start ecosystem.config.js",
+    "stop": "pm2 stop quickbite-api",
+    "restart": "pm2 restart quickbite-api",
+    "logs": "pm2 logs quickbite-api",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest",
@@ -41,6 +45,7 @@
     "morgan": "^1.10.1",
     "multer": "^2.0.2",
     "pino": "^9.11.0",
+    "pm2": "^5.3.0",
     "redis": "^5.8.2",
     "socket.io": "^4.8.1",
     "zod": "^4.1.9"
