@@ -27,6 +27,7 @@ export class SocketService {
                     : [
                         'http://localhost:3000', 
                         'http://localhost:5173', 
+                        'https://quickbite-roan.vercel.app',
                         'http://192.168.0.176:5000',
                         'http://192.168.0.176:8081',
                         'http://192.168.0.176:8082',
