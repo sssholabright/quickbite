@@ -1,11 +1,6 @@
 {
   "name": "quickbite",
   "private": true,
-  "packageManager": "npm@10.0.0",
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
   "scripts": {
     "build": "cd apps/web && npm run build",
     "docker:dev": "docker-compose -f docker-compose.dev.yml up -d",
