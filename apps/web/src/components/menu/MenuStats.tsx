@@ -13,7 +13,7 @@ export default function MenuStats({ items }: MenuStatsProps) {
     
     const categoryStats = menuCategories.map(category => ({
         ...category,
-        count: items.filter(item => item.category === category.id).length
+        count: items.filter(item => item.category.id === category.id).length
     }))
 
     const averagePrice = items.length > 0 
