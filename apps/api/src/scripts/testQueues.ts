@@ -40,7 +40,7 @@ async function testQueueService() {
         };
         
         const deliveryJob = await queueService.addDeliveryJob(testDeliveryJob);
-        console.log('✅ Delivery job added:', deliveryJob.id);
+        console.log('✅ Delivery job added:', deliveryJob);
         
         // Test location update queue
         console.log('🧪 Testing location update queue...');
