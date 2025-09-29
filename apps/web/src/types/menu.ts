@@ -32,6 +32,15 @@ export interface MenuCategory {
     updatedAt: string
 }
 
+export interface MenuCategoryInfo {
+    id: string
+    name: string
+    description?: string
+    image?: string
+    icon?: string
+    color: string
+}
+
 export interface MenuFilters {
     search?: string
     categoryId?: string
