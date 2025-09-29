@@ -31,7 +31,7 @@ app.use(helmet({
 // CORS configuration
 app.use(cors({
     origin: env.NODE_ENV === 'production' 
-        ? ['https://yourdomain.com'] 
+        ? ['https://quickbite-roan.vercel.app'] 
         : [' http://localhost:3000', 'http://localhost:5173', 'https://quickbite-roan.vercel.app', 'http://192.168.0.176:8081','http://192.168.0.176:8082', 'http://10.48.184.234:8081','http://10.48.184.234:8082'], 
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],

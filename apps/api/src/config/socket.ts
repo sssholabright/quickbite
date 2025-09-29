@@ -23,7 +23,7 @@ export class SocketService {
         this.io = new SocketIOServer(server, {
             cors: {
                 origin: env.NODE_ENV === 'production' 
-                    ? ['https://yourdomain.com'] 
+                    ? ['https://quickbite-roan.vercel.app'] 
                     : [
                         'http://localhost:3000', 
                         'http://localhost:5173', 
