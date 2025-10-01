@@ -1,11 +1,12 @@
+import { NotificationService } from './../notifications/notification.service.js';
 import { logger } from './../../utils/logger.js';
 import { CustomError } from './../../middlewares/errorHandler.js';
 import { prisma } from './../../config/db.js';
 import { CreateOrderRequest, OrderFilters, OrderResponse, OrderStatusUpdate } from './../../types/order.js';
 import { getSocketManager } from '../../config/socket.js';
 import { DeliveryJobData, NotificationJobData } from '../../types/queue.js';
-import { queueService } from '../queues/queue.service.js';
 import { FCMService } from '../../services/fcm.service.js';
+import { EventManagerService } from '../../services/eventManager.service.js';
 
 export class OrderService {
     // Create new order
@@ -159,53 +160,24 @@ export class OrderService {
 
             const formattedOrder = this.formatOrderResponse(order);
 
-            // Emit WebSocket events
+            // 🚀 FIXED: Use ONLY NotificationService - remove all direct socket calls
             try {
-                const socketManager = getSocketManager();
-                
-                // Emit to riders
-                socketManager.emitToAllRiders('new_order', { order: formattedOrder });
-                
-                // Emit to order room
-                socketManager.emitToOrder(order.id, 'order_updated', { order: formattedOrder });
-                
-                // Emit directly to vendor
-                socketManager.emitToVendor(order.vendorId, 'new_order', { order: formattedOrder });
-                // Emit to vendor orders room
-                socketManager.getIO().to(`vendor_orders:${order.vendorId}`).emit('new_order', { 
-                    order: formattedOrder,
-                    timestamp: new Date().toISOString()
+                await NotificationService.notifyVendor(order.vendorId, {
+                    type: 'new_order',
+                    title: '🆕 New Order!',
+                    message: `New order #${order.orderNumber} received`,
+                    data: {
+                        orderId: order.id,
+                        orderNumber: order.orderNumber,
+                        customerName: order.customer?.user?.name || 'Unknown Customer',
+                        total: order.total
+                    },
+                    priority: 'urgent'
                 });
-
-                // Send notifications with delay
-                setTimeout(async () => {
-                    try {
-                        const { notificationQueueService } = await import('../../services/notificationQueue.service.js');
-                        
-                        const notification = {
-                            id: `new-order-${order.id}-${Date.now()}`,
-                            targetType: 'vendor' as const,
-                            targetId: order.vendorId,
-                            type: 'order' as const,
-                            title: '🆕 New Order!',
-                            message: `New order #${order.orderNumber} received`,
-                            data: {
-                                orderId: order.id,
-                                orderNumber: order.orderNumber,
-                                customerName: order.customer?.user?.name || 'Unknown Customer',
-                                total: order.total
-                            },
-                            priority: 'urgent' as const,
-                            timestamp: new Date().toISOString()
-                        };
-                        
-                        await notificationQueueService.addNotification(notification);
-                    } catch (error) {
-                        logger.error({ error, orderId: order.id }, 'Failed to queue notification');
-                    }
-                }, 2000);
+                
+                logger.info(`✅ Order ${order.orderNumber} notification sent via NotificationService`);
             } catch (error) {
-                logger.error({ error, orderId: order.id }, 'Failed to emit notification');
+                logger.error({ error, orderId: order.id }, 'Failed to send order notification');
             }
 
             return formattedOrder;
@@ -356,18 +328,26 @@ export class OrderService {
 
             const formattedOrder = this.formatOrderResponse(updatedOrder);
 
-            // Trigger delivery job broadcasting when order is ready for pickup
-            if (statusUpdate.status === 'READY_FOR_PICKUP') {
-                try {
-                    await this.triggerDeliveryJobBroadcast(updatedOrder);
-                    logger.info(`Delivery job triggered for order ${orderId}`);
-                } catch (deliveryError) {
-                    logger.error({ error: deliveryError, orderId }, 'Failed to trigger delivery job broadcast');
-                    // Don't throw error, continue with other operations
+            // 🚀 CLEAN: Delegate all business logic to EventManager
+            try {
+                // 🚀 FIXED: Only require riderId for certain statuses
+                const riderId = updatedOrder.riderId;
+                
+                if (['PICKED_UP', 'OUT_FOR_DELIVERY', 'DELIVERED'].includes(statusUpdate.status) && !riderId) {
+                    throw new CustomError('Rider not found', 404);
                 }
+                
+                await EventManagerService.handleOrderStatusChange(
+                    orderId, 
+                    statusUpdate.status, 
+                    riderId || undefined  // Pass undefined if no riderId
+                );
+                logger.info(`EventManager: Handled order ${orderId} status change to ${statusUpdate.status}`);
+            } catch (eventError) {
+                logger.error({ error: eventError, orderId }, 'EventManager: Failed to handle order status change');
             }
 
-            // Emit WebSocket events
+            // 🚀 CLEAN: Emit basic socket events only
             try {
                 const socketManager = getSocketManager();
                 socketManager.emitToOrder(orderId, 'order_updated', { order: formattedOrder });
@@ -401,23 +381,21 @@ export class OrderService {
                     // Longer delay to ensure UI updates are processed first
                     setTimeout(async () => {
                         try {
-                            const { notificationQueueService } = await import('../../services/notificationQueue.service.js');
-                            
-                            // Send notification to customer
-                            await notificationQueueService.addNotification({
-                                id: `order-assigned-${orderId}-${Date.now()}`,
-                                targetType: 'customer',
-                                targetId: updatedOrder.customer.id,
-                                type: 'order',
-                                title: '🚚 Order Assigned!',
-                                message: `Your order has been assigned to a rider and will be picked up soon!`,
-                                data: {
-                                    orderId: orderId,
-                                    status: 'ASSIGNED'
-                                },
-                                priority: 'high',
-                                timestamp: new Date().toISOString()
-                            });
+                            await NotificationService.notifyOrderStatusUpdate(
+                                orderId,
+                                statusUpdate.status,
+                                updatedOrder.customer.userId, // customerId
+                                statusUpdate.riderId, // riderId
+                                updatedOrder.vendorId, // vendorId
+                                {
+                                    rider: statusUpdate.riderId ? {
+                                        id: updatedOrder.rider?.id,
+                                        name: updatedOrder.rider?.user.name,
+                                        phone: updatedOrder.rider?.user.phone
+                                    } : undefined,
+                                    timestamp: new Date().toISOString()
+                                }
+                            );
                         } catch (error) {
                             logger.error({ error, orderId }, 'Failed to send order assignment notification');
                         }
@@ -428,32 +406,15 @@ export class OrderService {
                 logger.error({ error: socketError }, 'Failed to emit socket events');
             }
 
-            if (statusUpdate.status === 'DELIVERED') {
-                // 🚀 NEW: Mark rider as available again when order is delivered
-                if (statusUpdate.riderId) {
-                    await prisma.rider.update({
-                        where: { id: statusUpdate.riderId },
-                        data: { isOnline: true }
-                    });
-                    
-                    logger.info(`✅ Rider ${statusUpdate.riderId} marked as available (order ${orderId} delivered)`);
-                    
-                    // Check for waiting orders
-                    try {
-                        const { DeliveryJobService } = await import('../delivery/deliveryJob.service.js');
-                        await DeliveryJobService.checkWaitingOrders();
-                    } catch (error) {
-                        logger.warn({ error }, 'Failed to check waiting orders after delivery');
-                    }
-                }
-            }
+            // 🚀 REMOVE: Delete the entire DELIVERED handling block (lines 433-452)
+            // Let EventManagerService handle everything through DeliveryOrchestratorService
 
             if (statusUpdate.status === 'PICKED_UP') {
                 // Rider is now unavailable (has active order)
                 if (statusUpdate.riderId) {
                     await prisma.rider.update({
                         where: { id: statusUpdate.riderId },
-                        data: { isAvailable: false }
+                        data: { isOnline: false }
                     });
                     
                     logger.info(`🚫 Rider ${statusUpdate.riderId} marked as unavailable (order ${orderId} picked up)`);
@@ -624,7 +585,7 @@ export class OrderService {
                 if (order.riderId) {
                     await prisma.rider.update({
                         where: { id: order.riderId },
-                        data: { isAvailable: true }
+                        data: { isOnline: true }
                     });
                 }
 
@@ -672,7 +633,9 @@ export class OrderService {
             // Emit socket event for order cancellation
             const socketManager = getSocketManager();
             if (socketManager) {
-                socketManager.emitOrderCancellation(orderId, formattedOrder, reason);
+                socketManager.emitToOrder(orderId, 'order_cancelled', { order: formattedOrder, reason });
+                socketManager.emitToCustomer(updatedOrder.customer.userId, 'order_cancelled', { order: formattedOrder, reason });
+                socketManager.emitToVendor(updatedOrder.vendor.userId, 'order_cancelled', { order: formattedOrder, reason });
             }
 
             return formattedOrder;
@@ -759,53 +722,75 @@ export class OrderService {
             let ordersBroadcasted = 0;
             const errors: string[] = [];
 
+            // 🚀 FIXED: Remove direct DeliveryJobService call - use only queue system
+            // const { DeliveryJobService } = await import('../delivery/deliveryJob.service.js');
+            // let socketManager = null;
+            
             // Broadcast each order
             for (const order of readyOrders) {
                 try {
-                    // Use the existing triggerDeliveryJobBroadcast method
-                    await this.triggerDeliveryJobBroadcast(order);
-                    ordersBroadcasted++;
-                    logger.info(`✅ Successfully broadcasted order ${order.orderNumber}`);
-                    
-                    // 🚀 FIX: Add delay between broadcasts to prevent bombarding
-                    if (ordersBroadcasted < readyOrders.length) {
-                        console.log(`⏳ Waiting 10 seconds before next broadcast...`);
-                        await new Promise(resolve => setTimeout(resolve, 40000)); // 40 second delay
-                    }
-                } catch (error) {
-                    // 🚀 FIXED: Better error handling
-                    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-                    const errorDetails = {
+                    // 🚀 FIXED: Use queue system instead of direct call
+                    const deliveryJobData: DeliveryJobData = {
                         orderId: order.id,
                         orderNumber: order.orderNumber,
-                        error: errorMessage,
-                        stack: error instanceof Error ? error.stack : undefined
+                        vendorId: order.vendorId,
+                        vendorName: order.vendor.businessName,
+                        customerId: order.customerId,
+                        customerName: order.customer.user.name,
+                        pickupAddress: order.vendor.businessAddress || '',
+                        deliveryAddress: order.deliveryAddress as string,
+                        deliveryFee: order.deliveryFee,
+                        totalAmount: order.total || 0,
+                        estimatedDistance: 0,
+                        expiresIn: 30,
+                        timer: 30,
+                        distance: 0,
+                        items: order.items.map(item => ({
+                            id: item.id,
+                            name: item.menuItem.name,
+                            quantity: item.quantity,
+                            price: item.unitPrice,
+                            unitPrice: item.unitPrice,
+                            totalPrice: item.totalPrice,
+                            specialInstructions: item.specialInstructions || ''
+                        })),
+                        createdAt: order.createdAt,
+                        expiresAt: new Date(Date.now() + 60 * 1000),
                     };
+
+                    const { DeliveryJobService } = await import('../delivery/deliveryJob.service.js');
+                    await DeliveryJobService.addOrderToQueue(order.id);
                     
-                    errors.push(`Failed to broadcast order ${order.orderNumber}: ${errorMessage}`);
-                    logger.error(errorDetails, `Failed to broadcast order ${order.orderNumber}`);
+                    ordersBroadcasted++;
+                    logger.info(`✅ Order ${order.orderNumber} added to FIFO delivery queue`);
+                    
+                } catch (error) {
+                    logger.error({ error, orderId: order.id }, 'Error adding order to delivery job queue');
+                    errors.push(`Order ${order.orderNumber}: ${error instanceof Error ? error.message : 'Unknown error'}`);
                 }
             }
 
             const result = {
                 success: true,
-                message: `Successfully processed ${readyOrders.length} orders. ${ordersBroadcasted} broadcasted successfully.`,
+                message: `Successfully processed ${ordersBroadcasted}/${readyOrders.length} orders`,
                 ordersFound: readyOrders.length,
                 ordersBroadcasted,
                 errors
             };
 
-            logger.info(`🎯 Broadcast complete: ${JSON.stringify(result)}`);
+            logger.info(`✅ Broadcast completed: ${ordersBroadcasted}/${readyOrders.length} orders broadcasted`);
             return result;
+
         } catch (error) {
-            console.error("Error broadcasting existing ready orders: ", error);
-            // logger.error({ error }, 'Error broadcasting existing ready orders');
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            logger.error({ error: errorMessage }, 'Error in broadcastExistingReadyOrders');
+            
             return {
                 success: false,
-                message: `Failed to broadcast existing orders: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                message: `Error broadcasting orders: ${errorMessage}`,
                 ordersFound: 0,
                 ordersBroadcasted: 0,
-                errors: [error instanceof Error ? error.message : 'Unknown error']
+                errors: [errorMessage]
             };
         }
     }
@@ -959,103 +944,10 @@ export class OrderService {
         };
     }
 
-    /**
-     * 🚀 NEW METHOD: Trigger delivery job broadcast when order is ready for pickup
-     * Real-world: When vendor clicks "Order Ready", this automatically finds riders and sends them the job
-     */
-    private static async triggerDeliveryJobBroadcast(order: any): Promise<void> {
-        try {
-            // 🚀 STEP 1: Check if any riders are available BEFORE creating job
-            let socketManager;
-            let ridersRoom;
-            let availableRidersCount = 0;
-            
-            try {
-                socketManager = getSocketManager();
-                const io = socketManager.getIO();
-                ridersRoom = io.sockets.adapter.rooms.get('riders');
-                
-                // Check database for available riders
-                availableRidersCount = await prisma.rider.count({
-                    where: {
-                        isOnline: true,
-                        isAvailable: true,
-                        currentLat: { not: null },
-                        currentLng: { not: null }
-                    }
-                });
-            } catch (socketError) {
-                // If socket manager is not available, just check database
-                console.log('⚠️ Socket manager not available, checking database only');
-                availableRidersCount = await prisma.rider.count({
-                    where: {
-                        isOnline: true,
-                        isAvailable: true,
-                        currentLat: { not: null },
-                        currentLng: { not: null }
-                    }
-                });
-            }
-            
-            if (availableRidersCount === 0) {
-                console.log(`🚫 No available riders found. Order ${order.id} will be queued for later broadcast.`);
-                // Don't return, still create the job for when riders come online
-            } else {
-                console.log(`✅ Found ${availableRidersCount} available riders. Proceeding with delivery job creation.`);
-            }
-            
-            // 🚀 STEP 2: Create delivery job only if riders are available
-            const deliveryJobData: DeliveryJobData = {
-                orderId: order.id,
-                vendorId: order.vendorId,
-                customerId: order.customerId,
-                customerName: order.customer.user.name,
-                vendorName: order.vendor.businessName,
-                pickupAddress: order.vendor.businessAddress || 'Vendor Address',
-                deliveryAddress: JSON.stringify(order.deliveryAddress),
-                deliveryFee: order.deliveryFee,
-                distance: this.calculateDistance(
-                    order.vendor.latitude, 
-                    order.vendor.longitude,
-                    order.deliveryAddress.coordinates?.lat || 0,
-                    order.deliveryAddress.coordinates?.lng || 0
-                ),
-                items: order.items.map((item: any) => ({
-                    id: item.id,
-                    name: item.menuItem.name,
-                    quantity: item.quantity,
-                    price: item.unitPrice
-                })),
-                createdAt: order.createdAt,
-                expiresAt: new Date(Date.now() + 5 * 60 * 1000), // 5 minutes from now
-            };
-
-            console.log(`📋 Adding delivery job to queue for order ${order.id}`);
-            // Add delivery job to queue
-            await queueService.addDeliveryJob(deliveryJobData);
-            console.log(`✅ Delivery job added to queue for order ${order.id}`);
-
-            logger.info(`Delivery job triggered for order ${order.id}`);
-        } catch (error) {
-            // 🚀 FIXED: Better error logging
-            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-            const errorStack = error instanceof Error ? error.stack : 'No stack trace';
-            
-            console.error(`❌ ERROR triggering delivery job broadcast for order ${order.id}:`, {
-                message: errorMessage,
-                stack: errorStack,
-                error: error
-            });
-            
-            logger.error({ 
-                error: errorMessage, 
-                stack: errorStack,
-                orderId: order.id 
-            }, 'Failed to trigger delivery job broadcast');
-            
-            // Don't throw error, continue with other operations
-        }
-    }
+    // 🚀 REMOVED: All delivery job broadcasting logic
+    // 🚀 REMOVED: All rider status update logic  
+    // 🚀 REMOVED: All complex notification logic
+    // These are now handled by EventManager and DeliveryOrchestrator
 
     private static calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
         const R = 6371; // Earth's radius in kilometers
@@ -1315,11 +1207,11 @@ export class OrderService {
                 return;
             }
 
-            await FCMService.sendToRider(order.riderId, {
-                title: 'New Order Assignment',
-                body: message,
-                data: { orderId, type: 'order_assignment' }
-            }, { orderId });
+            // await FCMService.sendToRider(order.riderId, {
+            //     title: 'New Order Assignment',
+            //     body: message,
+            //     data: { orderId, type: 'order_assignment' }
+            // }, { orderId });
 
             logger.info(`Order notification sent to rider: ${order.riderId}`);
         } catch (error) {

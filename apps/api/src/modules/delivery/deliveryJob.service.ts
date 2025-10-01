@@ -1,402 +1,343 @@
-import { logger } from '../../utils/logger.js';
-import { prisma } from '../../config/db.js';
-import { CustomError } from '../../middlewares/errorHandler.js';
-import { getSocketManager } from '../../config/socket.js';
-import { DeliveryJobData } from '../../types/queue.js';
-import { DeliveryJobBroadcast as DeliveryJobBroadcastType } from '../../types/delivery.js';
-import { queueService } from '../queues/queue.service.js';
-import redisService from '../../config/redis.js';
-import { Socket } from 'socket.io';
-import { FCMService } from '../../services/fcm.service.js';
+import { NotificationService } from './../notifications/notification.service.js';
+import { getSocketManager } from './../../config/socket.js';
+import { CustomError } from './../../middlewares/errorHandler.js';
+import { prisma } from './../../config/db.js';
+import { logger } from './../../utils/logger.js';
+import { TIMING_CONFIG } from './../../config/timing.js';
 
+/**
+ * 🚀 UPDATED: Database-Persistent FIFO Delivery Queue Service
+ * 
+ * Database-persistent FIFO queue system:
+ * 1. Orders stored in database delivery_queue table
+ * 2. Survives server restarts and crashes
+ * 3. Maintains FIFO order with position field
+ * 4. Full audit trail and monitoring
+ */
 export class DeliveryJobService {
-    private static activeJobs = new Map<string, any>();
-    private static jobQueue: string[] = [];
+    // 🚀 UPDATED: Remove in-memory storage
+    // private static queue: QueuedOrder[] = []; // Remove this
     private static isProcessing = false;
+    private static lastBroadcastTime = 0;
+    private static activeTimeouts = new Map<string, NodeJS.Timeout>();
+    
+    // 🚀 SIMPLE: Use timing config
+    private static readonly COOLDOWN_PERIOD = TIMING_CONFIG.DELIVERY_JOB_COOLDOWN;
+    private static readonly JOB_TIMEOUT = TIMING_CONFIG.DELIVERY_JOB_TIMEOUT;
+    private static readonly MAX_ATTEMPTS = 3;
 
     /**
-     * Industry Standard: Send ONE delivery request at a time
+     * 🚀 UPDATED: Add order to database queue
      */
-    public static async broadcastDeliveryJob(jobData: DeliveryJobData, socketManager?: any): Promise<void> {
+    public static async addOrderToQueue(orderId: string): Promise<void> {
         try {
-            logger.info(`📡 Broadcasting delivery job for order ${jobData.orderId}`);
-            
-            // Add to queue instead of immediate broadcast
-            this.jobQueue.push(jobData.orderId);
-            this.activeJobs.set(jobData.orderId, {
-                jobData,
-                socketManager,
-                createdAt: new Date(),
-                status: 'QUEUED',
-                rejectedRiders: new Set<string>(), // Track rejected riders
-                attempts: 0 // Track retry attempts
+            logger.info(`📋 Adding order ${orderId} to database FIFO queue`);
+
+            // Check if already in queue
+            const existingQueueItem = await prisma.deliveryQueue.findUnique({
+                where: { orderId }
             });
 
-            logger.info(`📋 Added order ${jobData.orderId} to delivery queue (position: ${this.jobQueue.length})`);
-            
-            // Start processing if not already running
-            if (!this.isProcessing) {
-                this.processJobQueue();
+            if (existingQueueItem) {
+                logger.warn(`Order ${orderId} already in queue`);
+                return;
+            }
+
+            // Get order details
+            const order = await prisma.order.findUnique({
+                where: { id: orderId },
+                include: {
+                    vendor: { include: { user: true } },
+                    customer: { include: { user: true } },
+                    items: { include: { menuItem: true } }
+                }
+            });
+
+            if (!order || order.status !== 'READY_FOR_PICKUP') {
+                logger.warn(`Order ${orderId} not found or not ready for pickup`);
+                return;
+            }
+
+            // Get next position in queue
+            const lastPosition = await prisma.deliveryQueue.findFirst({
+                orderBy: { position: 'desc' },
+                select: { position: true }
+            });
+            const nextPosition = (lastPosition?.position || 0) + 1;
+
+            // Create queue entry in database
+            await prisma.deliveryQueue.create({
+                data: {
+                    orderId: order.id,
+                    status: 'QUEUED',
+                    attempts: 0,
+                    position: nextPosition,
+                    expiresAt: new Date(Date.now() + this.JOB_TIMEOUT)
+                }
+            });
+
+            logger.info(`✅ Order ${orderId} added to database queue (position ${nextPosition})`);
+
+            // 🚀 FIXED: Only start processing if this is the first order in queue
+            const queueLength = await this.getQueueLength();
+            if (queueLength === 1) {
+                logger.info(`🚀 Starting queue processing for first order ${orderId}`);
+                this.processQueue();
+            } else {
+                logger.info(`⏳ Order ${orderId} queued, waiting for previous orders to complete`);
             }
 
         } catch (error) {
-            logger.error({ error, orderId: jobData.orderId }, 'Error broadcasting delivery job');
+            logger.error(`❌ Error adding order ${orderId} to queue: ${error}`);
+            throw new CustomError('Failed to add order to queue', 500);
         }
     }
 
     /**
-     * Process jobs one at a time with delays
+     * 🚀 UPDATED: Process database queue
      */
-    private static async processJobQueue(): Promise<void> {
-        if (this.isProcessing || this.jobQueue.length === 0) {
+    private static async processQueue(): Promise<void> {
+        if (this.isProcessing) {
+            logger.info(`⏸️ Already processing queue`);
+            return;
+        }
+
+        const queueLength = await this.getQueueLength();
+        if (queueLength === 0) {
+            logger.info(`📭 Queue is empty`);
+            return;
+        }
+
+        // Check cooldown
+        const now = Date.now();
+        const timeSinceLastBroadcast = now - this.lastBroadcastTime;
+        if (timeSinceLastBroadcast < this.COOLDOWN_PERIOD) {
+            const remainingCooldown = this.COOLDOWN_PERIOD - timeSinceLastBroadcast;
+            logger.info(`⏳ Cooldown active: ${remainingCooldown}ms remaining`);
+            setTimeout(() => this.processQueue(), remainingCooldown);
             return;
         }
 
         this.isProcessing = true;
-        logger.info(`🔄 Starting job queue processing (${this.jobQueue.length} jobs pending)`);
+        logger.info(`🚀 Processing database FIFO queue (${queueLength} orders)`);
 
-        // 🚀 NEW: Collect orders with no riders by vendor
-        const ordersWithNoRidersByVendor = new Map<string, string[]>();
-
-        while (this.jobQueue.length > 0) {
-            const orderId = this.jobQueue.shift();
-            if (!orderId) continue;
-
-            const jobInfo = this.activeJobs.get(orderId);
-            if (!jobInfo) continue;
-
-            try {
-                await this.processSingleJob(jobInfo, ordersWithNoRidersByVendor);
-                
-                // Wait 5 seconds before next job
-                if (this.jobQueue.length > 0) {
-                    console.log(`⏳ Waiting 5 seconds before next order...`);
-                    await new Promise(resolve => setTimeout(resolve, 5000));
-                }
-            } catch (error) {
-                logger.error({ error, orderId }, 'Error processing single job');
-            }
-        }
-
-        // 🚀 NEW: Send batched notifications
-        await this.sendBatchedNoRidersNotifications(ordersWithNoRidersByVendor);
-
-        this.isProcessing = false;
-        logger.info(`✅ Job queue processing completed`);
-    }
-
-    /**
-     * Process ONE job with 60-second timeout
-     */
-    private static async processSingleJob(jobInfo: any, ordersWithNoRidersByVendor: Map<string, string[]>): Promise<void> {
-        const { jobData, socketManager, rejectedRiders } = jobInfo;
-        
-        logger.info(`🎯 Processing order ${jobData.orderId} (attempt ${jobInfo.attempts + 1})`);
-
-        // Find available riders (excluding rejected ones)
-        const availableRiders = await this.findAvailableRiders(jobData, rejectedRiders);
-        
-        if (!availableRiders || availableRiders.length === 0) {
-            logger.warn(`🚫 No available riders for order ${jobData.orderId} - keeping in queue for later`);
-            
-            // 🚀 FIXED: Don't cancel - just remove from active processing and keep in queue
-            jobInfo.status = 'WAITING_FOR_RIDERS';
-            this.activeJobs.delete(jobData.orderId);
-            
-            // 🚀 NEW: Collect instead of immediately notify
-            if (!ordersWithNoRidersByVendor.has(jobData.vendorId)) {
-                ordersWithNoRidersByVendor.set(jobData.vendorId, []);
-            }
-            ordersWithNoRidersByVendor.get(jobData.vendorId)!.push(jobData.orderId);
-            
-            return; // Keep order in READY_FOR_PICKUP status
-        }
-
-        // Update job status
-        jobInfo.status = 'ACTIVE';
-        jobInfo.startedAt = new Date();
-        jobInfo.availableRiders = availableRiders;
-        jobInfo.attempts++;
-
-        // Create broadcast data
-        const broadcastData: DeliveryJobBroadcastType = {
-            orderId: jobData.orderId,
-            vendorId: jobData.vendorId,
-            vendorName: jobData.vendorName,
-            customerId: jobData.customerId,
-            customerName: jobData.customerName,
-            pickupAddress: jobData.pickupAddress,
-            deliveryAddress: jobData.deliveryAddress,
-            deliveryFee: jobData.deliveryFee,
-            distance: jobData.distance,
-            items: jobData.items,
-            expiresAt: new Date(Date.now() + 60 * 1000), // 60 seconds timeout
-            timer: 60,
-            retryCount: jobInfo.attempts,
-        };
-
-        // Broadcast to riders
-        await this.broadcastToRiders(broadcastData, availableRiders, socketManager);
-
-        // Set timeout for rider response
-        setTimeout(async () => {
-            await this.handleJobTimeout(jobData.orderId);
-        }, 60000); // 60 seconds timeout
-
-        logger.info(`⏰ Order ${jobData.orderId} sent to ${availableRiders.length} riders with 60-second timeout`);
-    }
-
-    /**
-     * Handle rider rejection - track rejection and continue with other riders
-     */
-    public static async handleRiderRejection(orderId: string, riderId: string): Promise<void> {
         try {
-            logger.info(`❌ Rider ${riderId} rejected order ${orderId}`);
+            // 🚀 FIXED: Only process if no order is currently broadcasting
+            const broadcastingOrder = await prisma.deliveryQueue.findFirst({
+                where: { status: 'BROADCASTING' }
+            });
 
-            const jobInfo = this.activeJobs.get(orderId);
-            if (!jobInfo) {
-                logger.warn(`Job ${orderId} not found in active jobs`);
+            if (broadcastingOrder) {
+                logger.info(`⏳ Order ${broadcastingOrder.orderId} already broadcasting, waiting for completion...`);
+                this.isProcessing = false;
                 return;
             }
 
-            // Add rider to rejected list
-            jobInfo.rejectedRiders.add(riderId);
-            
-            // Store rejection in Redis for persistence
-            const rejectionKey = `rejected_riders:${orderId}`;
-            const rejectedRiders = Array.from(jobInfo.rejectedRiders);
-            await redisService.set(rejectionKey, JSON.stringify(rejectedRiders), 3600); // 1 hour TTL
-
-            // Check if we still have available riders
-            const remainingRiders = jobInfo.availableRiders.filter((rider: any) => 
-                !jobInfo.rejectedRiders.has(rider.id)
-            );
-
-            if (remainingRiders.length === 0) {
-                logger.warn(`No more riders available for order ${orderId} after rejections - keeping in queue`);
-                
-                // 🚀 FIXED: Don't cancel - just remove from active processing
-                jobInfo.status = 'WAITING_FOR_RIDERS';
-                this.activeJobs.delete(orderId);
-                
-                // Notify vendor
-                const socketManager = getSocketManager();
-                socketManager.emitToVendor(jobInfo.jobData.vendorId, 'no_riders_available', {
-                    orderId: orderId,
-                    message: 'All available riders rejected this order. Will retry when more riders come online.',
-                    status: 'waiting_for_riders'
-                });
-            } else {
-                logger.info(`Order ${orderId} still has ${remainingRiders.length} riders available after rejection`);
-                // Job continues with remaining riders
-            }
-
-        } catch (error) {
-            logger.error({ error, orderId: orderId }, 'Error handling rider rejection');
-        }
-    }
-
-    /**
-     * Handle rider acceptance - remove from queue and process next
-     */
-    public static async handleRiderAcceptance(orderId: string, riderId: string): Promise<void> {
-        try {
-            logger.info(`✅ Rider ${riderId} accepted order ${orderId}`);
-
-            // Remove from active jobs and queue
-            this.activeJobs.delete(orderId);
-            const queueIndex = this.jobQueue.indexOf(orderId);
-            if (queueIndex > -1) {
-                this.jobQueue.splice(queueIndex, 1);
-            }
-
-            // Update order in database
-            const updateResult = await prisma.order.updateMany({
-                where: { 
-                    id: orderId,
-                    status: 'READY_FOR_PICKUP',
-                    riderId: null
+            // Get next order from front of queue (lowest position)
+            const nextQueueItem = await prisma.deliveryQueue.findFirst({
+                where: {
+                    status: { in: ['QUEUED', 'REJECTED'] }
                 },
-                data: {
-                    riderId: riderId,
-                    status: 'ASSIGNED'
-                }
-            });
-
-            if (updateResult.count === 0) {
-                logger.warn(`Order ${orderId} was already assigned or not ready for pickup`);
-                throw new CustomError('Order already assigned to another rider', 400);
-            }
-
-            // 🚀 FIXED: Update rider status to unavailable (they now have an assigned order)
-            await prisma.rider.update({
-                where: { id: riderId },
-                data: { 
-                    isAvailable: false,  // Not available for new orders
-                    isOnline: true       // Keep online (they're still connected)
-                }
-            });
-
-            logger.info(`🚫 Rider ${riderId} marked as unavailable (has assigned order ${orderId})`);
-
-            // Remove job from all riders
-            const socketManager = getSocketManager();
-            socketManager.emitToAllRiders('delivery_job_removed', {
-                orderId: orderId,
-                reason: 'accepted_by_another_rider'
-            });
-
-            // Notify accepting rider
-            socketManager.emitToRider(riderId, 'delivery_job_accepted', {
-                orderId: orderId,
-                message: 'You have successfully accepted this delivery job'
-            });
-
-            // 🚀 NEW: Get order details for notifications
-            const order = await prisma.order.findUnique({
-                where: { id: orderId },
+                orderBy: { position: 'asc' },
                 include: {
-                    customer: {
-                        include: { user: true }
-                    },
-                    vendor: {
-                        include: { user: true }
-                    },
-                    rider: {
-                        include: { user: true }
+                    order: {
+                        include: {
+                            vendor: { include: { user: true } },
+                            customer: { include: { user: true } },
+                            items: { include: { menuItem: true } }
+                        }
                     }
                 }
             });
 
-            if (order) {
-                try {
-                    const socketManager = getSocketManager();
-                    
-                    // Emit order_updated event
-                    socketManager.emitToOrder(orderId, 'order_updated', { 
-                        order: {
-                            id: order.id,
-                            status: 'ASSIGNED',
-                            rider: {
-                                id: order.rider?.id,
-                                name: order.rider?.user.name,
-                                phone: order.rider?.user.phone
-                            }
-                        }
-                    });
-                    
-                    // Emit order_status_update events
-                    socketManager.emitToCustomer(order.customer.userId, 'order_status_update', {
-                        orderId: orderId,
-                        status: 'ASSIGNED',
-                        timestamp: new Date().toISOString()
-                    });
-                    
-                    socketManager.emitToVendor(order.vendor.id, 'order_status_update', {
-                        orderId: orderId,
-                        status: 'ASSIGNED',
-                        timestamp: new Date().toISOString()
-                    });
-                    
-                    // Emit rider_assigned event
-                    socketManager.emitToCustomer(order.customer.userId, 'rider_assigned', {
-                        orderId: orderId,
-                        rider: {
-                            id: order.rider?.id,
-                            name: order.rider?.user.name,
-                            phone: order.rider?.user.phone
-                        },
-                        timestamp: new Date().toISOString()
-                    });
-                    
-                    logger.info(`📡 Socket events emitted for rider assignment: ${orderId}`);
-                } catch (socketError) {
-                    logger.error({ error: socketError, orderId }, 'Failed to emit socket events for rider assignment');
-                }
-
-                // 🚀 NEW: Send notifications to customer and vendor
-                try {
-                    const { notificationQueueService } = await import('../../services/notificationQueue.service.js');
-                    
-                    // Notify vendor
-                    await notificationQueueService.addNotification({
-                        id: `rider-assigned-vendor-${orderId}-${Date.now()}`,
-                        targetType: 'vendor',
-                        targetId: order.vendor.id,
-                        type: 'order',
-                        title: '🚚 Rider Assigned!',
-                        message: `Order #${order.orderNumber} has been assigned to ${order.rider?.user.name}`,
-                        data: {
-                            orderId: orderId,
-                            orderNumber: order.orderNumber,
-                            riderName: order.rider?.user.name,
-                            riderPhone: order.rider?.user.phone,
-                            status: 'ASSIGNED'
-                        },
-                        priority: 'normal',
-                        actions: [
-                            { label: 'View Order', action: 'view_order', data: { orderId } }
-                        ],
-                        timestamp: new Date().toISOString()
-                    });
-
-                    logger.info(`📱 Notifications sent for rider assignment: ${orderId}`);
-                } catch (notificationError) {
-                    logger.error({ error: notificationError, orderId }, 'Failed to send rider assignment notifications');
-                }
+            if (!nextQueueItem) {
+                this.isProcessing = false;
+                return;
             }
 
-            logger.info(`🎯 Order ${orderId} assigned to rider ${riderId}, processing next job...`);
+            // Find available riders
+            const availableRiders = await this.findAvailableRiders();
+            if (availableRiders.length === 0) {
+                logger.info(`No riders available, waiting...`);
+                this.isProcessing = false;
+                setTimeout(() => this.processQueue(), 10000);
+                return;
+            }
 
-            // Continue processing queue
-            this.processJobQueue();
+            // Broadcast to available riders
+            await this.broadcastToRiders(nextQueueItem, availableRiders);
+
+            // Update status in database
+            await prisma.deliveryQueue.update({
+                where: { id: nextQueueItem.id },
+                data: {
+                    status: 'BROADCASTING',
+                    attempts: { increment: 1 },
+                    expiresAt: new Date(Date.now() + this.JOB_TIMEOUT)
+                }
+            });
+
+            this.lastBroadcastTime = now;
+
+            // Set timeout
+            const timeoutId = setTimeout(() => {
+                this.handleJobTimeout(nextQueueItem.orderId);
+            }, this.JOB_TIMEOUT);
+            this.activeTimeouts.set(nextQueueItem.orderId, timeoutId);
+
+            logger.info(`✅ Order ${nextQueueItem.orderId} broadcasted to ${availableRiders.length} riders`);
 
         } catch (error) {
-            logger.error({ error, orderId: orderId }, 'Error handling rider acceptance');
+            logger.error(`❌ Error processing queue: ${error}`);
+            this.isProcessing = false;
+            setTimeout(() => this.processQueue(), 1000);
+        } finally {
+            this.isProcessing = false;
+        }
+    }
+
+    /**
+     * 🚀 NEW: Get queue length from database
+     */
+    private static async getQueueLength(): Promise<number> {
+        return await prisma.deliveryQueue.count({
+            where: {
+                status: { in: ['QUEUED', 'BROADCASTING', 'REJECTED'] }
+            }
+        });
+    }
+
+    /**
+     * 🚀 UPDATED: Handle rider acceptance
+     */
+    public static async handleRiderAcceptsOrder(orderId: string, riderId: string): Promise<void> {
+        try {
+            logger.info(`✅ Rider ${riderId} accepted order ${orderId}`);
+
+            // Find order in queue
+            const queueItem = await prisma.deliveryQueue.findUnique({
+                where: { orderId }
+            });
+
+            if (!queueItem) {
+                logger.warn(`Order ${orderId} not found in queue`);
+                return;
+            }
+
+            // Clear timeout
+            const timeoutId = this.activeTimeouts.get(orderId);
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+                this.activeTimeouts.delete(orderId);
+            }
+
+            // Update order in database
+            await prisma.order.update({
+                where: { id: orderId },
+                data: {
+                    status: 'ASSIGNED',
+                    riderId: riderId
+                }
+            });
+
+            // Remove from queue
+            await prisma.deliveryQueue.update({
+                where: { id: queueItem.id },
+                data: { status: 'COMPLETED' }
+            });
+
+            logger.info(`✅ Order ${orderId} assigned to rider ${riderId}, removed from queue`);
+
+            // Process next order after cooldown
+            setTimeout(() => this.processQueue(), this.COOLDOWN_PERIOD);
+
+        } catch (error) {
+            logger.error({ error, orderId, riderId }, 'Error handling rider acceptance');
             throw new CustomError('Failed to handle rider acceptance', 500);
         }
     }
 
     /**
-     * Handle job timeout - retry or wait for more riders
+     * 🚀 UPDATED: Handle rider rejection
+     */
+    public static async handleRiderRejectsOrder(orderId: string, riderId: string): Promise<void> {
+        try {
+            logger.info(`❌ Rider ${riderId} rejected order ${orderId}`);
+
+            // Find order in queue
+            const queueItem = await prisma.deliveryQueue.findUnique({
+                where: { orderId }
+            });
+
+            if (!queueItem) {
+                logger.warn(`Order ${orderId} not found in queue`);
+                return;
+            }
+
+            // Mark as rejected (stays in queue for other riders)
+            await prisma.deliveryQueue.update({
+                where: { id: queueItem.id },
+                data: { status: 'REJECTED' }
+            });
+
+            logger.info(`❌ Order ${orderId} marked as rejected, staying in queue for other riders`);
+
+        } catch (error) {
+            logger.error({ error, orderId, riderId }, 'Error handling rider rejection');
+            throw new CustomError('Failed to handle rider rejection', 500);
+        }
+    }
+
+    /**
+     * 🚀 UPDATED: Handle job timeout
      */
     private static async handleJobTimeout(orderId: string): Promise<void> {
         try {
-            logger.info(`⏰ Order ${orderId} timed out - no rider accepted within 60 seconds`);
+            logger.info(`⏰ Order ${orderId} timed out`);
 
-            const jobInfo = this.activeJobs.get(orderId);
-            if (!jobInfo) {
-                logger.warn(`Job ${orderId} not found in active jobs`);
-                return;
-            }
-
-            // Check if we should retry (max 3 attempts)
-            if (jobInfo.attempts < 3) {
-                logger.info(` Retrying order ${orderId} (attempt ${jobInfo.attempts + 1}/3)`);
-                
-                // Add back to queue for retry
-                this.jobQueue.unshift(orderId); // Add to front of queue
-                jobInfo.status = 'QUEUED';
-                
-                // Continue processing
-                this.processJobQueue();
-                return;
-            }
-
-            // Max attempts reached - keep in queue for when riders come online
-            logger.warn(`🚫 Order ${orderId} reached max retry attempts (3), keeping in queue for when riders come online`);
-            
-            // 🚀 FIXED: Don't cancel - just remove from active processing
-            jobInfo.status = 'WAITING_FOR_RIDERS';
-            this.activeJobs.delete(orderId);
-            
-            // Notify vendor
-            const socketManager = getSocketManager();
-            socketManager.emitToVendor(jobInfo.jobData.vendorId, 'order_waiting_for_riders', {
-                orderId: orderId,
-                message: 'Order is waiting for riders to come online. Will automatically broadcast when riders become available.',
-                status: 'waiting_for_riders'
+            // Find order in queue
+            const queueItem = await prisma.deliveryQueue.findUnique({
+                where: { orderId }
             });
+
+            if (!queueItem) {
+                logger.warn(`Order ${orderId} not found in queue`);
+                return;
+            }
+
+            // Clear timeout
+            this.activeTimeouts.delete(orderId);
+
+            if (queueItem.attempts < this.MAX_ATTEMPTS) {
+                // Move to back of queue
+                const lastPosition = await prisma.deliveryQueue.findFirst({
+                    orderBy: { position: 'desc' },
+                    select: { position: true }
+                });
+                const newPosition = (lastPosition?.position || 0) + 1;
+
+                await prisma.deliveryQueue.update({
+                    where: { id: queueItem.id },
+                    data: {
+                        status: 'QUEUED',
+                        attempts: { increment: 1 },
+                        position: newPosition,
+                        expiresAt: new Date(Date.now() + this.JOB_TIMEOUT)
+                    }
+                });
+
+                logger.info(`🔄 Order ${orderId} moved to back of queue (attempt ${queueItem.attempts + 1}/${this.MAX_ATTEMPTS})`);
+            } else {
+                // Remove from queue after max attempts
+                await prisma.deliveryQueue.update({
+                    where: { id: queueItem.id },
+                    data: { status: 'COMPLETED' }
+                });
+                logger.warn(`🚫 Order ${orderId} removed from queue after max attempts`);
+            }
+
+            // Process next order after cooldown
+            setTimeout(() => this.processQueue(), this.COOLDOWN_PERIOD);
 
         } catch (error) {
             logger.error({ error, orderId }, 'Error handling job timeout');
@@ -404,332 +345,192 @@ export class DeliveryJobService {
     }
 
     /**
-     *  NEW: Check for waiting orders when riders come online
-     * Real-world: When riders come online, automatically broadcast waiting orders
+     * 🚀 NEW: Load queue from database on startup
      */
-    public static async checkWaitingOrders(): Promise<void> {
+    public static async loadQueueFromDatabase(): Promise<void> {
         try {
-            logger.info(`🔍 Checking for orders waiting for riders...`);
+            logger.info(`🔄 Loading delivery queue from database...`);
 
-            // Find orders that are READY_FOR_PICKUP but not assigned
-            const waitingOrders = await prisma.order.findMany({
+            // Get all active queue items
+            const activeQueueItems = await prisma.deliveryQueue.findMany({
                 where: {
-                    status: 'READY_FOR_PICKUP',
-                    riderId: null,
-                    // 🚀 FIXED: Remove 24-hour filter to get ALL waiting orders
-                    // createdAt: {
-                    //     gte: new Date(Date.now() - 24 * 60 * 60 * 1000)
-                    // }
+                    status: { in: ['QUEUED', 'BROADCASTING', 'REJECTED'] }
                 },
+                orderBy: { position: 'asc' },
                 include: {
-                    vendor: {
-                        include: { user: true }
-                    },
-                    customer: {
-                        include: { user: true }
-                    },
-                    items: {
+                    order: {
                         include: {
-                            menuItem: true,
-                            addOns: {
-                                include: { addOn: true }
-                            }
-                        }
-                    }
-                },
-                orderBy: { createdAt: 'asc' } // Oldest orders first
-            });
-
-            if (waitingOrders.length === 0) {
-                logger.info(`✅ No orders waiting for riders`);
-                return;
-            }
-
-            logger.info(`📋 Found ${waitingOrders.length} orders waiting for riders`);
-
-            // Queue each waiting order
-            for (const order of waitingOrders) {
-                const deliveryJobData: DeliveryJobData = {
-                    orderId: order.id,
-                    vendorId: order.vendorId,
-                    customerId: order.customerId,
-                    customerName: order.customer.user.name,
-                    vendorName: order.vendor.businessName,
-                    pickupAddress: order.vendor.businessAddress || 'Vendor Address',
-                    deliveryAddress: JSON.stringify(order.deliveryAddress),
-                    deliveryFee: order.deliveryFee,
-                    distance: 0, // Will be calculated
-                    items: order.items.map((item: any) => ({
-                        id: item.id,
-                        name: item.menuItem.name,
-                        quantity: item.quantity,
-                        price: item.unitPrice
-                    })),
-                    createdAt: order.createdAt,
-                    expiresAt: new Date(Date.now() + 60 * 1000),
-                };
-
-                // Add to queue
-                this.jobQueue.push(order.id);
-                this.activeJobs.set(order.id, {
-                    jobData: deliveryJobData,
-                    socketManager: null,
-                    createdAt: new Date(),
-                    status: 'QUEUED',
-                    rejectedRiders: new Set<string>(),
-                    attempts: 0
-                });
-            }
-
-            logger.info(`✅ Queued ${waitingOrders.length} waiting orders for broadcast`);
-
-            // Start processing if not already running
-            if (!this.isProcessing) {
-                this.processJobQueue();
-            }
-
-        } catch (error) {
-            logger.error({ error }, 'Error checking waiting orders');
-        }
-    }
-
-    /**
-     * Find available riders excluding rejected ones and those with assigned orders
-     */
-    private static async findAvailableRiders(jobData: DeliveryJobData, rejectedRiders?: Set<string>): Promise<any[]> {
-        try {
-            logger.info(`🔍 Finding available riders for order ${jobData.orderId}`);
-            
-            // Get rejected riders from Redis
-            const rejectionKey = `rejected_riders:${jobData.orderId}`;
-            const rejectedRiderIds = await redisService.get(rejectionKey) || [];
-            
-            // Combine with current rejected riders
-            const allRejectedRiders = [
-                ...rejectedRiderIds,
-                ...(rejectedRiders ? Array.from(rejectedRiders) : [])
-            ];
-
-            // 🚀 FIXED: Get available riders from database with proper filtering
-            const availableRidersFromDB = await prisma.rider.findMany({
-                where: {
-                    isOnline: true,                    // Must be online
-                    currentLat: { not: null },         // Must have location
-                    currentLng: { not: null },         // Must have location
-                    id: { notIn: allRejectedRiders },  // Not rejected for this order
-                    // 🚀 CRITICAL: No assigned orders
-                    orders: {
-                        none: {
-                            status: {
-                                in: ['ASSIGNED', 'PICKED_UP', 'OUT_FOR_DELIVERY'] // No active orders
-                            }
-                        }
-                    }
-                },
-                include: {
-                    user: {
-                        select: {
-                            id: true,
-                            name: true,
-                            phone: true,
-                        }
-                    },
-                    // 🚀 NEW: Include orders to verify no active assignments
-                    orders: {
-                        where: {
-                            status: {
-                                in: ['ASSIGNED', 'PICKED_UP', 'OUT_FOR_DELIVERY']
-                            }
-                        },
-                        select: {
-                            id: true,
-                            status: true,
-                            orderNumber: true
+                            vendor: { include: { user: true } },
+                            customer: { include: { user: true } },
+                            items: { include: { menuItem: true } }
                         }
                     }
                 }
             });
 
-            logger.info(`🔍 Found ${availableRidersFromDB.length} available riders in database (excluding those with assigned orders)`);
+            logger.info(`📋 Loaded ${activeQueueItems.length} orders from database queue`);
 
-            // Check which riders are connected via socket
+            // Restart processing if there are queued orders
+            if (activeQueueItems.length > 0) {
+                logger.info(`🚀 Restarting queue processing after server restart`);
+                this.processQueue();
+            }
+
+        } catch (error) {
+            logger.error(`❌ Error loading queue from database: ${error}`);
+        }
+    }
+
+    /**
+     * 🚀 UPDATED: Get queue status from database
+     */
+    public static async getStatus(): Promise<any> {
+        const queueItems = await prisma.deliveryQueue.findMany({
+            where: {
+                status: { in: ['QUEUED', 'BROADCASTING', 'REJECTED'] }
+            },
+            orderBy: { position: 'asc' },
+            select: {
+                orderId: true,
+                status: true,
+                attempts: true,
+                position: true,
+                expiresAt: true,
+                order: {
+                    select: {
+                        orderNumber: true
+                    }
+                }
+            }
+        });
+
+        return {
+            queueLength: queueItems.length,
+            isProcessing: this.isProcessing,
+            lastBroadcastTime: this.lastBroadcastTime,
+            cooldownPeriod: this.COOLDOWN_PERIOD,
+            activeTimeouts: this.activeTimeouts.size,
+            orders: queueItems.map(item => ({
+                orderId: item.orderId,
+                orderNumber: item.order.orderNumber,
+                status: item.status,
+                attempts: item.attempts,
+                position: item.position,
+                expiresAt: item.expiresAt
+            }))
+        };
+    }
+
+    /**
+     * 🚀 DEBUG: Log current state
+     */
+    public static debugStatus(): void {
+        this.getStatus().then(status => {
+            logger.info(`🔍 FIFO DELIVERY QUEUE STATUS:`, status);
+        });
+    }
+
+    /**
+     * 🚀 HELPER: Find available riders (online and not assigned)
+    */
+    private static async findAvailableRiders(): Promise<any[]> {
+        try {
+            const riders = await prisma.rider.findMany({
+                where: {
+                    isOnline: true,
+                    currentLat: { not: null },
+                    currentLng: { not: null },
+                    orders: {
+                        none: {
+                            status: {
+                                in: ['ASSIGNED', 'PICKED_UP', 'OUT_FOR_DELIVERY']
+                            }
+                        }
+                    }
+                },
+                include: {
+                    user: { select: { id: true, name: true, phone: true } }
+                }
+            });
+
+            // Double-check socket connectivity
             const socketManager = getSocketManager();
             const io = socketManager.getIO();
             const ridersRoom = io.sockets.adapter.rooms.get('riders');
-            
+
             if (!ridersRoom || ridersRoom.size === 0) {
-                logger.warn(`🔍 No riders connected via socket`);
                 return [];
             }
 
             const connectedRiderIds: string[] = [];
             ridersRoom.forEach(socketId => {
-                const socket = io.sockets.sockets.get(socketId) as Socket & { userRole?: string; riderId?: string };
+                const socket = io.sockets.sockets.get(socketId) as any;
                 if (socket && socket.userRole === 'RIDER' && socket.riderId) {
                     connectedRiderIds.push(socket.riderId);
                 }
             });
 
-            // Filter to only include riders who are:
-            // 1. Available in DB
-            // 2. Connected via socket
-            // 3. Have no assigned orders
-            const actuallyAvailableRiders = availableRidersFromDB.filter(rider => {
-                const isConnected = connectedRiderIds.includes(rider.id);
-                const hasNoAssignedOrders = rider.orders.length === 0;
-                
-                if (!isConnected) {
-                    logger.warn(`🚫 Rider ${rider.id} is available in DB but not connected via socket`);
-                }
-                if (!hasNoAssignedOrders) {
-                    logger.warn(`🚫 Rider ${rider.id} has ${rider.orders.length} assigned orders: ${rider.orders.map(o => o.orderNumber).join(', ')}`);
-                }
-                
-                return isConnected && hasNoAssignedOrders;
-            });
-
-            logger.info(`🔍 Final count: ${actuallyAvailableRiders.length} riders who are available, connected, and have no assigned orders`);
-
-            // Log details for debugging
-            actuallyAvailableRiders.forEach(rider => {
-                logger.info(`✅ Available rider: ${rider.id} (${rider.user.name}) - No assigned orders`);
-            });
-
-            return actuallyAvailableRiders.slice(0, 5); // Limit to 5 riders
-            
+            return riders.filter(rider => connectedRiderIds.includes(rider.id));
         } catch (error) {
-            logger.error({ error, orderId: jobData.orderId }, 'Error finding available riders');
+            logger.error(`❌ Error finding available riders: ${error}`);
             return [];
         }
     }
 
     /**
-     * Broadcast delivery job to riders via WebSocket
-     * Real-world: Sends popup notification to rider apps
+     * 🚀 HELPER: Broadcast order to available riders
      */
-    private static async broadcastToRiders(broadcastData: DeliveryJobBroadcastType, riders: any[], socketManager?: any): Promise<void> {
+    private static async broadcastToRiders(queueItem: any, riders: any[]): Promise<void> {
         try {
-            // Get socket manager - either passed in or get from global instance
-            let manager = socketManager;
-            if (!manager) {
-                try {
-                    manager = getSocketManager();
-                } catch (error) {
-                    logger.warn('Socket manager not available, skipping WebSocket broadcast');
-                    return; // Skip WebSocket broadcast but don't fail
-                }
-            }
+            const order = queueItem.order;
+            const riderIds = riders.map(rider => rider.id);
             
-            if (!manager) {
-                logger.warn('No socket manager available, skipping WebSocket broadcast');
-                return; // Skip WebSocket broadcast but don't fail
-            }
-            
-            // 🔍 DEBUG: Check connected riders
-            const connectedRiders = manager.getConnectedRidersCount();
-            logger.info(`🔍 Connected riders: ${connectedRiders}`);
-            
-            // 🔍 DEBUG: Check if we have riders in the 'riders' room
-            const io = manager.getIO();
-            const ridersRoom = io.sockets.adapter.rooms.get('riders');
-            logger.info(`🔍 Riders in 'riders' room: ${ridersRoom ? ridersRoom.size : 0}`);
-            
-            // 🚀 NEW: Log the broadcast data
-            logger.info(`🔍 Broadcasting data: ${JSON.stringify(broadcastData, null, 2)}`);
-            
-            // Use the existing socket manager to broadcast to all riders
-            manager.emitToAllRiders('new_delivery_job', broadcastData);
-            
-            // 🚀 NEW: Also try emitting to individual rider rooms
-            riders.forEach(rider => {
-                logger.info(`🔍 Emitting to rider:${rider.id}`);
-                manager.emitToRider(rider.id, 'new_delivery_job', broadcastData);
+            // Use NotificationService for consistent delivery
+            await NotificationService.notifyDeliveryJob(riderIds, {
+                orderId: order.id,
+                vendorId: order.vendorId,
+                vendorName: order.vendor.businessName,
+                customerId: order.customerId,
+                customerName: order.customer.user.name,
+                pickupAddress: order.vendor.businessAddress || '',
+                deliveryAddress: order.deliveryAddress as string,
+                deliveryFee: order.deliveryFee,
+                totalAmount: order.total || 0,
+                items: order.items.map((item: any) => ({
+                    id: item.id,
+                    name: item.menuItem.name,
+                    quantity: item.quantity,
+                    price: item.unitPrice,
+                    unitPrice: item.unitPrice,
+                    totalPrice: item.totalPrice,
+                    specialInstructions: item.specialInstructions || ''
+                })),
+                createdAt: order.createdAt,
+                expiresAt: queueItem.expiresAt,
+                timer: 30, // This will need to be dynamic based on the order's timer
+                attempts: queueItem.attempts
             });
 
-            // 🚀 NEW: Send FCM push notification to all available riders
-            const fcmPromises = riders.map(async (rider) => {
-                try {
-                    await FCMService.sendToRider(rider.id, {
-                        title: '🚚 New Delivery Job Available!',
-                        body: `Order from ${broadcastData.vendorName} - ${broadcastData.deliveryFee} delivery fee`,
-                        data: {
-                            orderId: broadcastData.orderId,
-                            type: 'new_delivery_job',
-                            vendorName: broadcastData.vendorName,
-                            deliveryFee: broadcastData.deliveryFee,
-                            expiresAt: broadcastData.expiresAt.toISOString()
-                        }
-                    }, {
-                        orderId: broadcastData.orderId,
-                        riderId: rider.id
-                    })
+            logger.info(`📡 Order ${order.id} broadcasted to ${riderIds.length} riders`);
 
-                    logger.info(`🔍 Sent FCM push notification to rider:${rider.id}`);
-                } catch (error) {
-                    logger.error({ error, riderId: rider.id }, 'Error sending FCM push notification');
-                }
-            })
-
-            // Wait for all FCM notifications to be sent
-            await Promise.allSettled(fcmPromises);
-            
-            logger.info(`Delivery job broadcasted to ${riders.length} riders for order ${broadcastData.orderId}`);
         } catch (error) {
-            logger.error({ error, orderId: broadcastData.orderId }, 'Error broadcasting delivery job');
-            throw new CustomError('Failed to broadcast delivery job', 500);
+            logger.error({ error, orderId: queueItem.orderId }, 'Error broadcasting to riders');
         }
     }
 
     /**
-     * Calculate distance between two points using Haversine formula
-     * Real-world: Calculates straight-line distance between vendor and rider
+     * 🚀 MAIN: Trigger queue processing when rider comes online
      */
-    private static calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
-        const R = 6371; // Earth's radius in kilometers
-        const dLat = this.toRadians(lat2 - lat1);
-        const dLon = this.toRadians(lon2 - lon1);
-        
-        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                  Math.cos(this.toRadians(lat1)) * Math.cos(this.toRadians(lat2)) *
-                  Math.sin(dLon / 2) * Math.sin(dLon / 2);
-        
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        const distance = R * c;
-        
-        return distance;
+    public static async onRiderComesOnline(): Promise<void> {
+        logger.info(`🚀 Rider came online, triggering queue processing`);
+        this.processQueue();
     }
 
-    private static toRadians(degrees: number): number {
-        return degrees * (Math.PI / 180);
-    }
-
-    // Add this method to handle the case where order is already assigned
-    public static async handleAlreadyAssignedOrder(orderId: string): Promise<void> {
-        try {
-            const socketManager = getSocketManager();
-            socketManager.emitToAllRiders('delivery_job_removed', {
-                orderId: orderId,
-                reason: 'already_assigned'
-            });
-            logger.info(`Sent delivery_job_removed for already assigned order ${orderId}`);
-        } catch (error) {
-            logger.error({ error, orderId }, 'Error handling already assigned order');
-        }
-    }
-
-    // 🚀 NEW: Send batched notifications instead of individual ones
-    private static async sendBatchedNoRidersNotifications(ordersWithNoRidersByVendor: Map<string, string[]>): Promise<void> {
-        const socketManager = getSocketManager();
-        
-        for (const [vendorId, orderIds] of ordersWithNoRidersByVendor) {
-            if (orderIds.length > 0) {
-                socketManager.emitToVendor(vendorId, 'no_riders_available', {
-                    orderIds: orderIds,
-                    message: `No riders are currently available for ${orderIds.length} order(s). Orders will be broadcast when riders come online.`,
-                    status: 'waiting_for_riders'
-                });
-                logger.info(`📢 Sent batched no-riders notification to vendor ${vendorId} for ${orderIds.length} orders`);
-            }
-        }
+    /**
+     * 🚀 LEGACY: Keep for backward compatibility
+     */
+    public static async broadcastDeliveryJob(jobData: any, socketManager?: any): Promise<void> {
+        // Convert to new system
+        await this.addOrderToQueue(jobData.orderId);
     }
 }

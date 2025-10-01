@@ -1,36 +1,8 @@
 import { create } from 'zustand';
+import { UnifiedOrder } from '../types/order';
 
-// Delivery job data structure
-export interface DeliveryJob {
-    orderId: string;
-    vendor: {
-        id: string;
-        name: string;
-        address: string;
-        phone?: string;
-        lat: number;
-        lng: number;
-    };
-    customer: {
-        id: string;
-        name: string;
-        phone?: string; 
-        address: string;
-        lat: number;
-        lng: number;
-    };
-    deliveryAddress: any;
-    deliveryFee: number;
-    estimatedDistance: number;
-    items: Array<{
-        id: string;
-        name: string;
-        quantity: number;
-        price: number;
-    }>;
-    createdAt: string;
-    expiresIn: number; // seconds
-}
+// 🚀 FIXED: Use unified types
+export type DeliveryJob = UnifiedOrder;
 
 // Real-time order update
 export interface RealtimeOrderUpdate {

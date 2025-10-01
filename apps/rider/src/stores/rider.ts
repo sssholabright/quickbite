@@ -8,7 +8,6 @@ interface RiderState {
     isOnline: boolean;
     isLoading: boolean;
     error: string | null;
-    socket: any;
     pushToken: string | null;
     notificationsEnabled: boolean;
     
@@ -20,7 +19,7 @@ interface RiderState {
     sendTestNotification: () => Promise<void>;
     
     // 🚀 NEW: Socket reference for emitting events
-    setSocket: (socket: any) => void;
+    // ❌ REMOVE: setSocket: (socket: any) => void;
 }
 
 export const useRiderStore = create<RiderState>()(
@@ -29,7 +28,7 @@ export const useRiderStore = create<RiderState>()(
             isOnline: false,
             isLoading: false,
             error: null,
-            socket: null,
+            // ❌ REMOVE: socket: null,
             pushToken: null,
             notificationsEnabled: false,
 
@@ -43,17 +42,8 @@ export const useRiderStore = create<RiderState>()(
                     
                     console.log(`✅ Database updated, rider online: ${isOnline}`);
                     
-                    // 🚀 NEW: Emit socket event
-                    const { socket } = get();
-                    if (socket) {
-                        socket.emit('rider_status_change', { 
-                            isOnline, 
-                            isAvailable: true
-                        });
-                        console.log(`📡 Emitted rider_status_change: isOnline=${isOnline}`);
-                    } else {
-                        console.error('❌ Socket is null, cannot emit rider_status_change');
-                    }
+                    // ✅ Get socket from context instead of state
+                    // This will be handled by the socket context
                     
                     set({ 
                         isOnline,
@@ -80,17 +70,8 @@ export const useRiderStore = create<RiderState>()(
                     
                     console.log(`✅ Database updated, rider status:`, data);
                     
-                    // 🚀 NEW: Emit socket event
-                    const { socket } = get();
-                    if (socket) {
-                        socket.emit('rider_status_change', { 
-                            isOnline: data.isOnline !== undefined ? data.isOnline : get().isOnline,
-                            isAvailable: data.isAvailable !== undefined ? data.isAvailable : true
-                        });
-                        console.log(`📡 Emitted rider_status_change:`, data);
-                    } else {
-                        console.error('❌ Socket is null, cannot emit rider_status_change');
-                    }
+                    // 🚀 FIXED: Remove socket emission since socket is not in store
+                    // Socket events will be handled by the useSocket hook
                     
                     set({ 
                         ...(data.isOnline !== undefined && { isOnline: data.isOnline }),
@@ -159,7 +140,7 @@ export const useRiderStore = create<RiderState>()(
                 }
             },
 
-            setSocket: (socket) => set({ socket }),
+            // ❌ REMOVE: setSocket: (socket) => set({ socket }),
         }),
         {
             name: 'rider-status-storage',

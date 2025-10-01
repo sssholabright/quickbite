@@ -65,7 +65,6 @@ async function testDeliveryFlow() {
                 // userId: 'test-rider-user',
                 vehicleType: 'BIKE',
                 isOnline: true,
-                isAvailable: true,
                 currentLat: 40.7589,
                 currentLng: -73.9851,
                 user: {
@@ -89,7 +88,6 @@ async function testDeliveryFlow() {
                 name: 'Test Burger',
                 description: 'A delicious test burger',
                 price: 12.99,
-                isAvailable: true,
                 // category: 'MAIN_COURSE'
             }
         });
@@ -156,7 +154,7 @@ async function testDeliveryFlow() {
         console.log('🔄 Testing rider acceptance...');
         
         const { DeliveryJobService } = await import('../modules/delivery/deliveryJob.service.js');
-        await DeliveryJobService.handleRiderAcceptance(testOrder.id, testRider.id);
+        await DeliveryJobService.handleRiderAcceptsOrder(testOrder.id, testRider.id);
         
         // Check if order was assigned to rider
         const finalOrder = await prisma.order.findUnique({

@@ -27,7 +27,6 @@ export interface AuthResult {
             userId: string;
             vehicleType: string;
             isOnline: boolean;
-            isAvailable: boolean;
             currentLat: number | null;
             currentLng: number | null;
             bankAccount: string | null;

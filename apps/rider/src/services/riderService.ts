@@ -137,7 +137,7 @@ const riderService = {
                 }
             });
             
-            console.log('📦 Raw API response:', JSON.stringify(response.data, null, 2));
+            // console.log('📦 Raw API response:', JSON.stringify(response.data, null, 2));
             
             return response.data.data;
         } catch (error: any) {

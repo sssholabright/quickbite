@@ -9,9 +9,9 @@ import { CTAButton } from "../../ui/CTAButton";
 import type { RootStackParamList } from "../../navigation/types";
 import type { RouteProp } from "@react-navigation/native";
 import riderService from "../../services/riderService";
-import { useSocket } from "../../hooks/useSocket";
 import { useOrderStore } from "../../stores/order"; 
 import AlertModal from '../../ui/AlertModal'; 
+import { useSocketContext } from "../../contexts/SocketContext";
 
 type OrderDetailRouteProp = RouteProp<RootStackParamList, 'OrderDetail'>;
 type OrderDetailNavigationProp = NativeStackNavigationProp<RootStackParamList, 'OrderDetail'>;
@@ -32,7 +32,7 @@ export default function OrderDetailScreen() {
 
     const [isLoading, setIsLoading] = useState(false);
 
-    const { socket, joinOrderRoom, leaveOrderRoom } = useSocket();
+    const { socket, joinOrderRoom, leaveOrderRoom } = useSocketContext();
 
     const [alertModal, setAlertModal] = useState({
         visible: false,
@@ -96,7 +96,7 @@ export default function OrderDetailScreen() {
         }
         
         const url = Platform.select({
-            ios: `http://maps.apple.com/?ll=${currentOrder.vendor.lat},${currentOrder.vendor.lng}&q=${encodeURIComponent(currentOrder.vendor.name)}`,
+            ios: `http://maps.apple.com/?ll=${currentOrder.vendor.lat},${currentOrder.vendor.lng}&q=${encodeURIComponent(currentOrder.vendor.name || '')}`,
             android: `google.navigation:q=${currentOrder.vendor.lat},${currentOrder.vendor.lng}&mode=d`
         });
         
@@ -106,14 +106,14 @@ export default function OrderDetailScreen() {
     }, [currentOrder, showAlert]);
 
     const navigateToCustomer = useCallback(() => {
-        if (!currentOrder?.dropoffLat || !currentOrder?.dropoffLng) {
+        if (!currentOrder?.customer.dropoffLat || !currentOrder?.customer.dropoffLng) {
             showAlert("Location Error", "Customer location not available", 'error');
             return;
         }
         
         const url = Platform.select({
-            ios: `http://maps.apple.com/?ll=${currentOrder.dropoffLat},${currentOrder.dropoffLng}&q=${encodeURIComponent('Delivery Address')}`,
-            android: `google.navigation:q=${currentOrder.dropoffLat},${currentOrder.dropoffLng}&mode=d`
+            ios: `http://maps.apple.com/?ll=${currentOrder.customer.dropoffLat},${currentOrder.customer.dropoffLng}&q=${encodeURIComponent('Delivery Address')}`,
+            android: `google.navigation:q=${currentOrder.customer.dropoffLat},${currentOrder.customer.dropoffLng}&mode=d`
         });
         
         if (url) {
@@ -127,11 +127,11 @@ export default function OrderDetailScreen() {
     }, [currentOrder?.vendor.phone, showAlert]);
 
     const callCustomer = useCallback(() => {
-        if (!currentOrder?.customerPhone) {
+        if (!currentOrder?.customer.phone) {
             showAlert("No Phone", "Customer phone number not available", 'warning');
             return;
         }
-        const url = `tel:${currentOrder.customerPhone}`;
+        const url = `tel:${currentOrder.customer.phone}`;
         Linking.openURL(url).catch(() => showAlert("Call Error", "Unable to start call", 'error'));
     }, [currentOrder, showAlert]);
 
@@ -299,7 +299,7 @@ export default function OrderDetailScreen() {
 
                     <View style={{ alignItems: "center", flex: 1 }}>
                         <Text style={{ fontSize: 12, color: theme.colors.muted }}>
-                            Order #{currentOrder.id.slice(-6)}
+                            Order #{currentOrder?.orderNumber}
                         </Text>
                         <Text style={{ fontSize: 16, fontWeight: "700", color: theme.colors.text }}>
                             {currentStatus === 'going_to_pickup' ? 'Go to Vendor' :
@@ -432,7 +432,7 @@ export default function OrderDetailScreen() {
                                 📍 Address
                             </Text>
                             <Text style={{ fontSize: 12, color: theme.colors.text, lineHeight: 22 }}>
-                                {currentOrder.vendor.pickupLocation}
+                                {currentOrder.vendor.address}
                             </Text>
                         </View>
 
@@ -508,7 +508,7 @@ export default function OrderDetailScreen() {
                             </View>
                             <View style={{ flex: 1 }}>
                                 <Text style={{ fontSize: 16, fontWeight: "700", color: theme.colors.text }}>
-                                    {currentOrder.customerName || 'Customer'}
+                                    {currentOrder.customer.name || 'Customer'}
                                 </Text>
                                 <Text style={{ fontSize: 12, color: theme.colors.muted }}>
                                     Delivery Address
@@ -521,7 +521,7 @@ export default function OrderDetailScreen() {
                                 📍 Address
                             </Text>
                             <Text style={{ fontSize: 12, color: theme.colors.text, lineHeight: 22 }}>
-                                {currentOrder.dropoffAddress}
+                                {currentOrder.customer.address}
                             </Text>
                         </View>
 
@@ -612,13 +612,13 @@ export default function OrderDetailScreen() {
                             alignItems: "center"
                         }}>
                             <Text style={{ fontSize: 12, color: theme.colors.muted, marginBottom: 4 }}>
-                                Payment Method
+                                PAID
                             </Text>
                             <Text style={{ fontSize: 14, fontWeight: "700", color: theme.colors.text }}>
-                                Cash on Delivery
+                                Delivery Fee
                             </Text>
                             <Text style={{ fontSize: 18, fontWeight: "800", color: theme.colors.primary, marginTop: 4 }}>
-                                ₦{(currentOrder.payout || 0).toLocaleString()}
+                                ₦{(currentOrder.deliveryFee || 0).toLocaleString()}
                             </Text>
                         </View>
                     </View>

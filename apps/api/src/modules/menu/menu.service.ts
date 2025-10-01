@@ -66,7 +66,6 @@ class MenuService {
     // Get all menu items for a vendor
     static async getVendorMenuItems(vendorId: string, filters?: {
         categoryId?: string;
-        isAvailable?: boolean;
         search?: string;
         page?: number;
         limit?: number;
@@ -85,10 +84,6 @@ class MenuService {
 
             if (filters?.categoryId) {
                 where.categoryId = filters.categoryId;
-            }
-
-            if (filters?.isAvailable !== undefined) {
-                where.isAvailable = filters.isAvailable;
             }
 
             if (filters?.search) {

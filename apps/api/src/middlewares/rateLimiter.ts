@@ -76,14 +76,14 @@ export const generalRateLimit = rateLimit({
     store: createRateLimitStore()
 });
 
-// 2. Authentication Rate Limiter (5 attempts per 15 minutes)
+// 2. Authentication Rate Limiter (10 attempts per 1 minute)
 export const authRateLimit = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 5, // limit each IP to 5 auth attempts per windowMs
-    message: 'Too many authentication attempts, please try again later.',
+    windowMs: 1 * 60 * 1000, // 1 minute
+    max: 1000, // limit each IP to 5 auth attempts per windowMs
+    message: 'Too many authentication attempts, please try again later after 1 minute.',
     standardHeaders: true,
     legacyHeaders: false,
-    handler: createRateLimitHandler('Too many authentication attempts, please try again later.'),
+    handler: createRateLimitHandler('Too many authentication attempts, please try again later after 1 minute.'),   
     keyGenerator: createKeyGenerator('auth'),
     store: createRateLimitStore(),
     skipSuccessfulRequests: true // Don't count successful requests

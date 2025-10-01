@@ -1,5 +1,5 @@
-import { createJSONStorage, persist } from 'zustand/middleware';
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
 
 export interface Notification {
     id: string;
@@ -17,7 +17,6 @@ export interface Notification {
     read: boolean;
     expiresAt?: string;
 }
-
 
 interface NotificationState {
     notifications: Notification[];
@@ -37,7 +36,6 @@ interface NotificationState {
     getNotificationsByType: (type: Notification['type']) => Notification[];
     hasUnreadNotifications: () => boolean;
 }
-
 
 export const useNotificationStore = create<NotificationState>()(
     persist(

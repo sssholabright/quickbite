@@ -195,6 +195,7 @@ model Order {
     serviceFee            Float
     total                 Float?
     items                 OrderItem[]
+    deliveryQueue   DeliveryQueue?
     deliveryAddress       Json
     specialInstructions   String?
     estimatedDeliveryTime DateTime?
@@ -253,6 +254,22 @@ model Review {
     @@map("reviews")
 }
 
+// 🚀 NEW: Delivery Queue for FIFO order processing
+model DeliveryQueue {
+    id              String              @id @default(cuid())
+    orderId         String              @unique
+    order           Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+    status          DeliveryQueueStatus @default(QUEUED)
+    attempts        Int                 @default(0)
+    position        Int                 // Position in FIFO queue
+    expiresAt       DateTime            // When this job expires
+    createdAt       DateTime            @default(now())
+    updatedAt       DateTime            @updatedAt
+
+    @@map("delivery_queue")
+}
+
+
 // Enums
 enum UserRole {
     CUSTOMER
@@ -284,4 +301,14 @@ enum AddOnCategory {
     SIZE
     SIDE
     CUSTOMIZATION
+}
+
+// 🚀 NEW: Delivery Queue Status Enum
+enum DeliveryQueueStatus {
+    QUEUED
+    BROADCASTING
+    ASSIGNED
+    TIMEOUT
+    REJECTED
+    COMPLETED
 }

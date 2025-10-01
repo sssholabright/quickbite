@@ -12,7 +12,7 @@ export class QueueService {
     private timeoutQueue: Queue<OrderTimeoutJobData>;
 
     // Workers for processing jobs
-    private deliveryWorker!: Worker<DeliveryJobData>;
+    // private deliveryWorker!: Worker<DeliveryJobData>;
     private locationWorker!: Worker<LocationUpdateJobData>;
     private etaWorker!: Worker<ETAUpdateJobData>;
     private timeoutWorker!: Worker<OrderTimeoutJobData>;
@@ -58,45 +58,45 @@ export class QueueService {
         };
 
         // Delivery job worker - broadcasts delivery jobs to riders
-        this.deliveryWorker = new Worker<DeliveryJobData>(
-            'delivery-jobs',
-            async (job: Job<DeliveryJobData>) => {
-                console.log(`🔄 WORKER: Processing delivery job for order ${job.data.orderId} (attempt ${job.attemptsMade + 1})`);
+        // this.deliveryWorker = new Worker<DeliveryJobData>(
+        //     'delivery-jobs',
+        //     async (job: Job<DeliveryJobData>) => {
+        //         console.log(`🔄 WORKER: Processing delivery job for order ${job.data.orderId} (attempt ${job.attemptsMade + 1})`);
 
-                try {
-                    // Import here to avoid circular dependencies
-                    const { DeliveryJobService } = await import('../delivery/deliveryJob.service.js');
+        //         try {
+        //             // Import here to avoid circular dependencies
+        //             const { DeliveryJobService } = await import('../delivery/deliveryJob.service.js');
                     
-                    // Try to get the socket manager, but don't fail if it's not available
-                    let socketManager = null;
-                    try {
-                        const { getSocketManager } = await import('../../config/socket.js');
-                        socketManager = getSocketManager();
-                        console.log(`🔌 WORKER: Socket manager obtained successfully`);
-                    } catch (error) {
-                        console.error(`❌ WORKER: Socket manager not available: ${error}`);
-                        logger.warn('Socket manager not available in worker context, skipping WebSocket broadcast');
-                    }
+        //             // Try to get the socket manager, but don't fail if it's not available
+        //             let socketManager = null;
+        //             try {
+        //                 const { getSocketManager } = await import('../../config/socket.js');
+        //                 socketManager = getSocketManager();
+        //                 console.log(`🔌 WORKER: Socket manager obtained successfully`);
+        //             } catch (error) {
+        //                 console.error(`❌ WORKER: Socket manager not available: ${error}`);
+        //                 logger.warn('Socket manager not available in worker context, skipping WebSocket broadcast');
+        //             }
                     
-                    // Pass the socket manager to the delivery service (can be null)
-                    await DeliveryJobService.broadcastDeliveryJob(job.data, socketManager);
+        //             // Pass the socket manager to the delivery service (can be null)
+        //             await DeliveryJobService.broadcastDeliveryJob(job.data, socketManager);
                     
-                    console.log(`✅ WORKER: Successfully processed delivery job for order ${job.data.orderId}`);
-                    logger.info(`✅ Successfully processed delivery job for order ${job.data.orderId}`);
+        //             console.log(`✅ WORKER: Successfully processed delivery job for order ${job.data.orderId}`);
+        //             logger.info(`✅ Successfully processed delivery job for order ${job.data.orderId}`);
                     
-                } catch (error) {
-                    console.error(`❌ WORKER: Error processing delivery job: ${error}`);
-                    logger.error({ error, orderId: job.data.orderId, attempt: job.attemptsMade + 1 }, 'Error processing delivery job');
-                    throw error;
-                }
-            },
-            { 
-                connection,
-                concurrency: 1, // Process only one job at a time
-                removeOnComplete: { count: 5 }, // Keep only 5 completed jobs
-                removeOnFail: { count: 3 } // Keep only 3 failed jobs
-            }
-        );
+        //         } catch (error) {
+        //             console.error(`❌ WORKER: Error processing delivery job: ${error}`);
+        //             logger.error({ error, orderId: job.data.orderId, attempt: job.attemptsMade + 1 }, 'Error processing delivery job');
+        //             throw error;
+        //         }
+        //     },
+        //     { 
+        //         connection,
+        //         concurrency: 1, // Process only one job at a time
+        //         removeOnComplete: { count: 5 }, // Keep only 5 completed jobs
+        //         removeOnFail: { count: 3 } // Keep only 3 failed jobs
+        //     }
+        // );
 
         // Location update worker - processes rider location updates
         this.locationWorker = new Worker<LocationUpdateJobData>(
@@ -138,9 +138,9 @@ export class QueueService {
         );
 
         // Add error handling for all workers
-        this.deliveryWorker.on('error', (error) => {
-            logger.error({ error }, 'Delivery job worker error');
-        });
+        // this.deliveryWorker.on('error', (error) => {
+        //     logger.error({ error }, 'Delivery job worker error');
+        // });
 
         this.locationWorker.on('error', (error) => {
             logger.error({ error }, 'Location update worker error');
@@ -234,7 +234,7 @@ export class QueueService {
     // Clean up methods
     public async close(): Promise<void> {
         await Promise.all([
-            this.deliveryWorker.close(),
+            // this.deliveryWorker.close(),
             this.locationWorker.close(),
             this.etaWorker.close(),
             this.timeoutWorker.close(),

@@ -5,6 +5,8 @@ import { useAuthStore } from '../stores/auth';
 import { useRealtimeStore } from '../stores/realtime';
 
 // 🚀 ENHANCED: Complete socket event interfaces matching backend
+
+const API_SOCKET_URL = process.env.API_SOCKET_URL
 interface SocketEvents {
     // Order events
     order_status_update: (data: { orderId: string; status: string; timestamp: string; riderId?: string }) => void;
@@ -20,6 +22,28 @@ interface SocketEvents {
     order_delivered: (data: { orderId: string; riderId: string; timestamp: string }) => void;
     rider_location_update: (data: { orderId: string; riderId: string; location: { lat: number; lng: number }; timestamp: string }) => void;
     eta_update: (data: { orderId: string; eta: number; timestamp: string }) => void;
+
+    // 🚀 NEW: Notification events
+    notification_received: (data: {
+        id: string;
+        type: 'order' | 'delivery' | 'payment' | 'system';
+        title: string;
+        message: string;
+        data?: any;
+        priority: 'low' | 'normal' | 'high' | 'urgent';
+        actions?: Array<{ label: string; action: string; data?: any }>;
+        timestamp: string;
+        read: boolean;
+        expiresAt?: string;
+    }) => void;
+    
+    // 🚀 NEW: New order events
+    new_order: (data: {
+        orderId: string;
+        orderNumber: string;
+        total: number;
+        timestamp: string;
+    }) => void;
 }
 
 interface SocketEmitEvents {
@@ -57,7 +81,7 @@ export const useSocket = () => {
             reconnectTimeoutRef.current = null;
         }
 
-        const socketInstance = io('http://10.48.184.234:5000', {
+        const socketInstance = io(API_SOCKET_URL, {
             auth: {
                 token: tokens.accessToken
             },
@@ -92,7 +116,7 @@ export const useSocket = () => {
 
         // 🚀 ENHANCED: All socket event handlers
         socketInstance.on('order_status_update', (data) => {
-            console.log('📱 Order status updated:', data);
+            console.log('📱 Mobile: Order status updated:', data);
             updateOrderStatus(data.orderId, data.status);
             
             queryClient.setQueryData(['order', data.orderId], (oldData: any) => {
@@ -102,6 +126,14 @@ export const useSocket = () => {
                 return oldData;
             });
             queryClient.invalidateQueries({ queryKey: ['orders'] });
+            
+            // 🚀 NEW: Handle additional data from new notification system
+            if (data.rider) {
+                updateOrderRider(data.orderId, data.rider);
+            }
+            if (data.estimatedDeliveryTime) {
+                updateOrderETA(data.orderId, new Date(data.estimatedDeliveryTime));
+            }
         });
 
         socketInstance.on('order_updated', (data) => {
@@ -136,7 +168,7 @@ export const useSocket = () => {
         });
 
         socketInstance.on('rider_assigned', (data) => {
-            console.log('📱 Rider assigned to order:', data);
+            console.log('📱 Mobile: Rider assigned to order:', data);
             updateOrderStatus(data.orderId, 'ASSIGNED');
             updateOrderRider(data.orderId, data.rider);
             
@@ -196,8 +228,66 @@ export const useSocket = () => {
         });
 
         socketInstance.on('eta_update', (data) => {
-            console.log('📱 ETA update:', data);
-            updateOrderETA(data.orderId, new Date(Date.now() + data.eta * 60000)); // Convert minutes to Date
+            console.log('📱 Mobile: ETA update received:', data);
+            updateOrderETA(data.orderId, new Date(data.eta));
+            
+            queryClient.setQueryData(['order', data.orderId], (oldData: any) => {
+                if (oldData) {
+                    return { 
+                        ...oldData, 
+                        estimatedDeliveryTime: data.eta
+                    };
+                }
+                return oldData;
+            });
+        });
+
+        // 🚀 NEW: Notification event handlers
+        socketInstance.on('notification_received', (data) => {
+            console.log('🔔 Web notification received:', data);
+            
+            // Add to notification store
+            try {
+                // Assuming addNotification and showBrowserNotification are available globally or imported
+                // For now, we'll just log and show SweetAlert for simplicity
+                console.log('✅ Web notification added to store successfully');
+                // Example: addNotification({ ...data, type: 'order' }); // Assuming addNotification exists
+                // showBrowserNotification(data); // Assuming showBrowserNotification exists
+                // showSweetAlertNotification(data); // Assuming showSweetAlertNotification exists
+            } catch (error) {
+                console.error('❌ Error adding web notification to store:', error);
+            }
+            
+            // Show browser notification
+            // showBrowserNotification(data); // Assuming showBrowserNotification exists
+            
+            // Show SweetAlert for high priority
+            // showSweetAlertNotification(data); // Assuming showSweetAlertNotification exists
+        });
+
+        // Add handler for new_order events (web-specific)
+        socketInstance.on('new_order', (data) => {
+            console.log('🌐 New order received:', data);
+            
+            // Invalidate orders query to refresh the list
+            queryClient.invalidateQueries({ queryKey: ['orders'] });
+            
+            // Add new order notification
+            // Assuming addNotification is available globally or imported
+            // addNotification({
+            //     id: `new-order-${data.orderId}-${Date.now()}`,
+            //     type: 'order',
+            //     title: '🆕 New Order!',
+            //     message: `New order #${data.orderNumber} received`,
+            //     priority: 'urgent',
+            //     data: { 
+            //         orderId: data.orderId, 
+            //         orderNumber: data.orderNumber,
+            //         totalAmount: data.total
+            //     },
+            //     timestamp: data.timestamp || new Date().toISOString(),
+            //     read: false
+            // });
         });
 
         setSocket(socketInstance);

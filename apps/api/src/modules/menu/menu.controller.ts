@@ -77,7 +77,6 @@ export class MenuController {
 
             const filters = {
                 categoryId: req.query.categoryId as string,
-                isAvailable: req.query.isAvailable ? req.query.isAvailable === 'true' : undefined,
                 search: req.query.search as string,
                 page: req.query.page ? parseInt(req.query.page as string) : undefined,
                 limit: req.query.limit ? parseInt(req.query.limit as string) : undefined

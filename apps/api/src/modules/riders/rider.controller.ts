@@ -16,7 +16,6 @@ interface AuthenticatedRequest extends Request {
 
 interface UpdateRiderStatusData {
     isOnline?: boolean | undefined;
-    isAvailable?: boolean | undefined;
 }
 
 export class RiderController {
@@ -33,7 +32,6 @@ export class RiderController {
             // Validate request body
             const updateRiderStatusSchema = z.object({
                 isOnline: z.boolean().optional(),
-                isAvailable: z.boolean().optional(),
             });
 
             const validatedData = updateRiderStatusSchema.parse(req.body);
@@ -93,7 +91,7 @@ export class RiderController {
             const rider = await RiderService.getRiderStatus(userId);
             
             // Accept the delivery job
-            await DeliveryJobService.handleRiderAcceptance(orderId, rider.id);
+            await DeliveryJobService.handleRiderAcceptsOrder(orderId, rider.id);
             
             ResponseHandler.success(res as any, { orderId, riderId: rider.id }, 'Delivery job accepted successfully');
             
@@ -124,7 +122,7 @@ export class RiderController {
             const rider = await RiderService.getRiderStatus(userId);
             
             // Reject the delivery job
-            await DeliveryJobService.handleRiderRejection(orderId, rider.id);
+            await DeliveryJobService.handleRiderRejectsOrder(orderId, rider.id);
             
             ResponseHandler.success(res as any, { orderId, riderId: rider.id }, 'Delivery job rejected successfully');
             
@@ -214,7 +212,6 @@ export class RiderController {
                     longitude: rider.currentLng,
                 },
                 isOnline: rider.isOnline,
-                isAvailable: rider.isAvailable
             }, 'Rider location retrieved successfully');
             
         } catch (error) {

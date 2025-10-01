@@ -2,11 +2,7 @@ import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 import * as SecureStore from 'expo-secure-store';
 
 // API Configuration
-const API_BASE_URL = 'http://10.48.184.234:5000/api/v1'
-//  [
-//   'http://192.168.0.176:5000/api/v1',
-//   'http://10.200.122.234:5000/api/v1'
-// ];
+const API_BASE_URL = 'http://10.249.44.234:5000/api/v1'
 
 // Create axios instance
 const apiClient: AxiosInstance = axios.create({

@@ -5,7 +5,6 @@ import { getSocketManager } from '../../config/socket.js';
 
 interface UpdateRiderStatusData {
     isOnline?: boolean | undefined;
-    isAvailable?: boolean | undefined;
 }
 
 interface UpdateRiderLocationData {
@@ -34,7 +33,6 @@ export class RiderService {
                     where: { userId },
                     data: {
                         ...(updateData.isOnline !== undefined && { isOnline: updateData.isOnline }),
-                        ...(updateData.isAvailable !== undefined && { isAvailable: updateData.isAvailable }),
                     },
                     include: {
                         user: {
@@ -53,31 +51,10 @@ export class RiderService {
                     }
                 });
 
-                // Log the update for debugging
-                logger.info(`Rider status updated: ${existingRider.user.email} - Online: ${updated.isOnline}, Available: ${updated.isAvailable}`);
+                // 🚀 REMOVED: Don't emit rider_status_change here - let socket handler do it
+                // The socket handler will call EventManagerService.handleRiderStatusChange()
                 
-                // 🚀 NEW: Check for waiting orders when rider comes online and available
-                if (updated.isOnline && updated.isAvailable) {
-                    try {
-                        const { DeliveryJobService } = await import('../delivery/deliveryJob.service.js');
-                        await DeliveryJobService.checkWaitingOrders();
-                        logger.info(`Checked for waiting orders after rider ${updated.id} came online`);
-                    } catch (error) {
-                        logger.warn({ error }, 'Failed to check waiting orders');
-                    }
-                }
-                
-                // 🚀 NEW: Emit rider_status_change event after status update
-                try {
-                    const socketManager = getSocketManager();
-                    socketManager.emitToRider(updated.id, 'rider_status_change', {
-                        isOnline: updated.isOnline,
-                        isAvailable: updated.isAvailable
-                    });
-                    logger.info(`📡 Emitted rider_status_change to rider ${updated.id}`);
-                } catch (socketError) {
-                    logger.warn({ error: socketError }, 'Failed to emit rider_status_change event');
-                }
+                logger.info(`📡 Rider status updated in database: ${updated.id} - Online: ${updated.isOnline}`);
                 
                 return updated;
             });
@@ -136,7 +113,6 @@ export class RiderService {
                 userId: updatedRider.userId,
                 vehicleType: updatedRider.vehicleType,
                 isOnline: updatedRider.isOnline,
-                isAvailable: updatedRider.isAvailable,
                 currentLat: updatedRider.currentLat,
                 currentLng: updatedRider.currentLng,
                 bankAccount: updatedRider.bankAccount,
@@ -187,7 +163,6 @@ export class RiderService {
                 userId: rider.userId,
                 vehicleType: rider.vehicleType,
                 isOnline: rider.isOnline,
-                isAvailable: rider.isAvailable,
                 currentLat: rider.currentLat,
                 currentLng: rider.currentLng,
                 bankAccount: rider.bankAccount,
@@ -248,7 +223,6 @@ export class RiderService {
                 userId: updatedRider.userId,
                 vehicleType: updatedRider.vehicleType,
                 isOnline: updatedRider.isOnline,
-                isAvailable: updatedRider.isAvailable,
                 currentLat: updatedRider.currentLat,
                 currentLng: updatedRider.currentLng,
                 bankAccount: updatedRider.bankAccount,

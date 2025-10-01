@@ -65,7 +65,6 @@ describe('Delivery System Integration Tests', () => {
                 // userId: 'test-rider-user',
                 vehicleType: 'BIKE',
                 isOnline: true,
-                isAvailable: true,
                 currentLat: 40.7589,
                 currentLng: -73.9851,
                 user: {
@@ -95,8 +94,7 @@ describe('Delivery System Integration Tests', () => {
                 categoryId: testCategory.id, // Use the actual category ID
                 name: 'Test Burger',
                 description: 'A delicious test burger',
-                price: 12.99,
-                isAvailable: true
+                price: 12.99
             }
         });
 
@@ -274,13 +272,11 @@ describe('Delivery System Integration Tests', () => {
                 .set('Authorization', `Bearer ${riderToken}`)
                 .send({
                     isOnline: true,
-                    isAvailable: false
                 });
 
             expect(response.status).toBe(200);
             expect(response.body.success).toBe(true);
             expect(response.body.data.isOnline).toBe(true);
-            expect(response.body.data.isAvailable).toBe(false);
         });
 
         it('should allow rider to get status', async () => {
@@ -291,7 +287,6 @@ describe('Delivery System Integration Tests', () => {
             expect(response.status).toBe(200);
             expect(response.body.success).toBe(true);
             expect(response.body.data).toHaveProperty('isOnline');
-            expect(response.body.data).toHaveProperty('isAvailable');
         });
     });
 });

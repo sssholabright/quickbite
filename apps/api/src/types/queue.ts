@@ -9,11 +9,19 @@ export interface DeliveryJobData {
     deliveryAddress: string;
     deliveryFee: number;
     distance: number;
+    estimatedDistance: number; // Add this
+    expiresIn: number; // Add this
+    timer: number; // Add this
+    totalAmount: number; // Add this
+    orderNumber: string; // Add this
     items: Array<{
         id: string;
         name: string;
         quantity: number;
         price: number;
+        unitPrice: number; // Add this
+        totalPrice: number; // Add this
+        specialInstructions?: string; // Add this
     }>;
     createdAt: Date;
     expiresAt: Date;

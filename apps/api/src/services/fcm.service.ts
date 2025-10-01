@@ -356,7 +356,6 @@ export class FCMService {
             const riders = await prisma.rider.findMany({
                 where: {
                     isOnline: true,
-                    isAvailable: true,
                     pushToken: { not: null },
                     currentLat: { not: null },
                     currentLng: { not: null }

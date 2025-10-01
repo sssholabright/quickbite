@@ -1,3 +1,4 @@
+import { NotificationService } from './../notifications/notification.service.js';
 import { Request, Response, NextFunction } from 'express';
 import { OrderService } from './order.service.js';
 import { createOrderSchema, updateOrderStatusSchema, cancelOrderSchema } from '../../validations/order.js';
@@ -5,7 +6,6 @@ import { logger } from '../../utils/logger.js';
 import { CustomError } from '../../middlewares/errorHandler.js';
 import { OrderFilters } from '../../types/order.js';
 import { prisma } from '../../config/db.js';
-import { FCMService } from '../../services/fcm.service.js';
 
 export class OrderController {
     // Create new order
@@ -24,6 +24,26 @@ export class OrderController {
             }
 
             const order = await OrderService.createOrder(customer.id, validatedData);
+
+            // 🚀 NEW: Use unified notification service for new orders
+            setTimeout(async () => {
+                try {
+                    await NotificationService.notifyVendor(order.vendor.id, {
+                        type: 'new_order',
+                        title: '🆕 New Order!',
+                        message: `New order #${order.orderNumber} received`,
+                        data: {
+                            orderId: order.id,
+                            orderNumber: order.orderNumber,
+                            customerName: order.customer?.name || 'Unknown Customer',
+                            total: order.pricing.total
+                        },
+                        priority: 'urgent'
+                    });
+                } catch (error) {
+                    logger.error({ error, orderId: order.id }, 'Failed to notify vendor');
+                }
+            }, 2000);
 
             res.status(201).json({
                 success: true,
@@ -81,9 +101,6 @@ export class OrderController {
     // Update order status
     static async updateOrderStatus(req: Request, res: Response): Promise<void> {
         try {
-            const { getSocketManager } = await import('../../config/socket.js');
-            const socketManager = getSocketManager();
-
             const { orderId } = req.params;
             const userId = (req.user as any).userId as string;
             const userRole = (req.user as any).role as string;
@@ -91,169 +108,21 @@ export class OrderController {
 
             const order = await OrderService.updateOrderStatus(orderId!, validatedData, userId, userRole);
 
-            // 🚀 ENHANCED: Send push notifications for important status changes
-            const importantStatuses = ['ASSIGNED', 'PICKED_UP', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED'];
+            // 🚀 FIXED: Use ONLY NotificationService - remove all direct socket calls
             const notificationStatuses = ['CONFIRMED', 'PREPARING', 'READY_FOR_PICKUP', 'ASSIGNED', 'PICKED_UP', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED'];
 
-            if (importantStatuses.includes(validatedData.status)) {
-                // Emit socket events only for important status changes
-                socketManager.emitToOrder(orderId!, 'order_updated', { order: order });
-                socketManager.emitToOrder(orderId!, 'order_status_update', {
-                    orderId: orderId!,
-                    status: validatedData.status,
-                    timestamp: new Date().toISOString()
-                });
-
-                // Emit to specific users
-                if (order.customer) {
-                    socketManager.emitToCustomer(order.customer.id, 'order_status_update', {
-                        orderId: orderId!,
-                        status: validatedData.status,
-                        timestamp: new Date().toISOString()
-                    });
-                }
-
-                socketManager.emitToVendor(order.vendor.id, 'order_status_update', {
-                    orderId: orderId!,
-                    status: validatedData.status,
-                    timestamp: new Date().toISOString()
-                });
-            }
-
-            // 🚀 NEW: Send push notifications for notification-worthy status changes
             if (notificationStatuses.includes(validatedData.status)) {
-                // Prepare notification content
-                let notificationTitle = '';
-                let notificationMessage = '';
-                let priority: 'low' | 'normal' | 'high' | 'urgent' = 'normal';
-                
-                switch (validatedData.status) {
-                    case 'CONFIRMED':
-                        notificationTitle = 'Order Confirmed';
-                        notificationMessage = `Order #${order.orderNumber} has been confirmed`;
-                        priority = 'high';
-                        break;
-                    case 'PREPARING':
-                        notificationTitle = 'Order Being Prepared';
-                        notificationMessage = `Order #${order.orderNumber} is being prepared`;
-                        priority = 'normal';
-                        break;
-                    case 'READY_FOR_PICKUP':
-                        notificationTitle = 'Order Ready for Pickup!';
-                        notificationMessage = `Order #${order.orderNumber} is ready for pickup`;
-                        priority = 'high';
-                        break;
-                    case 'ASSIGNED':
-                        notificationTitle = 'Rider Assigned';
-                        notificationMessage = `A rider has been assigned to your order #${order.orderNumber}`;
-                        priority = 'high';
-                        break;
-                    case 'PICKED_UP':
-                        notificationTitle = 'Order Picked Up';
-                        notificationMessage = `Order #${order.orderNumber} has been picked up and is on the way`;
-                        priority = 'high';
-                        break;
-                    case 'OUT_FOR_DELIVERY':
-                        notificationTitle = 'Order Out for Delivery';
-                        notificationMessage = `Order #${order.orderNumber} is out for delivery`;
-                        priority = 'high';
-                        break;
-                    case 'DELIVERED':
-                        notificationTitle = 'Order Delivered';
-                        notificationMessage = `Order #${order.orderNumber} has been delivered successfully`;
-                        priority = 'high';
-                        break;
-                    case 'CANCELLED':
-                        notificationTitle = 'Order Cancelled';
-                        notificationMessage = `Order #${order.orderNumber} has been cancelled`;
-                        priority = 'high';
-                        break;
-                    default:
-                        notificationTitle = 'Order Status Updated';
-                        notificationMessage = `Order #${order.orderNumber} status changed to ${validatedData.status}`;
-                        priority = 'normal';
-                }
-
-                // 🚀 NEW: Send push notifications to customer
-                if (order.customer) {
-                    try {
-                        await FCMService.sendOrderNotification(orderId!, {
-                            title: notificationTitle,
-                            body: notificationMessage,
-                            data: { 
-                                orderId: order.id, 
-                                status: validatedData.status,
-                                type: 'order_status_update'
-                            }
-                        }, 'CUSTOMER');
-                        
-                        logger.info(`Push notification sent to customer for order ${orderId}`);
-                    } catch (error) {
-                        logger.error({ error, orderId, customerId: order.customer.id }, 'Failed to send push notification to customer');
+                await NotificationService.notifyOrderStatusUpdate(
+                    orderId!,
+                    validatedData.status,
+                    order.customer?.id,
+                    validatedData.riderId,
+                    order.vendor.id,
+                    {
+                        orderNumber: order.orderNumber,
+                        timestamp: new Date().toISOString()
                     }
-                }
-
-                // 🚀 NEW: Send push notifications to vendor
-                try {
-                    await FCMService.sendOrderNotification(orderId!, {
-                        title: notificationTitle,
-                        body: notificationMessage,
-                        data: { 
-                            orderId: order.id, 
-                            status: validatedData.status,
-                            type: 'order_status_update'
-                        }
-                    }, 'VENDOR');
-                    
-                    logger.info(`Push notification sent to vendor for order ${orderId}`);
-                } catch (error) {
-                    logger.error({ error, orderId, vendorId: order.vendor.id }, 'Failed to send push notification to vendor');
-                }
-
-                // 🚀 NEW: Send push notifications to rider (if assigned)
-                if (order.rider) {
-                    try {
-                        await FCMService.sendOrderNotification(orderId!, {
-                            title: notificationTitle,
-                            body: notificationMessage,
-                            data: { 
-                                orderId: order.id, 
-                                status: validatedData.status,
-                                type: 'order_status_update'
-                            }
-                        }, 'RIDER');
-                        
-                        logger.info(`Push notification sent to rider for order ${orderId}`);
-                    } catch (error) {
-                        logger.error({ error, orderId, riderId: order.rider.id }, 'Failed to send push notification to rider');
-                    }
-                }
-
-                // 🚀 ENHANCED: Also send in-app notifications via socket
-                if (order.customer) {
-                    socketManager.emitToCustomer(order.customer.id, 'notification_received', {
-                        id: `order-status-${order.id}-${Date.now()}`,
-                        type: 'order',
-                        title: notificationTitle,
-                        message: notificationMessage,
-                        priority: priority,
-                        data: { orderId: order.id, status: validatedData.status },
-                        timestamp: new Date().toISOString(),
-                        read: false
-                    });
-                }
-                
-                // Notify vendor
-                socketManager.emitToVendor(order.vendor.id, 'notification_received', {
-                    id: `order-status-vendor-${order.id}-${Date.now()}`,
-                    type: 'order',
-                    title: notificationTitle,
-                    message: notificationMessage,
-                    priority: priority,
-                    data: { orderId: order.id, status: validatedData.status },
-                    timestamp: new Date().toISOString(),
-                    read: false
-                });
+                );
             }
 
             res.json({
@@ -459,7 +328,7 @@ export class OrderController {
             console.log('🧪 Test data:', JSON.stringify(testData, null, 2));
             
             // Test emission
-            socketManager.emitToAllRiders('new_delivery_job', testData);
+            socketManager.emitToAllRiders('delivery_job', testData);
             
             res.status(200).json({
                 success: true,

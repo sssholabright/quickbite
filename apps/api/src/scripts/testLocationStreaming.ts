@@ -60,7 +60,6 @@ async function testLocationStreaming() {
             data: {
                 vehicleType: 'BIKE',
                 isOnline: true,
-                isAvailable: true,
                 currentLat: 40.7128,
                 currentLng: -74.0060,
                 user: {

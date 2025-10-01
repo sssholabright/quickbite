@@ -35,7 +35,7 @@ async function broadcastExistingOrders() {
         console.log('🔄 Checking for waiting orders using sequential processing...');
         
         try {
-            await DeliveryJobService.checkWaitingOrders();
+            await DeliveryJobService.onRiderComesOnline();
             console.log('✅ Successfully triggered sequential broadcasting of waiting orders');
             
             // Wait a moment for processing to complete

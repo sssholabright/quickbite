@@ -1,6 +1,9 @@
 {
   "name": "quickbite",
   "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
   "scripts": {
     "build": "cd apps/web && npm run build"
   }

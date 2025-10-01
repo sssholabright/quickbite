@@ -6,19 +6,21 @@ import { useTheme } from "../../theme/theme";
 import { SafeAreaWrapper } from "../../ui/SafeAreaWrapper";
 import { Icon } from "../../ui/Icon";
 import { CTAButton } from "../../ui/CTAButton";
-import { RiderAvailableOrder } from "../../types/order";
+import { UnifiedOrder } from "../../types/order";
 import { RootStackParamList } from "../../navigation/types";
 import { LocationStatusIndicator } from '../../components/LocationStatusIndicator';
 import { useLocationStatus } from '../../hooks/useLocationStatus';
 import { useRiderStore } from '../../stores/rider';
 import { useAuthStore } from '../../stores/auth';
 import { useOrderStore } from '../../stores/order';
-import { useSocket } from '../../hooks/useSocket';
+import { useSocketContext } from '../../contexts/SocketContext';
 import { useRealtimeStore, DeliveryJob } from '../../stores/realtime';
 import riderService from '../../services/riderService';
 import { useLocationStore } from '../../stores/location';
 import AlertModal from '../../ui/AlertModal'; 
-import notificationService from "../../services/notificationService";
+import { DataTransform } from '../../utils/dataTransform';
+import { TimerUtils } from '../../utils/timerUtils';
+import { ErrorHandler } from '../../utils/errorHandler';
 
 // React Native compatible timer component
 const CountdownTimer = ({ seconds, onComplete }: { seconds: number; onComplete: () => void }) => {
@@ -103,9 +105,9 @@ export default function HomeScreen() {
         canReceiveNewOrders 
     } = useOrderStore();
 
-    const { socket, isConnected, connectionStatus, joinOrderRoom, leaveOrderRoom, sendLocationUpdate, markOrderPickedUp, markOrderDelivered, setSocket } = useSocket();
+    const { socket, isConnected, connectionStatus, joinOrderRoom } = useSocketContext();
     
-    const { deliveryJobs, getActiveDeliveryJobs, removeDeliveryJob, addDeliveryJob } = useRealtimeStore();
+    const { deliveryJobs, getActiveDeliveryJobs, removeDeliveryJob } = useRealtimeStore();
 
     //  NEW: Alert modal state
     const [alertModal, setAlertModal] = useState({
@@ -151,8 +153,13 @@ export default function HomeScreen() {
     }, []);
 
     const getConnectionStatusInfo = () => {
-        if (connectionStatus === 'connected') return { color: '#10b981', text: 'Connected', icon: 'wifi' };
-        if (connectionStatus === 'reconnecting') return { color: '#f59e0b', text: 'Reconnecting', icon: 'refresh' };
+        // 🚀 IMPROVED: Better connection status detection
+        if (isConnected && connectionStatus === 'connected') {
+            return { color: '#10b981', text: 'Connected', icon: 'wifi' };
+        }
+        if (connectionStatus === 'reconnecting') {
+            return { color: '#f59e0b', text: 'Reconnecting', icon: 'refresh' };
+        }
         return { color: '#ef4444', text: 'Disconnected', icon: 'wifi-off' };
     };
 
@@ -160,8 +167,14 @@ export default function HomeScreen() {
 
     const [activeDeliveryJobs, setActiveDeliveryJobs] = useState<DeliveryJob[]>([]);
     const [incomingDeliveryJob, setIncomingDeliveryJob] = useState<DeliveryJob | null>(null);
-    const [deliveryJobTimer, setDeliveryJobTimer] = useState(60);
+    // 🚀 IMPROVED: Use timer from backend data instead of hardcoded values
+    const [deliveryJobTimer, setDeliveryJobTimer] = useState(0);
     
+    // 🚀 IMPROVED: Calculate timer from backend data
+    const calculateTimeLeft = useCallback((job: DeliveryJob) => {
+        return TimerUtils.calculateTimeLeft(job);
+    }, []);
+
     const { currentLocation, sendInitialLocation, updateLocationForDelivery } = useLocationStore();
     
     const riderLocation = currentLocation || { latitude: 6.5244, longitude: 3.3792 };
@@ -206,31 +219,8 @@ export default function HomeScreen() {
                     if (undeliveredOrders.length > 0) {
                         const assignedOrder = undeliveredOrders[0];
                         
-                        const activeOrderData: RiderAvailableOrder = {
-                            id: assignedOrder.id,
-                            vendor: {
-                                id: assignedOrder.vendor?.id || '',
-                                name: assignedOrder.vendor?.businessName || 'Unknown Vendor',
-                                pickupLocation: assignedOrder.vendor?.businessAddress || '',
-                                phone: assignedOrder.vendor?.phone || '',
-                                lat: assignedOrder.vendor?.latitude || 0,
-                                lng: assignedOrder.vendor?.longitude || 0
-                            },
-                            dropoffAddress: assignedOrder.deliveryAddress?.address || '',
-                            dropoffLat: assignedOrder.deliveryAddress?.coordinates?.lat || 0,
-                            dropoffLng: assignedOrder.deliveryAddress?.coordinates?.lng || 0,
-                            customerName: assignedOrder.customer?.user?.name || 'Customer',
-                            customerPhone: assignedOrder.customer?.user?.phone || '',
-                            distanceKm: 0,
-                            payout: assignedOrder.deliveryFee || 0,
-                            items: (assignedOrder.items || []).map((item: any) => ({
-                                id: item.id,
-                                name: item.menuItem?.name || 'Unknown Item',
-                                quantity: item.quantity || 1,
-                                price: item.unitPrice || 0
-                            })),
-                            createdAt: new Date(assignedOrder.createdAt)
-                        };
+                        // 🚀 FIXED: Use unified data transformation
+                        const activeOrderData = DataTransform.transformOrder(assignedOrder);
                         
                         // Set the active order and status
                         setActiveOrder(activeOrderData);
@@ -252,16 +242,15 @@ export default function HomeScreen() {
                     }
                 }
             } catch (error: any) {
-                console.error('❌ Failed to check existing orders:', error);
+                ErrorHandler.logError(error, 'checkExistingOrders');
             }
         };
         
         checkExistingOrders();
     }, [isOnline, hasActiveOrder, setActiveOrder, setOrderStatus]);
 
-    // 🚀 ENHANCED: Update active delivery jobs when realtime store changes
+    // 🚀 IMPROVED: Update active delivery jobs with backend timer
     useEffect(() => {
-        // Only process delivery jobs when properly connected and can receive new orders
         if (!isConnected || connectionStatus !== 'connected' || !canReceiveNewOrders()) {
             return;
         }
@@ -269,90 +258,64 @@ export default function HomeScreen() {
         const jobs = getActiveDeliveryJobs();
         setActiveDeliveryJobs(jobs);
         
-        // 🚀 CRITICAL: Clear incoming delivery job if it's no longer in the store
         if (incomingDeliveryJob && !jobs.find(job => job.orderId === incomingDeliveryJob.orderId)) {
             setIncomingDeliveryJob(null);
-            setDeliveryJobTimer(60);
+            setDeliveryJobTimer(0);
         }
         
-        // Show the most recent delivery job as incoming (only if no active order)
         if (jobs.length > 0 && !incomingDeliveryJob && !hasActiveOrder()) {
             const latestJob = jobs[jobs.length - 1];
             setIncomingDeliveryJob(latestJob);
-            setDeliveryJobTimer(60);
+            // 🚀 IMPROVED: Use timer from backend data
+            setDeliveryJobTimer(calculateTimeLeft(latestJob));
         }
-    }, [deliveryJobs, getActiveDeliveryJobs, incomingDeliveryJob, hasActiveOrder, canReceiveNewOrders, isOnline, connectionStatus, isConnected]);
+    }, [deliveryJobs, getActiveDeliveryJobs, incomingDeliveryJob, hasActiveOrder, canReceiveNewOrders, isOnline, connectionStatus, isConnected, calculateTimeLeft]);
 
-    // Handle delivery job timer
+    // 🚀 IMPROVED: Handle delivery job timer using backend data
     useEffect(() => {
         if (!incomingDeliveryJob) return;
         
         const timer = setInterval(() => {
-            setDeliveryJobTimer(prev => {
-                if (prev <= 1) {
-                    handleDeliveryJobExpired();
-                    return 60;
-                }
-                return prev - 1;
-            });
+            const timeLeft = calculateTimeLeft(incomingDeliveryJob);
+            setDeliveryJobTimer(timeLeft);
+            
+            if (timeLeft <= 0) {
+                handleDeliveryJobExpired();
+            }
         }, 1000);
         
         return () => clearInterval(timer);
-    }, [incomingDeliveryJob]);
+    }, [incomingDeliveryJob, calculateTimeLeft]);
 
-    // Handle delivery job expiration
+    // 🚀 IMPROVED: Handle delivery job expiration
     const handleDeliveryJobExpired = useCallback(() => {
         if (incomingDeliveryJob) {
             removeDeliveryJob(incomingDeliveryJob.orderId);
             setIncomingDeliveryJob(null);
-            setDeliveryJobTimer(60);
+            setDeliveryJobTimer(0);
         }
     }, [incomingDeliveryJob, removeDeliveryJob]);
 
-    // Accept delivery job
+    // 🚀 IMPROVED: Accept delivery job using backend timer
     const acceptDeliveryJob = useCallback(async () => {
         if (!incomingDeliveryJob) return;
         
         try {
-            // Call API to accept the job
             await riderService.acceptDeliveryJob(incomingDeliveryJob.orderId);
-            
-            // Join the order room for real-time updates
             joinOrderRoom(incomingDeliveryJob.orderId);
             
-            // Convert delivery job to active order format
-            const activeOrderData: RiderAvailableOrder = {
-                id: incomingDeliveryJob.orderId,
-                vendor: {
-                    id: incomingDeliveryJob.vendor.id,
-                    name: incomingDeliveryJob.vendor.name,
-                    phone: incomingDeliveryJob.vendor.phone || '',
-                    pickupLocation: incomingDeliveryJob.vendor.address,
-                    lat: incomingDeliveryJob.vendor.lat,
-                    lng: incomingDeliveryJob.vendor.lng
-                },
-                dropoffAddress: incomingDeliveryJob.customer.address,
-                dropoffLat: incomingDeliveryJob.customer.lat,
-                dropoffLng: incomingDeliveryJob.customer.lng,
-                customerName: incomingDeliveryJob.customer.name,
-                customerPhone: incomingDeliveryJob.customer.phone,
-                distanceKm: incomingDeliveryJob.estimatedDistance,
-                payout: incomingDeliveryJob.deliveryFee,
-                items: incomingDeliveryJob.items,
-                createdAt: new Date(incomingDeliveryJob.createdAt)
-            };
-            
+            // 🚀 FIXED: Use unified data transformation
+            const activeOrderData = DataTransform.transformDeliveryJob(incomingDeliveryJob);
+
             showAlert(
                 "Job Accepted", 
                 "You have accepted the delivery job. Navigate to the vendor to pick up the order.",
                 'success'
             );
 
-            // 🚀 CRITICAL: Set active order in store
             setActiveOrder(activeOrderData);
             setOrderStatus('going_to_pickup');
             
-            // 🚀 CRITICAL: Navigate to OrderDetailScreen immediately
             navigation.navigate('OrderDetail', { 
                 order: activeOrderData, 
                 orderStatus: 'going_to_pickup',
@@ -370,36 +333,30 @@ export default function HomeScreen() {
                 }
             });
             
-            // Clear the popup and remove from delivery jobs
             setIncomingDeliveryJob(null);
-            setDeliveryJobTimer(60);
+            setDeliveryJobTimer(0);
             removeDeliveryJob(incomingDeliveryJob.orderId);
             
         } catch (error: any) {
-            console.error('Failed to accept delivery job:', error);
-            // 🚀 REPLACED: Alert.alert with custom modal
+            ErrorHandler.logError(error, 'acceptDeliveryJob');
             showAlert(
                 "Error", 
-                error.message || "Failed to accept delivery job",
+                ErrorHandler.handleApiError(error, 'accept delivery job'),
                 'error'
             );
         }
     }, [incomingDeliveryJob, joinOrderRoom, removeDeliveryJob, navigation, setActiveOrder, setOrderStatus, clearActiveOrder, showAlert]);
 
-    // Reject delivery job
+    // 🚀 IMPROVED: Reject delivery job
     const rejectDeliveryJob = useCallback(async () => {
         if (!incomingDeliveryJob) return;
         
         try {
-            // Call API to reject the job
             await riderService.rejectDeliveryJob(incomingDeliveryJob.orderId);
-            
-            // Remove from delivery jobs
             removeDeliveryJob(incomingDeliveryJob.orderId);
             setIncomingDeliveryJob(null);
-            setDeliveryJobTimer(60);
+            setDeliveryJobTimer(0);
             
-            // 🚀 REPLACED: Alert.alert with custom modal
             showAlert(
                 "Job Rejected", 
                 "Order will be assigned to another rider.",
@@ -407,11 +364,10 @@ export default function HomeScreen() {
             );
             
         } catch (error: any) {
-            console.error('Failed to reject delivery job:', error);
-            // 🚀 REPLACED: Alert.alert with custom modal
+            ErrorHandler.logError(error, 'rejectDeliveryJob');
             showAlert(
                 "Error", 
-                error.message || "Failed to reject delivery job",
+                ErrorHandler.handleApiError(error, 'reject delivery job'),
                 'error'
             );
         }
@@ -427,82 +383,19 @@ export default function HomeScreen() {
     };
 
     // Convert delivery job to order format for display
-    const convertDeliveryJobToOrder = useCallback((job: DeliveryJob): RiderAvailableOrder => {
-        return {
-            id: job.orderId,
-            vendor: {
-                id: job.vendor.id,
-                name: job.vendor.name,
-                pickupLocation: job.vendor.address,
-                phone: job.vendor.phone,
-                lat: job.vendor.lat,
-                lng: job.vendor.lng
-            },
-            dropoffAddress: job.customer.address,
-            dropoffLat: job.customer.lat,
-            dropoffLng: job.customer.lng,
-            customerName: job.customer.name,
-            customerPhone: job.customer.phone,
-            distanceKm: job.estimatedDistance,
-            payout: job.deliveryFee,
-            items: job.items,
-            createdAt: new Date(job.createdAt)
-        };
-    }, []);
-
-    // Set socket reference in rider store
-    useEffect(() => {
-        if (socket && isConnected) {
-            setSocket(socket);
-        }
-    }, [socket, isConnected, setSocket]);
+    // 🚀 REMOVED: convertDeliveryJobToOrder function - now using DataTransform
 
     // Set up notification listeners
     useEffect(() => {
-        const notificationListener = notificationService.addNotificationListener((notification) => {
-          console.log('📱 Received notification:', notification);
-          // Handle incoming notifications
-        });
-      
-        const responseListener = notificationService.addNotificationResponseListener((response) => {
-          console.log('�� Notification tapped:', response);
-          // Handle notification taps
-        });
-      
-        return () => {
-          notificationService.removeNotificationListener(notificationListener);
-          notificationService.removeNotificationListener(responseListener);
-        };
-      }, []);
+        // 🚀 REMOVED: Duplicate notification listeners - now handled in useSocket.ts
+    }, []);
 
     // Add a ref to track shown notifications
     const shownNotifications = useRef(new Set<string>());
 
     // Handle new delivery jobs with socket events
     useEffect(() => {
-        if (!socket) return;
-
-        const handleNewDeliveryJob = (data: any) => {
-            // Check if we've already shown notification for this job
-            if (!shownNotifications.current.has(data.orderId)) {
-                // Show notification
-                notificationService.scheduleLocalNotification({
-                    title: '🚚 New Delivery Job!',
-                    body: `Order from ${data.vendorName} - ₦${data.deliveryFee} delivery fee`,
-                    data: { orderId: data.orderId, type: 'delivery_job' }
-                });
-                
-                // Mark as shown
-                shownNotifications.current.add(data.orderId);
-            }
-        };  
-
-        // Listen to socket events
-        socket.on('new_delivery_job', handleNewDeliveryJob);
-        
-        return () => {
-            socket.off('new_delivery_job', handleNewDeliveryJob);
-        };
+        // 🚀 REMOVED: Duplicate socket event listeners - now handled in useSocket.ts
     }, [socket]);
 
     return (
@@ -638,36 +531,6 @@ export default function HomeScreen() {
                             />
                         </View>
 
-                        {/* Availability Toggle (only show when online)
-                        {/* {isOnline && (
-                            <View style={{ 
-                                flexDirection: "row", 
-                                alignItems: "center",
-                                justifyContent: "space-between",
-                                backgroundColor: theme.colors.background,
-                                paddingHorizontal: 16,
-                                paddingVertical: 12,
-                                borderRadius: 12,
-                                borderWidth: 1,
-                                borderColor: theme.colors.border
-                            }}>
-                                <Text style={{ 
-                                    fontSize: 16, 
-                                    fontWeight: "600",
-                                    color: theme.colors.text 
-                                }}>
-                                    {isAvailable ? "Available" : "Busy"}
-                                </Text>
-                                <Switch
-                                    value={isAvailable}
-                                    onValueChange={handleToggleAvailability}
-                                    trackColor={{ false: theme.colors.border, true: theme.colors.primary }}
-                                    thumbColor={isAvailable ? "white" : theme.colors.muted}
-                                    style={{ transform: [{ scaleX: 1.2 }, { scaleY: 1.2 }] }}
-                                />
-                            </View>
-                        )} */}
-
                         {/* Location Status */}
                         <View style={{
                             backgroundColor: theme.colors.background,
@@ -678,14 +541,6 @@ export default function HomeScreen() {
                             borderColor: theme.colors.border,
                             alignItems: "center"
                         }}>
-                            {/* <Text style={{ 
-                                fontSize: 12, 
-                                fontWeight: "600", 
-                                color: theme.colors.text,
-                                marginBottom: 8
-                            }}>
-                                Location Status
-                            </Text> */}
                             <LocationStatusIndicator />
                             <Text style={{ 
                                 fontSize: 12, 
@@ -721,7 +576,8 @@ export default function HomeScreen() {
                             horizontal
                             showsHorizontalScrollIndicator={false}
                             renderItem={({ item }) => {
-                                const order = convertDeliveryJobToOrder(item);
+                                const timeLeft = calculateTimeLeft(item); // 🚀 IMPROVED: Use backend timer calculation
+                                
                                 return (
                                     <Pressable
                                         style={{
@@ -735,7 +591,7 @@ export default function HomeScreen() {
                                         }}
                                         onPress={() => {
                                             setIncomingDeliveryJob(item);
-                                            setDeliveryJobTimer(60);
+                                            setDeliveryJobTimer(calculateTimeLeft(item)); // 🚀 IMPROVED: Use backend timer
                                         }}
                                     >
                                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -750,8 +606,12 @@ export default function HomeScreen() {
                                                     {item.items.length} items
                                                 </Text>
                                             </View>
-                                            <Text style={{ fontSize: 12, color: theme.colors.muted }}>
-                                                {Math.floor((item.expiresIn - (Date.now() - new Date(item.createdAt).getTime()) / 1000) / 60)}m left
+                                            <Text style={{ 
+                                                fontSize: 12, 
+                                                color: TimerUtils.isExpiringSoon(item) ? '#ef4444' : theme.colors.muted,
+                                                fontWeight: TimerUtils.isExpiringSoon(item) ? '600' : 'normal'
+                                            }}>
+                                                {TimerUtils.formatTimeLeft(timeLeft)}
                                             </Text>
                                         </View>
                                     </Pressable>
@@ -790,7 +650,7 @@ export default function HomeScreen() {
                                         Active Delivery
                                     </Text>
                                     <Text style={{ fontSize: 12, color: theme.colors.muted }}>
-                                        Order #{activeOrder.id.slice(-6)}
+                                        Order #{activeOrder.orderNumber}
                                     </Text>
                                 </View>
                                 <View style={{
@@ -830,10 +690,10 @@ export default function HomeScreen() {
                                     Deliver to:
                                 </Text>
                                 <Text style={{ fontSize: 14, fontWeight: "700", color: '#ef4444' }}>
-                                    {activeOrder.customerName || 'Customer'}
+                                    {activeOrder.customer.name || 'Customer'}
                                 </Text>
                                 <Text style={{ fontSize: 12, color: theme.colors.muted }}>
-                                    {activeOrder.dropoffAddress || 'Customer Location'}
+                                    {activeOrder.customer.address || 'Customer Location'}
                                 </Text>
                             </View>
 
@@ -1003,17 +863,6 @@ export default function HomeScreen() {
                                                 {incomingDeliveryJob.vendor.name}
                                             </Text>
                                         </View>
-                                        {/* <Text style={{ 
-                                            fontSize: 12, 
-                                            fontWeight: "700", 
-                                            color: theme.colors.primary,
-                                            backgroundColor: theme.colors.primary + '15',
-                                            paddingHorizontal: 8,
-                                            paddingVertical: 4,
-                                            borderRadius: 8
-                                        }}>
-                                            {incomingDeliveryJob.estimatedDistance.toFixed(1)} km
-                                        </Text> */}
                                     </View>
                                     <Text style={{ fontSize: 12, color: theme.colors.muted, marginLeft: 44 }}>
                                         📍 {incomingDeliveryJob.vendor.address}
@@ -1047,17 +896,6 @@ export default function HomeScreen() {
                                                 {incomingDeliveryJob.customer.name}
                                             </Text>
                                         </View>
-                                        {/* <Text style={{ 
-                                            fontSize: 12, 
-                                            fontWeight: "700", 
-                                            color: "#ef4444",
-                                            backgroundColor: '#ef4444' + '15',
-                                            paddingHorizontal: 8,
-                                            paddingVertical: 4,
-                                            borderRadius: 8
-                                        }}>
-                                            {incomingDeliveryJob.estimatedDistance.toFixed(1)} km
-                                        </Text> */}
                                     </View>
                                     <Text style={{ fontSize: 12, color: theme.colors.muted, marginLeft: 44 }}>
                                         🚚 {incomingDeliveryJob.customer.address}

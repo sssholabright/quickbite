@@ -43,7 +43,6 @@ async function testDeliveryJob() {
         const availableRiders = await prisma.rider.findMany({
             where: {
                 isOnline: true,
-                isAvailable: true,
                 currentLat: { not: null },
                 currentLng: { not: null }
             },

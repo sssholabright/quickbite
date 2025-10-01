@@ -7,6 +7,17 @@ Notifications.setNotificationHandler({
         console.log('📱 ===== NOTIFICATION HANDLER CALLED =====');
         console.log('📱 Notification:', notification);
         
+        // Handle different notification types from new system
+        const data = notification.request.content.data;
+        
+        if (data?.type === 'order_status_update') {
+            console.log('📱 Order status update notification');
+        } else if (data?.type === 'delivery_job') {
+            console.log('📱 Delivery job notification');
+        } else if (data?.type === 'rider_assigned') {
+            console.log('📱 Rider assigned notification');
+        }
+        
         // Always show notification
         return {
             shouldShowAlert: true,
@@ -375,6 +386,28 @@ class NotificationService {
             }
         } catch (error) {
             console.error('❌ Error testing direct Expo push:', error);
+        }
+    }
+
+    // Add method to handle FCM notifications from the new system
+    async handleFCMNotification(notification: {
+        title: string;
+        body: string;
+        data?: any;
+    }): Promise<void> {
+        try {
+            console.log('📱 Handling FCM notification:', notification);
+            
+            // Schedule local notification to ensure it shows
+            await this.scheduleLocalNotification({
+                title: notification.title,
+                body: notification.body,
+                data: notification.data || {}
+            });
+            
+            console.log('✅ FCM notification handled successfully');
+        } catch (error) {
+            console.error('❌ Error handling FCM notification:', error);
         }
     }
 }

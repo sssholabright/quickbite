@@ -34,7 +34,6 @@ async function checkRiderStatus() {
             console.log(`   Email: ${rider.user.email}`);
             console.log(`   Phone: ${rider.user.phone}`);
             console.log(`   Is Online: ${rider.isOnline}`);
-            console.log(`   Is Available: ${rider.isAvailable}`);
             console.log(`   Current Lat: ${rider.currentLat}`);
             console.log(`   Current Lng: ${rider.currentLng}`);
             console.log(`   Vehicle Type: ${rider.vehicleType}`);
@@ -46,7 +45,7 @@ async function checkRiderStatus() {
         console.log(`\n🟢 Online riders: ${onlineRiders.length}`);
 
         // Check for available riders
-        const availableRiders = riders.filter(r => r.isAvailable);
+        const availableRiders = riders.filter(r => r.isOnline);
         console.log(`🟡 Available riders: ${availableRiders.length}`);
 
         // Check for riders with location
@@ -56,7 +55,6 @@ async function checkRiderStatus() {
         // Check for riders that meet all criteria
         const eligibleRiders = riders.filter(r => 
             r.isOnline && 
-            r.isAvailable && 
             r.currentLat && 
             r.currentLng
         );
@@ -67,8 +65,7 @@ async function checkRiderStatus() {
             console.log('This is why you\'re not receiving orders.');
             console.log('\n🔧 To fix this:');
             console.log('1. Make sure your rider is marked as online');
-            console.log('2. Make sure your rider is marked as available');
-            console.log('3. Make sure your rider has location data');
+            console.log('2. Make sure your rider has location data');
         } else {
             console.log('\n✅ Found eligible riders!');
             eligibleRiders.forEach(rider => {

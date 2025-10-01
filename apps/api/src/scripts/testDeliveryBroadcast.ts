@@ -72,7 +72,7 @@ async function testDeliveryBroadcast() {
         console.log('📤 Adding delivery job to queue...');
         
         // Add job to queue
-        const job = await queueService.addDeliveryJob(jobData);
+        const job = await queueService.addDeliveryJob(jobData as any);
         console.log(`✅ Delivery job added: ${job}`);
         
         // Wait a bit for processing

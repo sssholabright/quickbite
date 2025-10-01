@@ -3,15 +3,20 @@ import { app } from './app.js';
 import { env } from './config/env.js';
 import { prisma } from './config/db.js';
 import { logger } from './utils/logger.js';
-import { initializeSocket } from './config/socket.js';
+import { initializeSocket, setSocketManager } from './config/socket.js';
 import { redisService } from './config/redis.js';
 import { QueueService } from './modules/queues/queue.service.js';
+import { DeliveryJobService } from './modules/delivery/deliveryJob.service.js';
 
 // Create HTTP server
 const server = createServer(app);
 
 // Initialize Socket.IO with our custom manager
 const socketManager = initializeSocket(server);
+
+// 🚀 FIXED: Set socket manager globally
+setSocketManager(socketManager);
+logger.info('📡 Socket manager initialized and set globally');
 
 // Graceful shutdown
 const gracefulShutdown = async (signal: string) => {
@@ -47,6 +52,13 @@ server.listen(PORT, async () => {
         // Initialize Queue Service
         const queue = QueueService.getInstance();
         logger.info('📋 Queue service initialized successfully');
+
+        // After database connection is established
+        await DeliveryJobService.loadQueueFromDatabase();
+        logger.info('🔔 Delivery queue loaded from database successfully');
+        
+        // 🚀 REMOVED: Notification queue service (web-only, not needed for mobile)
+        logger.info('🔔 Unified notification service ready (mobile: socket+FCM, web: socket+queue)');
         
         logger.info(`🚀 Server running on port ${PORT}`);
         logger.info(`🌍 Environment: ${env.NODE_ENV}`);

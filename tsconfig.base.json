@@ -9,8 +9,5 @@
     "skipLibCheck": true,
     "strict": true,
     "baseUrl": ".",
-    "paths": {
-      "@quickbite/shared": ["packages/shared/src/index.ts"]
-    }
   }
 }

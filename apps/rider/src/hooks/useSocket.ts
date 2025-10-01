@@ -4,11 +4,14 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../stores/auth';
 import { useRiderStore } from '../stores/rider';
 import { DeliveryJob, useRealtimeStore } from '../stores/realtime';
+import notificationService from '../services/notificationService';
+
+const API_SOCKET_URL = 'http://10.249.44.234:5000'
 
 // Rider-specific Socket events
 interface RiderSocketEvents {
     // Delivery job events - FIXED: Match backend structure
-    new_delivery_job: (data: {
+    delivery_job: (data: {
         orderId: string;
         vendorId: string;
         vendorName: string;
@@ -17,6 +20,7 @@ interface RiderSocketEvents {
         pickupAddress: string;
         deliveryAddress: string;
         deliveryFee: number;
+        orderNumber: string;
         distance: number;
         items: Array<{
             id: string;
@@ -112,7 +116,8 @@ export const useSocket = () => {
     const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const reconnectAttempts = useRef(0);
     const maxReconnectAttempts = 5;
-    const reconnectDelay = useRef(1000); // Start with 1 second
+    const reconnectDelay = useRef(1000);
+    const socketCreationInProgress = useRef(false); // 🚀 NEW: Track socket creation
 
     // 🚀 NEW: Get fresh token with refresh capability
     const getValidToken = useCallback(async (): Promise<string | null> => {
@@ -150,76 +155,68 @@ export const useSocket = () => {
         }
     }, [tokens?.accessToken, refreshToken]);
 
-    // 🚀 IMPROVED: Create socket connection with retry logic
+    // 🚀 FIXED: Create socket connection without duplicate listeners
     const createSocketConnection = useCallback(async () => {
+        if (socketCreationInProgress.current) {
+            console.log('⚠️ Socket creation already in progress, skipping...');
+            return null;
+        }
+
         try {
+            socketCreationInProgress.current = true;
+            console.log('🔑 Starting socket creation process...');
+            
             const token = await getValidToken();
             if (!token) {
-                console.log('❌ No valid token available for socket connection');
+                console.log('❌ No valid token available');
                 return null;
             }
 
-            console.log('🔑 Creating socket connection for rider...');
+            console.log('🔑 Creating socket connection...');
             
-            const socketInstance = io('http://10.48.184.234:5000', {
-                auth: {
-                    token: token
-                },
+            const socketInstance = io(API_SOCKET_URL, {
+                auth: { token },
                 transports: ['websocket', 'polling'],
                 timeout: 10000,
-                reconnection: false, // We'll handle reconnection manually
-                forceNew: true // Force new connection
+                reconnection: false,
+                forceNew: true
             });
 
+            console.log('📡 Socket instance created');
+            
+            // 🚀 FIXED: Set up listeners ONLY ONCE
+            setupSocketListeners(socketInstance);
+            
+            console.log('✅ Socket instance created successfully');
             return socketInstance;
         } catch (error) {
-            console.error('❌ Failed to create socket connection:', error);
+            console.error('❌ Failed to create socket:', error);
             return null;
+        } finally {
+            socketCreationInProgress.current = false;
         }
     }, [getValidToken]);
 
-    // 🚀 IMPROVED: Reconnection logic with exponential backoff
+    // 🚀 FIXED: Basic reconnection function without duplicate setupSocketListeners
     const attemptReconnection = useCallback(async () => {
-        if (reconnectAttempts.current >= maxReconnectAttempts) {
-            console.log('❌ Max reconnection attempts reached');
-            setConnectionStatus('disconnected');
-            return;
-        }
-
-        reconnectAttempts.current++;
-        setConnectionStatus('reconnecting');
-        
-        console.log(`🔄 Reconnection attempt ${reconnectAttempts.current}/${maxReconnectAttempts}`);
-        
-        // Clear existing timeout
-        if (reconnectTimeoutRef.current) {
-            clearTimeout(reconnectTimeoutRef.current);
-        }
-
-        // Exponential backoff delay
-        const delay = Math.min(reconnectDelay.current * Math.pow(2, reconnectAttempts.current - 1), 30000);
-        console.log(`⏳ Waiting ${delay}ms before reconnection...`);
-
-        reconnectTimeoutRef.current = setTimeout(async () => {
-            try {
-                const newSocket = await createSocketConnection();
-                if (newSocket) {
-                    setupSocketListeners(newSocket);
-                    setSocket(newSocket);
-                    reconnectAttempts.current = 0; // Reset on successful connection
-                    reconnectDelay.current = 1000; // Reset delay
-                } else {
-                    attemptReconnection();
-                }
-            } catch (error) {
-                console.error('❌ Reconnection failed:', error);
-                attemptReconnection();
+        console.log('🔄 Attempting reconnection...');
+        setTimeout(() => {
+            if (isOnline && !socket) {
+                createSocketConnection().then(socketInstance => {
+                    if (socketInstance) {
+                        // 🚀 FIXED: Don't call setupSocketListeners again - it's already called in createSocketConnection
+                        setSocket(socketInstance);
+                    }
+                });
             }
-        }, delay);
-    }, [createSocketConnection]);
+        }, 2000);
+    }, [isOnline, socket, createSocketConnection]);
 
-    // �� IMPROVED: Setup socket listeners with better error handling
+    // 🚀 FIXED: Consolidated socket event handling
     const setupSocketListeners = useCallback((socketInstance: Socket) => {
+        console.log('🔧 Setting up socket listeners for socket:', socketInstance.id);
+        
+        // 🚀 FIXED: Check if listeners are already added BEFORE setting to false
         if (listenersAdded.current) {
             console.log('⚠️ Listeners already added, skipping...');
             return;
@@ -228,24 +225,30 @@ export const useSocket = () => {
         console.log('📡 Adding event listeners...');
         listenersAdded.current = true;
 
+        // Add the catch-all event listener first
+        socketInstance.onAny((eventName, ...args) => {
+            console.log(`🔍 Received event: ${eventName}`, args);
+        });
+
+        // 🚀 FIXED: Single connection handler
         socketInstance.on('connect', () => {
             console.log('🚀 Rider Socket connected:', socketInstance.id);
             setIsConnected(true);
             setConnectionStatus('connected');
-            reconnectAttempts.current = 0; // Reset on successful connection
-            reconnectDelay.current = 1000; // Reset delay
+            reconnectAttempts.current = 0;
+            reconnectDelay.current = 1000;
             
-            // 🚀 NEW: Emit rider_online event when connected
             const { user } = useAuthStore.getState();
+            const { isOnline } = useRiderStore.getState();
+            
             if (user?.id) {
-                socketInstance.emit('rider_online', {
-                    riderId: user.id,
-                    isOnline: useRiderStore.getState().isOnline, // 🚀 Use current status instead of hardcoded true
-                });
-                console.log(`📡 Emitted rider_online event with status: ${useRiderStore.getState().isOnline}`);
+                console.log(`📡 Emitting rider_online with status: ${isOnline}`);
+                socketInstance.emit('rider_online', { isOnline });
+                console.log(`✅ Emitted rider_online event with status: ${isOnline}`);
             }
         });
 
+        // 🚀 NEW: Add connection state change listener
         socketInstance.on('disconnect', (reason) => {
             console.log('❌ Rider Socket disconnected:', reason);
             setIsConnected(false);
@@ -253,10 +256,12 @@ export const useSocket = () => {
             
             // Only attempt reconnection if rider is online
             if (isOnline && reason !== 'io client disconnect') {
+                console.log('🔄 Attempting reconnection...');
                 attemptReconnection();
             }
         });
 
+        // 🚀 NEW: Add connection error handler
         socketInstance.on('connect_error', (error) => {
             console.error('❌ Socket connection error:', error);
             setIsConnected(false);
@@ -273,33 +278,63 @@ export const useSocket = () => {
             }
         });
 
-        // 🚀 IMPROVED: Delivery job event with better error handling
-        socketInstance.on('new_delivery_job', (data) => {
+        // 🚀 NEW: Add reconnection attempt handler
+        socketInstance.on('reconnect_attempt', (attemptNumber) => {
+            console.log(`🔄 Reconnection attempt ${attemptNumber}`);
+            setConnectionStatus('reconnecting');
+        });
+
+        // 🚀 FIXED: Single delivery job event handler with proper duplicate detection
+        socketInstance.on('delivery_job', (data) => {
+            console.log('📦 Received delivery job event:', data);
             try {
-                console.log('📦 New delivery job received:', data);
-                
                 if (!data || !data.orderId) {
                     console.error('❌ Invalid delivery job data:', data);
                     return;
                 }
 
+                // 🚀 FIXED: Check if we're currently showing this job in the modal
+                const { getActiveDeliveryJobs } = useRealtimeStore.getState();
+                const isCurrentlyShowing = getActiveDeliveryJobs().some((job: DeliveryJob) => job.orderId === data.orderId);
+                
+                if (isCurrentlyShowing) {
+                    console.log('⚠️ Job already being shown in modal, skipping duplicate:', data.orderId);
+                    return;
+                }
+
+                console.log('📦 Data:', JSON.stringify(data, null, 2));
+
                 // Transform data to match frontend format
                 const transformedJob: DeliveryJob = {
                     orderId: data.orderId,
+                    id: data.orderId,
+                    orderNumber: data.orderNumber,
+                    payout: data.deliveryFee || 0,
+                    distanceKm: data.distance || 0,
                     vendor: {
                         id: data.vendorId,
                         name: data.vendorName,
+                        pickupLocation: data.pickupAddress || '',
                         address: data.pickupAddress || '',
-                        lat: 0, // Will be updated from vendor location
-                        lng: 0  // Will be updated from vendor location
+                        lat: 0,
+                        lng: 0
                     },
                     customer: {
                         id: data.customerId,
                         name: data.customerName,
-                        phone: '', // Will be updated from customer data
+                        phone: '',
                         address: typeof data.deliveryAddress === 'string' 
                             ? JSON.parse(data.deliveryAddress).address 
                             : data.deliveryAddress?.address || '',
+                        dropoffAddress: typeof data.deliveryAddress === 'string' 
+                            ? JSON.parse(data.deliveryAddress).address 
+                            : data.deliveryAddress?.address || '',
+                        dropoffLat: typeof data.deliveryAddress === 'string'
+                            ? JSON.parse(data.deliveryAddress).coordinates?.lat || 0
+                            : data.deliveryAddress?.coordinates?.lat || 0,
+                        dropoffLng: typeof data.deliveryAddress === 'string'
+                            ? JSON.parse(data.deliveryAddress).coordinates?.lng || 0
+                            : data.deliveryAddress?.coordinates?.lng || 0,
                         lat: typeof data.deliveryAddress === 'string'
                             ? JSON.parse(data.deliveryAddress).coordinates?.lat || 0
                             : data.deliveryAddress?.coordinates?.lat || 0,
@@ -307,28 +342,29 @@ export const useSocket = () => {
                             ? JSON.parse(data.deliveryAddress).coordinates?.lng || 0
                             : data.deliveryAddress?.coordinates?.lng || 0
                     },
-                    deliveryAddress: typeof data.deliveryAddress === 'string' 
-                        ? JSON.parse(data.deliveryAddress) 
-                        : data.deliveryAddress,
-                    deliveryFee: data.deliveryFee,
-                    estimatedDistance: data.distance,
-                    items: data.items,
-                    createdAt: data.expiresAt ? new Date(data.expiresAt).toISOString() : new Date().toISOString(),
-                    expiresIn: data.timer
+                    deliveryAddress: data.deliveryAddress,
+                    deliveryFee: data.deliveryFee || 0,
+                    estimatedDistance: data.distance || 0,
+                    items: data.items || [],
+                    createdAt: new Date().toISOString(),
+                    expiresIn: data.timer || 30,
+                    timer: data.timer || 30
                 };
-                
+
+                console.log('📦 Transformed delivery job:', transformedJob);
+
+                // Add to store (this will show the modal)
                 addDeliveryJob(transformedJob);
+                
                 console.log('✅ Delivery job added to store');
             } catch (error) {
-                console.error('❌ Error processing delivery job:', error);
+                console.error('❌ Error handling delivery job:', error);
             }
         });
 
         // 🚀 IMPROVED: Delivery job removal with better error handling
         socketInstance.on('delivery_job_removed', (data) => {
             try {
-                console.log('🗑️ Delivery job removed:', data);
-                
                 if (!data || !data.orderId) {
                     console.error('❌ Invalid delivery job removal data:', data);
                     return;
@@ -348,8 +384,6 @@ export const useSocket = () => {
 
         // Handle order status updates
         socketInstance.on('order_status_update', (data) => {
-            console.log('📋 Order status updated:', data);
-            
             // Update real-time store
             updateOrderStatus(data.orderId, data.status);
             
@@ -367,8 +401,6 @@ export const useSocket = () => {
 
         // Handle comprehensive order updates
         socketInstance.on('order_updated', (data) => {
-            console.log('📋 Order updated:', data);
-            
             const { order } = data;
             
             // Update real-time store with relevant data
@@ -398,8 +430,6 @@ export const useSocket = () => {
 
         // Handle ETA updates
         socketInstance.on('eta_update', (data) => {
-            console.log('⏱️ ETA update:', data);
-            
             // Update ETA in real-time store
             updateOrderETA(data.orderId, new Date(data.estimatedArrival));
             
@@ -419,8 +449,6 @@ export const useSocket = () => {
 
         // Handle order cancellation
         socketInstance.on('order_cancelled', (data) => {
-            console.log('❌ Order cancelled:', data);
-            
             // Remove from delivery jobs if it was pending
             removeDeliveryJob(data.orderId);
             
@@ -440,60 +468,52 @@ export const useSocket = () => {
 
         // 🚀 NEW: Handle delivery job acceptance confirmation
         socketInstance.on('delivery_job_accepted', (data) => {
-            console.log('✅ Delivery job accepted:', data);
-            
             // Remove from delivery jobs
             removeDeliveryJob(data.orderId);
             
-            // 🚀 FIXED: Update rider status to unavailable (NOT offline)
+            // Update rider status to unavailable (NOT offline)
             const { updateRiderStatus } = useRiderStore.getState();
             updateRiderStatus({ 
                 isOnline: true,      // Keep online
                 isAvailable: false   // Make unavailable for new orders
             });
-            
-            // Show success message
-            // Alert.alert('Job Accepted', 'You have successfully accepted this delivery job');
         });
 
         // 🚀 NEW: Handle delivery job rejection confirmation
         socketInstance.on('delivery_job_rejected', (data) => {
-            console.log('❌ Delivery job rejected:', data);
-            
             // Remove from delivery jobs
             removeDeliveryJob(data.orderId);
-            
-            // Show rejection message
-            // Alert.alert('Job Rejected', 'You have rejected this delivery job'); // This line was removed from the original file
         });
 
-        // Add this before the specific event handlers
-        socketInstance.onAny((eventName, ...args) => {
-            console.log(`🔍 Received event: ${eventName}`, args);
-        });
-        
-    }, [isOnline, addDeliveryJob, removeDeliveryJob, getValidToken, attemptReconnection, updateOrderStatus, updateOrderRider, updateOrderETA, queryClient, useRiderStore.getState().setSocket]);
+        console.log('✅ Socket listeners setup complete');
+    }, [isOnline, addDeliveryJob, removeDeliveryJob, getValidToken, attemptReconnection, updateOrderStatus, updateOrderRider, updateOrderETA, queryClient]);
 
-    // 🚀 CRITICAL FIX: Main effect with proper dependency management
+    // 🚀 FIXED: Remove duplicate setupSocketListeners call
     useEffect(() => {
-        if (!isOnline) {
-            console.log('❌ Rider is offline, not connecting socket');
-            return;
-        }
-
         let mounted = true;
 
         const initializeSocket = async () => {
-            try {
-                const socketInstance = await createSocketConnection();
-                if (socketInstance && mounted) {
-                    setupSocketListeners(socketInstance);
-                    setSocket(socketInstance);
+            if (!isOnline) {
+                console.log('❌ Rider is offline, disconnecting socket');
+                if (socket) {
+                    socket.disconnect();
+                    setSocket(null);
+                    setIsConnected(false);
+                    setConnectionStatus('disconnected');
                 }
-            } catch (error) {
-                console.error('❌ Failed to initialize socket:', error);
-                if (mounted) {
-                    attemptReconnection();
+                return;
+            }
+
+            // Only create socket if we don't have one and rider is online
+            if (!socket && mounted) {
+                try {
+                    const socketInstance = await createSocketConnection();
+                    if (socketInstance && mounted) {
+                        // 🚀 FIXED: Don't call setupSocketListeners again
+                        setSocket(socketInstance);
+                    }
+                } catch (error) {
+                    console.error('❌ Failed to create socket:', error);
                 }
             }
         };
@@ -502,18 +522,8 @@ export const useSocket = () => {
 
         return () => {
             mounted = false;
-            if (reconnectTimeoutRef.current) {
-                clearTimeout(reconnectTimeoutRef.current);
-            }
-            if (socket) {
-                console.log('🧹 Cleaning up socket connection');
-                listenersAdded.current = false;
-                socket.removeAllListeners();
-                socket.disconnect();
-                setConnectionStatus('disconnected');
-            }
         };
-    }, [isOnline, createSocketConnection, setupSocketListeners, attemptReconnection]);
+    }, [isOnline]);
 
     // 🚀 IMPROVED: Socket actions with better error handling
     const joinOrderRoom = useCallback((orderId: string) => {
@@ -561,15 +571,6 @@ export const useSocket = () => {
         }
     }, [socket, isConnected]);
 
-    useEffect(() => {
-        if (socket && isConnected) {
-            // 🚀 NEW: Provide socket reference to rider store
-            const { setSocket } = useRiderStore.getState();
-            setSocket(socket);
-            console.log('📡 Socket reference provided to rider store');
-        }
-    }, [socket, isConnected]);
-
     return {
         socket,
         isConnected,
@@ -578,7 +579,6 @@ export const useSocket = () => {
         leaveOrderRoom,
         sendLocationUpdate,
         markOrderPickedUp,
-        markOrderDelivered,
-        setSocket: useRiderStore.getState().setSocket // 🚀 NEW: Expose setSocket
+        markOrderDelivered
     };
 };
