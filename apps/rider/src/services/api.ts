@@ -2,7 +2,7 @@ import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 import * as SecureStore from 'expo-secure-store';
 
 // API Configuration
-const API_BASE_URL = 'http://10.249.44.234:5000/api/v1'
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
 
 // Create axios instance
 const apiClient: AxiosInstance = axios.create({
@@ -15,6 +15,14 @@ const apiClient: AxiosInstance = axios.create({
 
 // Track refresh token promise to prevent multiple simultaneous refreshes
 let refreshTokenPromise: Promise<string> | null = null;
+
+// 🚀 NEW: Auto-logout callback function
+let autoLogoutCallback: (() => void) | null = null;
+
+// 🚀 NEW: Set auto-logout callback
+export const setAutoLogoutCallback = (callback: () => void) => {
+    autoLogoutCallback = callback;
+};
 
 // Request interceptor to add auth token
 apiClient.interceptors.request.use(
@@ -34,7 +42,7 @@ apiClient.interceptors.request.use(
     }
 );
 
-// Response interceptor to handle token refresh
+// Response interceptor to handle token refresh and auto-logout
 apiClient.interceptors.response.use(
     (response) => response,
     async (error) => {
@@ -82,9 +90,16 @@ apiClient.interceptors.response.use(
                 console.error('Token refresh failed:', refreshError);
                 // Clear refresh promise on failure
                 refreshTokenPromise = null;
-                // Refresh failed, redirect to login
+                
+                // 🚀 NEW: Clear tokens and trigger auto-logout
                 await SecureStore.deleteItemAsync('access_token');
                 await SecureStore.deleteItemAsync('refresh_token');
+                
+                // 🚀 NEW: Trigger auto-logout callback
+                if (autoLogoutCallback) {
+                    console.log('🔄 Token expired - triggering auto-logout');
+                    autoLogoutCallback();
+                }
             } finally {
                 // Clear refresh promise when done
                 refreshTokenPromise = null;

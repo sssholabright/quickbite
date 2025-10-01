@@ -5,7 +5,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useAuthStore } from '../stores/auth';
 import LoginScreen from '../screens/auth/LoginScreen';
 import HomeScreen from '../screens/home/HomeScreen';
-import { Text } from 'react-native';
+import { Text, Alert } from 'react-native';
 import { Icon } from '../ui/Icon';
 import OnboardingScreen from '../screens/auth/OnboardingScreen';
 import RegisterScreen from '../screens/auth/RegisterScreen';
@@ -113,13 +113,29 @@ function AppTabs() {
 }
 
 export default function RootNavigator() {
-	const { tokens, user, hydrated, hydrate } = useAuthStore();
-	const isLocationReady = useIsLocationReady(); // Use the selector
+	const { tokens, user, hydrated, hydrate, error, clearError } = useAuthStore();
+	const isLocationReady = useIsLocationReady();
 	const appTheme = useTheme();
 
 	useEffect(() => { 
 		void hydrate();
 	}, [hydrate]);
+
+	// 🚀 NEW: Show session expired alert
+	useEffect(() => {
+		if (error && error.includes('Session expired')) {
+			Alert.alert(
+				'Session Expired',
+				'Your session has expired. Please login again.',
+				[
+					{
+						text: 'OK',
+						onPress: () => clearError()
+					}
+				]
+			);
+		}
+	}, [error, clearError]);
 
 	if (!hydrated) {
 		return (

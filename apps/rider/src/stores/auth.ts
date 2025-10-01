@@ -8,12 +8,12 @@ interface AuthStore extends AuthState {
     hydrated: boolean;
     hasSeenOnboarding: boolean;
     login: (credentials: LoginCredentials) => Promise<void>;
-	logout: () => Promise<void>;
+    logout: () => Promise<void>;
     refreshToken: () => Promise<void>;
     clearError: () => void;
-	hydrate: () => Promise<void>;
-	markOnboardingSeen: () => Promise<void>;
-	forgotPassword: (identifier: string) => Promise<void>;
+    hydrate: () => Promise<void>;
+    markOnboardingSeen: () => Promise<void>;
+    forgotPassword: (identifier: string) => Promise<void>;
     fetchProfile: () => Promise<void>;
     updateProfile: (profileData: { 
         name?: string; 
@@ -26,6 +26,8 @@ interface AuthStore extends AuthState {
     isUpdatingProfile: boolean;
     changePassword: (passwordData: { currentPassword: string; newPassword: string; confirmPassword: string; }) => Promise<void>;
     isChangingPassword: boolean;
+    // 🚀 NEW: Auto-logout method
+    autoLogout: () => Promise<void>;
 };
 
 export const useAuthStore = create<AuthStore>((set, get) => ({
@@ -40,7 +42,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     error: null,
     hydrated: false,
     hasSeenOnboarding: false,
-    isUpdatingProfile: false, // Add this
+    isUpdatingProfile: false,
     isChangingPassword: false,
 
     login: async (credentials: LoginCredentials) => {
@@ -107,6 +109,41 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
                 isAuthenticated: false,
                 isLoading: false,
                 error: null,
+            });
+        }
+    },
+
+    // 🚀 NEW: Auto-logout method (called when token expires)
+    autoLogout: async () => {
+        try {
+            console.log('🔄 Auto-logout triggered due to token expiration');
+            
+            // Clear stored tokens
+            await SecureStore.deleteItemAsync('access_token');
+            await SecureStore.deleteItemAsync('refresh_token');
+            
+            set({
+                user: null,
+                tokens: {
+                    accessToken: null,
+                    refreshToken: null,
+                },
+                isAuthenticated: false,
+                isLoading: false,
+                error: 'Session expired. Please login again.',
+            });
+        } catch (error: any) {
+            console.error('Error during auto-logout:', error);
+            // Force clear state even if SecureStore fails
+            set({
+                user: null,
+                tokens: {
+                    accessToken: null,
+                    refreshToken: null,
+                },
+                isAuthenticated: false,
+                isLoading: false,
+                error: 'Session expired. Please login again.',
             });
         }
     },

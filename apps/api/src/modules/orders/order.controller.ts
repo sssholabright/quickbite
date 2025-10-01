@@ -106,6 +106,33 @@ export class OrderController {
             const userRole = (req.user as any).role as string;
             const validatedData = updateOrderStatusSchema.parse(req.body);
 
+            // 🚀 NEW: Add cancellation validation for riders
+            if (validatedData.status === 'CANCELLED' && userRole === 'RIDER') {
+                // Get current order status
+                const currentOrder = await prisma.order.findUnique({
+                    where: { id: orderId! }
+                });
+                
+                if (!currentOrder) {
+                    res.status(404).json({
+                        success: false,
+                        message: 'Order not found'
+                    });
+                    return;
+                }
+                
+                // Only allow cancellation before pickup
+                if (currentOrder.status === 'PICKED_UP' || 
+                    currentOrder.status === 'OUT_FOR_DELIVERY' || 
+                    currentOrder.status === 'DELIVERED') {
+                    res.status(400).json({
+                        success: false,
+                        message: 'Cannot cancel order after pickup. Orders can only be cancelled before pickup.'
+                    });
+                    return;
+                }
+            }
+
             const order = await OrderService.updateOrderStatus(orderId!, validatedData, userId, userRole);
 
             // 🚀 FIXED: Use ONLY NotificationService - remove all direct socket calls

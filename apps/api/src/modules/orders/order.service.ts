@@ -581,21 +581,9 @@ export class OrderService {
                     }
                 });
 
-                // 🚀 NEW: Make rider available again
-                if (order.riderId) {
-                    await prisma.rider.update({
-                        where: { id: order.riderId },
-                        data: { isOnline: true }
-                    });
-                }
-
-                // 🚀 NEW: Trigger broadcast to other riders
-                const socketManager = getSocketManager();
-                socketManager.emitToAllRiders('order_available_for_pickup', {
-                    orderId: orderId,
-                    message: 'Order is now available for pickup',
-                    reason: 'rider_cancelled'
-                });
+                // 🚀 NEW: Use DeliveryOrchestrator for rider cancellations
+                const { DeliveryOrchestratorService } = await import('../../services/deliveryOrchestration.service.js');
+                await DeliveryOrchestratorService.onOrderCancelled(orderId, userId);
 
                 logger.info(`🔄 Order ${orderId} set back to READY_FOR_PICKUP after rider cancellation`);
 

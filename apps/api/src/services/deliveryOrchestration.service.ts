@@ -269,6 +269,66 @@ export class DeliveryOrchestratorService {
     }
     
     /**
+     * 🚀 Orchestrate: Order Cancelled by Rider
+     * Handles the complete workflow when a rider cancels an order
+     */
+    static async onOrderCancelled(orderId: string, riderId: string): Promise<void> {
+        try {
+            logger.info(`❌ DeliveryOrchestrator: Order ${orderId} cancelled by rider ${riderId} - starting orchestration`);
+
+            // Step 1: Get order and rider details
+            const [order, rider] = await Promise.all([
+                prisma.order.findUnique({
+                    where: { id: orderId },
+                    include: { 
+                        rider: { include: { user: true } },
+                        customer: { include: { user: true } },
+                        vendor: { include: { user: true } }
+                    }
+                }),
+                prisma.rider.findUnique({
+                    where: { id: riderId },
+                    include: { user: true }
+                })
+            ]);
+
+            if (!order) {
+                logger.error(`❌ DeliveryOrchestrator: Order ${orderId} not found`);
+                return;
+            }
+            
+            if (!rider) {
+                logger.error(`❌ DeliveryOrchestrator: Rider ${riderId} not found`);
+                return;
+            }
+
+            logger.info(`✅ DeliveryOrchestrator: Order ${order.orderNumber} cancelled by ${rider.user.name}`);
+
+            // Step 2: Make rider available for new orders
+            await prisma.rider.update({
+                where: { id: riderId },
+                data: { isOnline: true }
+            });
+
+            // Step 3: Re-add order to queue for rebroadcasting
+            await this.rebroadcastCancelledOrder(order);
+
+            // Step 4: Notify stakeholders about reassignment
+            await this.notifyOrderReassignment(order);
+
+            // Step 5: Trigger queue processing for next order
+            setTimeout(async () => {
+                await DeliveryJobService.onRiderComesOnline();
+            }, TIMING_CONFIG.DELIVERY_JOB_COOLDOWN);
+
+            logger.info(`✅ DeliveryOrchestrator: Completed order cancellation orchestration for ${orderId}`);
+
+        } catch (error) {
+            logger.error({ error, orderId, riderId }, 'DeliveryOrchestrator: Error in onOrderCancelled');
+        }
+    }
+
+    /**
      * 🚀 Send Delivery Completion Notifications
      */
     private static async sendDeliveryCompletionNotifications(order: any, rider: any): Promise<void> {
@@ -387,9 +447,84 @@ export class DeliveryOrchestratorService {
             logger.error({ error, orderId: order.id }, 'DeliveryOrchestrator: Error sending acceptance notifications');
         }
     }
+
+    /**
+     * 🚀 Re-add cancelled order to queue for rebroadcasting
+     */
+    private static async rebroadcastCancelledOrder(order: any): Promise<void> {
+        try {
+            // Check if order is still in delivery queue
+            const existingQueueItem = await prisma.deliveryQueue.findUnique({
+                where: { orderId: order.id }
+            });
+
+            if (existingQueueItem) {
+                // Update existing queue item to rebroadcast
+                await prisma.deliveryQueue.update({
+                    where: { id: existingQueueItem.id },
+                    data: {
+                        status: 'QUEUED',
+                        attempts: 0, // Reset attempts for fresh start
+                        expiresAt: new Date(Date.now() + TIMING_CONFIG.DELIVERY_JOB_TIMEOUT)
+                    }
+                });
+                logger.info(`🔄 Order ${order.id} updated in queue for rebroadcasting`);
+            } else {
+                // Add to queue if not already there
+                await DeliveryJobService.addOrderToQueue(order.id);
+                logger.info(`🔄 Order ${order.id} added to queue for rebroadcasting`);
+            }
+
+            // Reset order status to READY_FOR_PICKUP
+            await prisma.order.update({
+                where: { id: order.id },
+                data: {
+                    status: 'READY_FOR_PICKUP',
+                    riderId: null, // Remove rider assignment
+                    cancelledAt: null, // Clear cancellation
+                    cancellationReason: null
+                }
+            });
+
+        } catch (error) {
+            logger.error({ error, orderId: order.id }, 'DeliveryOrchestrator: Error rebroadcasting cancelled order');
+        }
+    }
+
+    /**
+     * 🚀 Notify stakeholders about order reassignment
+     */
+    private static async notifyOrderReassignment(order: any): Promise<void> {
+        try {
+            const socketManager = getSocketManager();
+            
+            // Notify customer - order will be reassigned
+            socketManager.emitToCustomer(order.customer.userId, 'order_reassigned', {
+                orderId: order.id,
+                orderNumber: order.orderNumber,
+                message: 'Your order was cancelled by the previous rider. A new rider will be assigned shortly.',
+                status: 'reassigning',
+                timestamp: new Date().toISOString()
+            });
+
+            // Notify vendor - order will be reassigned
+            socketManager.emitToVendor(order.vendorId, 'order_reassigned', {
+                orderId: order.id,
+                orderNumber: order.orderNumber,
+                message: `Order ${order.orderNumber} was cancelled by the rider. A new rider will be assigned shortly.`,
+                status: 'reassigning',
+                timestamp: new Date().toISOString()
+            });
+
+            logger.info(`📢 DeliveryOrchestrator: Notified customer and vendor about order reassignment ${order.id}`);
+
+        } catch (error) {
+            logger.error({ error, orderId: order.id }, 'DeliveryOrchestrator: Error notifying about order reassignment');
+        }
+    }
     
     /**
-     * 🚀 Calculate Distance Between Two Points
+     * �� Calculate Distance Between Two Points
      */
     private static calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
         const R = 6371; // Earth's radius in kilometers
@@ -423,7 +558,8 @@ export class DeliveryOrchestratorService {
                 'onOrderDelivered',
                 'onOrderPickedUp',
                 'onRiderRejectsOrder',
-                'onRiderAcceptsOrder'
+                'onRiderAcceptsOrder',
+                'onOrderCancelled' // 🚀 NEW: Added order cancellation
             ]
         };
     }

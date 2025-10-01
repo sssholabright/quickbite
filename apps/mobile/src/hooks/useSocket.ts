@@ -6,7 +6,7 @@ import { useRealtimeStore } from '../stores/realtime';
 
 // 🚀 ENHANCED: Complete socket event interfaces matching backend
 
-const API_SOCKET_URL = process.env.API_SOCKET_URL
+const API_SOCKET_URL = process.env.EXPO_PUBLIC_API_SOCKET_URL
 interface SocketEvents {
     // Order events
     order_status_update: (data: { orderId: string; status: string; timestamp: string; riderId?: string }) => void;

@@ -6,7 +6,7 @@ import { useRiderStore } from '../stores/rider';
 import { DeliveryJob, useRealtimeStore } from '../stores/realtime';
 import notificationService from '../services/notificationService';
 
-const API_SOCKET_URL = 'http://10.249.44.234:5000'
+const API_SOCKET_URL = process.env.EXPO_PUBLIC_API_SOCKET_URL;
 
 // Rider-specific Socket events
 interface RiderSocketEvents {
