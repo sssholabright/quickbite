@@ -54,7 +54,8 @@ export const updateRiderValidation = {
         email: z.string().email().optional(),
         vehicleType: z.enum(['BIKE', 'CAR', 'MOTORCYCLE']).optional(),
         bankAccount: z.string().optional(),
-        status: z.enum(['ACTIVE', 'SUSPENDED', 'BLOCKED']).optional()
+        status: z.enum(['ACTIVE', 'SUSPENDED', 'BLOCKED']).optional(),
+        companyId: z.string().cuid().optional()
     })
 };
 

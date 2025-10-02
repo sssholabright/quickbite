@@ -92,7 +92,8 @@ export default function EditRiderModal({ isOpen, onClose, rider, onSuccess }: Ed
                     email: formData.email.trim(),
                     vehicleType: formData.vehicleType,
                     bankAccount: formData.bankAccount.trim() || undefined,
-                    status: formData.status
+                    status: formData.status,
+                    companyId: formData.companyId
                 }
             });
             

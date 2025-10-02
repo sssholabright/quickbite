@@ -290,10 +290,10 @@ export class RiderService {
         }
     }
 
-    // Update rider
+    // Update the updateRider method to handle company changes
     static async updateRider(riderId: string, request: UpdateRiderRequest): Promise<RiderDetails> {
         try {
-            const { name, phone, email, vehicleType, bankAccount, status } = request;
+            const { name, phone, email, vehicleType, bankAccount, status, companyId } = request;
 
             const rider = await prisma.rider.findUnique({
                 where: { id: riderId },
@@ -302,6 +302,21 @@ export class RiderService {
 
             if (!rider) {
                 throw new CustomError('Rider not found', 404);
+            }
+
+            // If companyId is provided, check if the new company exists and is active
+            if (companyId && companyId !== rider.companyId) {
+                const newCompany = await prisma.logisticsCompany.findUnique({
+                    where: { id: companyId }
+                });
+
+                if (!newCompany) {
+                    throw new CustomError('Logistics company not found', 404);
+                }
+
+                if (newCompany.status !== 'ACTIVE') {
+                    throw new CustomError('Cannot assign rider to inactive company', 400);
+                }
             }
 
             // Update rider and user data
@@ -324,7 +339,8 @@ export class RiderService {
                     data: {
                         ...(vehicleType && { vehicleType }),
                         ...(bankAccount !== undefined && { bankAccount }),
-                        ...(status && { status })
+                        ...(status && { status }),
+                        ...(companyId && { companyId }) // Add this line
                     },
                     include: {
                         user: true,

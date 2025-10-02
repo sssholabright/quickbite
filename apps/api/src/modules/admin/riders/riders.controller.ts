@@ -130,6 +130,7 @@ export class RiderController {
 
     // Update rider
     static async updateRider(req: Request, res: Response) {
+        console.log('Update rider controller:', req.body);
         try {
             const riderId = req.params.id;
             const updateData: UpdateRiderRequest = req.body;

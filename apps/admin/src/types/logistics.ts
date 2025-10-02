@@ -152,6 +152,7 @@ export interface UpdateRiderRequest {
     vehicleType?: 'BIKE' | 'CAR' | 'MOTORCYCLE';
     bankAccount?: string;
     status?: 'ACTIVE' | 'SUSPENDED' | 'BLOCKED';
+    companyId?: string; // Add this line
 }
 
 export interface RiderSort {
