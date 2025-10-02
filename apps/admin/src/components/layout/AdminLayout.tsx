@@ -1,5 +1,6 @@
 import React, { ReactNode, useState } from 'react'
-import { FaBars, FaBell, FaChartBar, FaClipboardList, FaCog, FaCreditCard, FaHistory, FaHome, FaMotorcycle, FaSignOutAlt, FaStore, FaTimes, FaUsers } from 'react-icons/fa'
+import { FaBars, FaBell, FaChartBar, FaClipboardList, FaCog, FaCreditCard, FaHistory, FaHome, FaMotorcycle, FaSignOutAlt, FaStore, FaUsers, FaTruck } from 'react-icons/fa'
+import { FaTimes } from 'react-icons/fa'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAdminStore } from '../../stores/adminStore'
 
@@ -26,6 +27,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             href: '/admin/orders', 
             icon: FaClipboardList,
             permission: 'orders.read'
+        },
+        { 
+            name: 'Logistics', 
+            href: '/admin/logistics', 
+            icon: FaTruck,
+            permission: 'logistics.read'
         },
         { 
             name: 'Riders', 
@@ -125,12 +132,13 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                                     to={item.href}
                                     className={`group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
                                         isActive
-                                            ? 'bg-primary-100 text-primary-700 border-r-2 border-primary-600'
+                                            ? 'bg-primary-100 text-primary-700'
                                             : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                                     }`}
+                                    onClick={() => setSidebarOpen(false)}
                                 >
-                                    <item.icon className={`mr-3 w-5 h-5 ${
-                                        isActive ? 'text-primary-600' : 'text-gray-400 group-hover:text-gray-500'
+                                    <item.icon className={`mr-3 flex-shrink-0 h-5 w-5 ${
+                                        isActive ? 'text-primary-500' : 'text-gray-400 group-hover:text-gray-500'
                                     }`} />
                                     {item.name}
                                 </Link>
@@ -143,46 +151,32 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             {/* Main content */}
             <div className="lg:pl-64">
                 {/* Top bar */}
-                <div className="sticky top-0 z-10 bg-white shadow-sm border-b border-gray-200">
-                    <div className="flex items-center justify-between h-16 px-4 sm:px-6 lg:px-8">
+                <div className="sticky top-0 z-30 bg-white shadow-sm border-b border-gray-200">
+                    <div className="flex items-center justify-between h-16 px-4 sm:px-6">
                         <button
                             onClick={() => setSidebarOpen(true)}
-                            className="lg:hidden p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100"
+                            className="lg:hidden text-gray-400 hover:text-gray-600"
                         >
                             <FaBars className="w-5 h-5" />
                         </button>
+
                         <div className="flex items-center space-x-4">
-                            {/* Admin info */}
-                            <div className="text-right">
-                                <p className="text-sm font-medium text-gray-900">{user?.name || 'Admin'}</p>
-                                <p className="text-xs text-gray-500">{user?.adminRole || 'Admin'}</p>
+                            <div className="text-sm text-gray-700">
+                                Welcome, <span className="font-medium">{user?.name}</span>
                             </div>
-
-                            {/* Admin avatar */}
-                            <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
-                                {user?.avatar ? (
-                                    <img src={user.avatar} alt={user.name} className="w-8 h-8 rounded-full" />
-                                ) : (
-                                    <span className="text-primary-600 text-sm font-medium">
-                                        {user?.name?.charAt(0).toUpperCase() || 'A'}
-                                    </span>
-                                )}
-                            </div>
-
-                            {/* Logout button */}
                             <button
                                 onClick={handleLogout}
-                                className="p-2 text-gray-400 hover:text-gray-500 hover:bg-gray-100 rounded-md transition-colors"
-                                title="Logout"
+                                className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
                             >
-                                <FaSignOutAlt className="w-5 h-5" />
+                                <FaSignOutAlt className="w-4 h-4 mr-2" />
+                                Logout
                             </button>
                         </div>
                     </div>
                 </div>
 
                 {/* Page content */}
-                <main className="p-4 sm:p-6 lg:p-8">
+                <main className="flex-1 p-4 sm:p-6">
                     {children}
                 </main>
             </div>

@@ -31,12 +31,14 @@ export default function AdminProtectedRoute({
     }
 
     if (!user) {
-        return navigate("/admin/auth/login", { state: { from: location } })
+        navigate("/admin/auth/login", { state: { from: location } })
+        return null
     }
 
     // Check single permission
     if (requiredPermission && !hasPermission(requiredPermission)) {
-        return navigate("/admin/unauthorized", { replace: true })
+        navigate("/admin/unauthorized", { replace: true })
+        return null
     }
 
     // Check multiple permissions
@@ -46,7 +48,8 @@ export default function AdminProtectedRoute({
             : hasAnyPermission(requiredPermissions)
 
         if (!hasRequiredPermissions) {
-            return navigate("/admin/unauthorized", { replace: true })
+            navigate("/admin/unauthorized", { replace: true })
+            return null
         }
     }
 

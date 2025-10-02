@@ -9,6 +9,8 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import queryClient from './lib/queryClient'
 import AuthRedirect from './components/AuthRedirect'
 import OrdersPage from './pages/OrdersPage'
+import LogisticsPage from './pages/LogisticsPage'
+import RidersPage from './pages/RidersPage'
 
 // Separate component that has access to QueryClient
 function AppContent() {
@@ -41,6 +43,18 @@ function AppContent() {
                 <Route path="/admin/orders" element={
                     <AdminProtectedRoute>
                         <OrdersPage />
+                    </AdminProtectedRoute>
+                } />
+
+                <Route path="/admin/logistics" element={
+                    <AdminProtectedRoute>
+                        <LogisticsPage />
+                    </AdminProtectedRoute>
+                } />
+
+                <Route path="/admin/riders" element={
+                    <AdminProtectedRoute>
+                        <RidersPage />
                     </AdminProtectedRoute>
                 } />
 

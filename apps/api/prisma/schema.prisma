@@ -45,11 +45,29 @@ model Customer {
     @@map("customers")
 }
 
-// Rider specific data
+// 🚀 NEW: Logistics Companies (Parent entities)
+model LogisticsCompany {
+    id            String                    @id @default(cuid())
+    name          String                    @unique
+    contactPerson String
+    phone         String
+    email         String
+    address       String?
+    status        LogisticsCompanyStatus    @default(ACTIVE)
+    riders        Rider[]
+    createdAt     DateTime                  @default(now())
+    updatedAt     DateTime                  @updatedAt
+
+    @@map("logistics_companies")
+}
+
+// Updated Rider model (now belongs to a logistics company)
 model Rider {
     id              String      @id @default(cuid())
     userId          String      @unique
     user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+    companyId       String?
+    company         LogisticsCompany? @relation(fields: [companyId], references: [id])
     vehicleType     VehicleType
     isOnline        Boolean     @default(false)
     isAvailable     Boolean     @default(false)
@@ -60,11 +78,40 @@ model Rider {
     completedOrders Int         @default(0)
     rating          Float       @default(0)
     pushToken       String?     // 🚀 NEW: FCM push token
+    currentOrderId  String?     // 🚀 NEW: Track current order
     orders          Order[]
+    earningsHistory RiderEarning[]
     createdAt       DateTime    @default(now())
     updatedAt       DateTime    @updatedAt
 
     @@map("riders")
+}
+
+// 🚀 NEW: Rider Earnings tracking
+model RiderEarning {
+    id          String   @id @default(cuid())
+    riderId     String
+    rider       Rider    @relation(fields: [riderId], references: [id], onDelete: Cascade)
+    orderId     String?  // Optional - might be from different sources
+    amount      Float
+    type        EarningType @default(DELIVERY_FEE)
+    description String?
+    date        DateTime @default(now())
+    createdAt   DateTime @default(now())
+
+    @@map("rider_earnings")
+}
+
+// 🚀 NEW: Rider Order History
+model RiderOrderHistory {
+    id        String              @id @default(cuid())
+    riderId   String
+    orderId   String
+    status    OrderHistoryStatus
+    timestamp DateTime            @default(now())
+    notes     String?
+
+    @@map("rider_order_history")
 }
 
 // Vendor specific data
@@ -269,7 +316,6 @@ model DeliveryQueue {
     @@map("delivery_queue")
 }
 
-
 // Enums
 enum UserRole {
     CUSTOMER
@@ -311,4 +357,27 @@ enum DeliveryQueueStatus {
     TIMEOUT
     REJECTED
     COMPLETED
+}
+
+// 🚀 NEW: Logistics Company Status
+enum LogisticsCompanyStatus {
+    ACTIVE
+    SUSPENDED
+    BLOCKED
+}
+
+// 🚀 NEW: Earning Types
+enum EarningType {
+    DELIVERY_FEE
+    BONUS
+    TIP
+    PENALTY
+}
+
+// 🚀 NEW: Order History Status
+enum OrderHistoryStatus {
+    COMPLETED
+    CANCELLED
+    REASSIGNED
+    FAILED
 }

@@ -100,6 +100,12 @@ export interface AdminPermissions {
     'riders.suspend': boolean;
     'riders.delete': boolean;
     
+    // Logistics Companies
+    'logistics.read': boolean;
+    'logistics.write': boolean;
+    'logistics.suspend': boolean;
+    'logistics.block': boolean;
+    
     // Vendors
     'vendors.read': boolean;
     'vendors.write': boolean;
@@ -149,6 +155,7 @@ export const ADMIN_ROLES = {
             'analytics.read', 'analytics.write',
             'orders.read', 'orders.write', 'orders.delete', 'orders.refund',
             'riders.read', 'riders.write', 'riders.suspend', 'riders.delete',
+            'logistics.read', 'logistics.write', 'logistics.suspend', 'logistics.block',
             'vendors.read', 'vendors.write', 'vendors.approve', 'vendors.suspend', 'vendors.delete',
             'customers.read', 'customers.write', 'customers.ban', 'customers.delete',
             'payments.read', 'payments.write', 'payments.refund', 'payments.payout',
@@ -167,6 +174,7 @@ export const ADMIN_ROLES = {
             'analytics.read', 'analytics.write',
             'orders.read', 'orders.write', 'orders.refund',
             'riders.read', 'riders.write', 'riders.suspend',
+            'logistics.read', 'logistics.write', 'logistics.suspend',
             'vendors.read', 'vendors.write',
             'customers.read',
             'payments.read',
@@ -186,6 +194,7 @@ export const ADMIN_ROLES = {
             'customers.read', 'customers.write',
             'vendors.read',
             'riders.read',
+            'logistics.read',
             'notifications.read', 'notifications.send',
             'reports.read'
         ]
