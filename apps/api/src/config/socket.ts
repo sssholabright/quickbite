@@ -28,7 +28,7 @@ export class SocketService {
                 origin: env.NODE_ENV === 'production' 
                     ? ['https://quickbite-roan.vercel.app'] 
                     : [
-                        'http://localhost:3000', 
+                        'http://localhost:5174', 
                         'http://localhost:5173', 
                         'https://quickbite-roan.vercel.app',
                         'http://192.168.0.176:5000',
