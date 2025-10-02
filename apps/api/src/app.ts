@@ -15,13 +15,11 @@ import orderRoutes from './modules/orders/order.routes.js';
 import menuRoutes from './modules/menu/menu.routes.js';
 import riderRoutes from './modules/riders/rider.routes.js';
 import customerRoutes from './modules/customers/customer.routes.js';
+
+// Admin routes
 import adminRoutes from './modules/admin/admins/admin.routes.js';
 import dashboardRoutes from './modules/admin/stats/dashboard.routes.js';
-// import userRoutes from './modules/users/routes.js';
-// import vendorRoutes from './modules/vendors/routes.js';
-// import riderRoutes from './modules/riders/routes.js';
-// import paymentRoutes from './modules/payments/routes.js';
-import { initializeSocket } from './config/socket.js';
+import { ordersRoutes } from './modules/admin/orders/orders.routes.js';
 
 const app = express();
 
@@ -80,8 +78,7 @@ app.use('/api/v1/customers', customerRoutes);
 // Admin routes
 app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/admin/stats', dashboardRoutes);
-// app.use('/api/v1/vendors', vendorRoutes);
-// app.use('/api/v1/payments', paymentRoutes);
+app.use('/api/v1/admin/orders', ordersRoutes);
 
 // 404 handler
 app.use(notFoundHandler);
