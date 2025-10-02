@@ -7,7 +7,7 @@
         "skipLibCheck": true,
 
         /* Bundler mode */
-        "moduleResolution": "bundler",
+        // "moduleResolution": "bundler",
         "allowImportingTsExtensions": true,
         "resolveJsonModule": true,
         "isolatedModules": true,
@@ -29,7 +29,11 @@
         /* Additional options to fix React type issues */
         "allowSyntheticDefaultImports": true,
         "esModuleInterop": true,
-        "forceConsistentCasingInFileNames": true
+        "forceConsistentCasingInFileNames": true,
+        
+        /* Fix for react-icons compatibility */
+        "types": ["vite/client", "react", "react-dom"],
+        "moduleResolution": "node"
     },
     "include": ["src"],
     "references": [{ "path": "./tsconfig.node.json" }]

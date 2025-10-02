@@ -15,6 +15,8 @@ import orderRoutes from './modules/orders/order.routes.js';
 import menuRoutes from './modules/menu/menu.routes.js';
 import riderRoutes from './modules/riders/rider.routes.js';
 import customerRoutes from './modules/customers/customer.routes.js';
+import adminRoutes from './modules/admin/admins/admin.routes.js';
+import dashboardRoutes from './modules/admin/stats/dashboard.routes.js';
 // import userRoutes from './modules/users/routes.js';
 // import vendorRoutes from './modules/vendors/routes.js';
 // import riderRoutes from './modules/riders/routes.js';
@@ -32,7 +34,7 @@ app.use(helmet({
 app.use(cors({
     origin: env.NODE_ENV === 'production' 
         ? ['https://quickbite-roan.vercel.app'] 
-        : [' http://localhost:5174', 'http://localhost:5173', 'https://quickbite-roan.vercel.app', 'http://192.168.0.176:8081','http://192.168.0.176:8082', 'http://10.249.44.234:8081','http://10.249.44.234:8082'], 
+        : ['http://localhost:5174', 'http://localhost:5173', 'https://quickbite-roan.vercel.app', 'http://192.168.0.176:8081','http://192.168.0.176:8082', 'http://10.249.44.234:8081','http://10.249.44.234:8082'], 
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
@@ -74,6 +76,10 @@ app.use('/api/v1/orders', orderRoutes);
 app.use('/api/v1/menu', menuRoutes);
 app.use('/api/v1/riders', riderRoutes);
 app.use('/api/v1/customers', customerRoutes);
+
+// Admin routes
+app.use('/api/v1/admin', adminRoutes);
+app.use('/api/v1/admin/stats', dashboardRoutes);
 // app.use('/api/v1/vendors', vendorRoutes);
 // app.use('/api/v1/payments', paymentRoutes);
 
