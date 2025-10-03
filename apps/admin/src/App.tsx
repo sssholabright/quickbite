@@ -1,16 +1,21 @@
 import React, { useEffect } from 'react'
-import AdminLogin from './pages/auth/AdminLogin'
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
-import AdminUnauthorized from './pages/AdminUnauthorized'
-import AdminDashboard from './pages/AdminDashboard'
-import { useAdminStore } from './stores/adminStore'
-import AdminProtectedRoute from './components/AdminProtectedRoute'
 import { QueryClientProvider } from '@tanstack/react-query'
 import queryClient from './lib/queryClient'
+
+// Auth Pages
 import AuthRedirect from './components/AuthRedirect'
+import AdminLogin from './pages/auth/AdminLogin'
+import { useAdminStore } from './stores/adminStore'
+import AdminProtectedRoute from './components/AdminProtectedRoute'
+
+// Pages
+import AdminUnauthorized from './pages/AdminUnauthorized'
+import AdminDashboard from './pages/AdminDashboard'
 import OrdersPage from './pages/OrdersPage'
 import LogisticsPage from './pages/LogisticsPage'
 import RidersPage from './pages/RidersPage'
+import VendorsPage from './pages/VendorsPage'
 
 // Separate component that has access to QueryClient
 function AppContent() {
@@ -55,6 +60,12 @@ function AppContent() {
                 <Route path="/admin/riders" element={
                     <AdminProtectedRoute>
                         <RidersPage />
+                    </AdminProtectedRoute>
+                } />
+
+                <Route path="/admin/vendors" element={
+                    <AdminProtectedRoute>
+                        <VendorsPage />
                     </AdminProtectedRoute>
                 } />
 

@@ -1,15 +1,7 @@
 import React, { useState } from 'react';
 import { useCreateRider, useAvailableCompanies } from '../../hooks/useRiders';
 import Swal from 'sweetalert2';
-import { 
-    FaTimes, 
-    FaUser,
-    FaPhone,
-    FaEnvelope,
-    FaMotorcycle,
-    FaBuilding,
-    FaCreditCard
-} from 'react-icons/fa';
+import { FaTimes, FaUser, FaPhone, FaEnvelope, FaMotorcycle, FaBuilding, FaCreditCard } from 'react-icons/fa';
 
 interface CreateRiderModalProps {
     isOpen: boolean;

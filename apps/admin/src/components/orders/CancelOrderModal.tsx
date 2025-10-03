@@ -1,11 +1,7 @@
 import React, { useState } from 'react';
 import { useCancelOrder } from '../../hooks/useOrders';
 import Swal from 'sweetalert2';
-import { 
-    FaTimes, 
-    FaExclamationTriangle,
-    FaDollarSign
-} from 'react-icons/fa';
+import { FaTimes, FaExclamationTriangle, FaDollarSign } from 'react-icons/fa';
 
 interface CancelOrderModalProps {
     isOpen: boolean;
@@ -242,7 +238,7 @@ export default function CancelOrderModal({
                         </div>
 
                         {/* Footer */}
-                        <div className="bg-gray-50 px-4 py-3 sm:px-6 flex flex-col sm:flex-row sm:flex-row-reverse space-y-2 sm:space-y-0">
+                        <div className="bg-gray-50 px-4 py-3 sm:px-6 flex flex-col sm:flex-row-reverse space-y-2 sm:space-y-0">
                             <button
                                 type="submit"
                                 disabled={!reason.trim() || !confirmCancel || cancelOrderMutation.isPending}

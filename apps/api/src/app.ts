@@ -22,6 +22,7 @@ import dashboardRoutes from './modules/admin/stats/dashboard.routes.js';
 import { ordersRoutes } from './modules/admin/orders/orders.routes.js';
 import { logisticsRoutes } from './modules/admin/logistics/logistics.routes.js';
 import { ridersRoutes } from './modules/admin/riders/riders.routes.js';
+import vendorsRoutes from './modules/admin/vendors/vendors.routes.js';
 
 const app = express();
 
@@ -83,6 +84,7 @@ app.use('/api/v1/admin/stats', dashboardRoutes);
 app.use('/api/v1/admin/orders', ordersRoutes);
 app.use('/api/v1/admin/logistics', logisticsRoutes);
 app.use('/api/v1/admin/riders', ridersRoutes);
+app.use('/api/v1/admin/vendors', vendorsRoutes);
 
 // 404 handler
 app.use(notFoundHandler);

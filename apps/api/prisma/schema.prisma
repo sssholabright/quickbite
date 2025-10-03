@@ -130,10 +130,21 @@ model Vendor {
     isOpen          Boolean    @default(false)
     rating          Float      @default(0)
     pushToken       String?     // 🚀 NEW: FCM push token
+
+    status          VendorStatus @default(PENDING)
+    openingTime     String?
+    closingTime     String?
+    operatingDays   String[]    @default([])  // e.g ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+
+    totalOrders     Int        @default(0)
+    completedOrders Int        @default(0)
+    cancelledOrders Int        @default(0)
+    avgPrepTime     Float?     // in minutes 
+
     categories      Category[]
     menuItems       MenuItem[]
     orders          Order[]
-    reviews         Review[]
+    reviews         Review[] 
     createdAt       DateTime   @default(now())
     updatedAt       DateTime   @updatedAt
 
@@ -380,4 +391,13 @@ enum OrderHistoryStatus {
     CANCELLED
     REASSIGNED
     FAILED
+}
+
+// 🚀 NEW: Vendor Status
+enum VendorStatus {
+    PENDING
+    APPROVED
+    SUSPENDED
+    REJECTED
+    BLOCKED
 }
