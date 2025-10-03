@@ -1,0 +1,10 @@
+-- CreateEnum
+CREATE TYPE "public"."CustomerStatus" AS ENUM ('ACTIVE', 'SUSPENDED', 'BLOCKED', 'VERIFICATION_PENDING');
+
+-- AlterTable
+ALTER TABLE "public"."customers" ADD COLUMN     "avgOrderValue" DOUBLE PRECISION NOT NULL DEFAULT 0,
+ADD COLUMN     "cancelledOrders" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "completedOrders" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "status" "public"."CustomerStatus" NOT NULL DEFAULT 'ACTIVE',
+ADD COLUMN     "totalOrders" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "totalSpent" DOUBLE PRECISION NOT NULL DEFAULT 0;

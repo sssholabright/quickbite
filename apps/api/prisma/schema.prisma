@@ -31,16 +31,27 @@ model User {
 
 // Customer specific data
 model Customer {
-    id          String    @id @default(cuid())
-    userId      String    @unique
-    user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+    id          String         @id @default(cuid())
+    userId      String         @unique
+    user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
     dateOfBirth DateTime?
     addresses   Address[]
     orders      Order[]
     reviews     Review[]
-    pushToken   String?     // 🚀 NEW: FCM push token
-    createdAt   DateTime  @default(now())
-    updatedAt   DateTime  @updatedAt
+    pushToken   String?
+    
+    // 🚀 NEW: Customer Status Management
+    status      CustomerStatus @default(ACTIVE)
+    
+    // 🚀 NEW: Customer Performance Tracking
+    totalOrders     Int      @default(0)
+    completedOrders Int      @default(0)
+    cancelledOrders Int      @default(0)
+    totalSpent      Float    @default(0)
+    avgOrderValue   Float    @default(0)
+    
+    createdAt   DateTime       @default(now())
+    updatedAt   DateTime       @updatedAt
 
     @@map("customers")
 }
@@ -400,4 +411,12 @@ enum VendorStatus {
     SUSPENDED
     REJECTED
     BLOCKED
+}
+
+// 🚀 NEW: Customer Status Enum
+enum CustomerStatus {
+    ACTIVE
+    SUSPENDED
+    BLOCKED
+    VERIFICATION_PENDING
 }

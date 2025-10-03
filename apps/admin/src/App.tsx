@@ -16,6 +16,8 @@ import OrdersPage from './pages/OrdersPage'
 import LogisticsPage from './pages/LogisticsPage'
 import RidersPage from './pages/RidersPage'
 import VendorsPage from './pages/VendorsPage'
+import CustomersPage from './pages/CustomersPage'
+import NotFoundPage from './pages/NotFoundPage'
 
 // Separate component that has access to QueryClient
 function AppContent() {
@@ -69,8 +71,17 @@ function AppContent() {
                     </AdminProtectedRoute>
                 } />
 
+                <Route path="/admin/customers" element={
+                    <AdminProtectedRoute>
+                        <CustomersPage />
+                    </AdminProtectedRoute>
+                } />
+
                 {/* Admin error routes */}
                 <Route path="/admin/unauthorized" element={<AdminUnauthorized />} />
+
+                {/* 404 Catch-all route */}
+                <Route path="*" element={<NotFoundPage />} />
             </Routes>
         </Router>
     )
