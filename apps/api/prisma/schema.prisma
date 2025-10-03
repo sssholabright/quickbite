@@ -38,6 +38,7 @@ model Customer {
     addresses   Address[]
     orders      Order[]
     reviews     Review[]
+    payments    Payment[]      // Add this line
     pushToken   String?
     
     // 🚀 NEW: Customer Status Management
@@ -92,6 +93,7 @@ model Rider {
     currentOrderId  String?     // 🚀 NEW: Track current order
     orders          Order[]
     earningsHistory RiderEarning[]
+    wallet          RiderWallet?
     createdAt       DateTime    @default(now())
     updatedAt       DateTime    @updatedAt
 
@@ -141,6 +143,7 @@ model Vendor {
     isOpen          Boolean    @default(false)
     rating          Float      @default(0)
     pushToken       String?     // 🚀 NEW: FCM push token
+    wallet          VendorWallet?
 
     status          VendorStatus @default(PENDING)
     openingTime     String?
@@ -258,6 +261,7 @@ model Order {
     vendor                Vendor      @relation(fields: [vendorId], references: [id])
     riderId               String?
     rider                 Rider?      @relation(fields: [riderId], references: [id])
+    payments              Payment[]   // Add this line
     status                OrderStatus @default(PENDING)
     subtotal              Float
     deliveryFee           Float
@@ -336,6 +340,188 @@ model DeliveryQueue {
     updatedAt       DateTime            @updatedAt
 
     @@map("delivery_queue")
+}
+
+// Payment tracking for customer orders
+model Payment {
+    id                String          @id @default(cuid())
+    orderId           String
+    order             Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+    customerId        String
+    customer          Customer        @relation(fields: [customerId], references: [id], onDelete: Cascade)
+    
+    // Payment details
+    transactionId     String?         @unique // Gateway transaction ID
+    gatewayReference  String?         // Gateway reference number
+    amount            Float           // Amount in kobo (NGN)
+    currency          String          @default("NGN")
+    gateway           PaymentGateway  @default(PAYSTACK)
+    paymentMethod     PaymentMethod   @default(CARD)
+    
+    // Status tracking
+    status            PaymentStatus   @default(PENDING)
+    gatewayResponse   Json?           // Full gateway response
+    
+    // Metadata
+    customerEmail     String
+    customerPhone     String?
+    description       String?
+    
+    // Timestamps
+    initiatedAt       DateTime        @default(now())
+    completedAt       DateTime?
+    failedAt          DateTime?
+    
+    // Retry tracking
+    retryCount        Int             @default(0)
+    maxRetries        Int             @default(3)
+    
+    // Relations
+    refunds           Refund[]
+    createdAt         DateTime        @default(now())
+    updatedAt         DateTime        @updatedAt
+
+    @@map("payments")
+}
+
+// Refund tracking
+model Refund {
+    id                String          @id @default(cuid())
+    paymentId         String
+    payment           Payment         @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+    
+    // Refund details
+    refundId          String?         @unique // Gateway refund ID
+    amount            Float           // Refund amount in kobo
+    reason            String
+    status            RefundStatus    @default(PENDING)
+    gatewayResponse   Json?           // Gateway refund response
+    
+    // Admin tracking
+    initiatedBy       String          // Admin user ID who initiated
+    approvedBy        String?         // Admin user ID who approved (if required)
+    
+    // Timestamps
+    initiatedAt       DateTime        @default(now())
+    processedAt       DateTime?
+    completedAt       DateTime?
+    
+    createdAt         DateTime        @default(now())
+    updatedAt         DateTime        @updatedAt
+
+    @@map("refunds")
+}
+
+// Vendor wallet and balance tracking
+model VendorWallet {
+    id                String          @id @default(cuid())
+    vendorId          String          @unique
+    vendor            Vendor          @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+    
+    // Balance tracking
+    currentBalance    Float           @default(0) // Available balance in kobo
+    pendingBalance    Float           @default(0) // Pending payout balance in kobo
+    totalEarnings     Float           @default(0) // Lifetime earnings in kobo
+    totalPaidOut      Float           @default(0) // Total amount paid out in kobo
+    
+    // Commission tracking
+    totalCommission   Float           @default(0) // Total commission deducted
+    commissionRate    Float           @default(0.15) // 15% default commission
+    
+    // Payout settings
+    payoutMethod      PayoutMethod    @default(BANK_TRANSFER)
+    bankDetails       Json?           // Encrypted bank details
+    payoutFrequency   PayoutFrequency @default(WEEKLY)
+    minimumPayout     Float           @default(10000) // Minimum payout amount (100 NGN)
+    
+    // Status
+    isActive          Boolean         @default(true)
+    lastPayoutDate    DateTime?
+    nextPayoutDate    DateTime?
+    
+    createdAt         DateTime        @default(now())
+    updatedAt         DateTime        @updatedAt
+
+    @@map("vendor_wallets")
+}
+
+// Rider wallet and balance tracking
+model RiderWallet {
+    id                String          @id @default(cuid())
+    riderId           String          @unique
+    rider             Rider           @relation(fields: [riderId], references: [id], onDelete: Cascade)
+    
+    // Balance tracking
+    currentBalance    Float           @default(0) // Available balance in kobo
+    pendingBalance    Float           @default(0) // Pending payout balance in kobo
+    totalEarnings     Float           @default(0) // Lifetime earnings in kobo
+    totalPaidOut      Float           @default(0) // Total amount paid out in kobo
+    
+    // Commission tracking
+    totalCommission   Float           @default(0) // Total commission deducted
+    commissionRate    Float           @default(0.10) // 10% default commission for riders
+    
+    // Payout settings
+    payoutMethod      PayoutMethod    @default(BANK_TRANSFER)
+    bankDetails       Json?           // Encrypted bank details
+    payoutFrequency   PayoutFrequency @default(DAILY)
+    minimumPayout     Float           @default(5000) // Minimum payout amount (50 NGN)
+    
+    // Status
+    isActive          Boolean         @default(true)
+    lastPayoutDate    DateTime?
+    nextPayoutDate    DateTime?
+    
+    createdAt         DateTime        @default(now())
+    updatedAt         DateTime        @updatedAt
+
+    @@map("rider_wallets")
+}
+
+// Payout transactions
+model Payout {
+    id                String          @id @default(cuid())
+    
+    // Recipient details
+    recipientType     PayoutRecipient @default(VENDOR)
+    recipientId       String          // Vendor ID or Rider ID
+    
+    // Amount details
+    amount            Float           // Payout amount in kobo
+    currency          String          @default("NGN")
+    
+    // Status tracking
+    status            PayoutStatus    @default(PENDING)
+    gatewayResponse   Json?           // Gateway payout response
+    gatewayReference  String?         // Gateway reference number
+    
+    // Bank details (encrypted)
+    bankDetails       Json?           // Bank account details
+    
+    // Admin tracking
+    initiatedBy       String          // Admin user ID
+    processedBy       String?         // System or admin who processed
+    approvedBy        String?         // Admin who approved (if required)
+    
+    // Timestamps
+    initiatedAt       DateTime        @default(now())
+    processedAt       DateTime?
+    completedAt       DateTime?
+    failedAt          DateTime?
+    
+    // Failure details
+    failureReason     String?
+    retryCount        Int             @default(0)
+    maxRetries        Int             @default(3)
+    
+    // Metadata
+    description       String?
+    notes             String?
+    
+    createdAt         DateTime        @default(now())
+    updatedAt         DateTime        @updatedAt
+
+    @@map("payouts")
 }
 
 // Enums
@@ -419,4 +605,62 @@ enum CustomerStatus {
     SUSPENDED
     BLOCKED
     VERIFICATION_PENDING
+}
+
+enum PaymentGateway {
+    PAYSTACK
+    FLUTTERWAVE
+    STRIPE
+    SQUARE
+}
+
+enum PaymentMethod {
+    CARD
+    BANK_TRANSFER
+    WALLET
+    CASH
+}
+
+enum PaymentStatus {
+    PENDING
+    PROCESSING
+    SUCCESS
+    FAILED
+    CANCELLED
+    REFUNDED
+}
+
+enum RefundStatus {
+    PENDING
+    PROCESSING
+    SUCCESS
+    FAILED
+    CANCELLED
+}
+
+enum PayoutMethod {
+    BANK_TRANSFER
+    WALLET
+    CASH
+}
+
+enum PayoutFrequency {
+    DAILY
+    WEEKLY
+    MONTHLY
+    MANUAL
+}
+
+enum PayoutRecipient {
+    VENDOR
+    RIDER
+}
+
+enum PayoutStatus {
+    PENDING
+    PROCESSING
+    SUCCESS
+    FAILED
+    CANCELLED
+    REJECTED
 }

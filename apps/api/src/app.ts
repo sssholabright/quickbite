@@ -24,6 +24,8 @@ import { logisticsRoutes } from './modules/admin/logistics/logistics.routes.js';
 import { ridersRoutes } from './modules/admin/riders/riders.routes.js';
 import vendorsRoutes from './modules/admin/vendors/vendors.routes.js';
 import customersRoutes from './modules/admin/customers/customers.routes.js';
+import paymentsRoutes from './modules/admin/payments/payments.routes.js';
+import payoutsRoutes from './modules/admin/payouts/payouts.routes.js';
 
 const app = express();
 
@@ -87,6 +89,8 @@ app.use('/api/v1/admin/logistics', logisticsRoutes);
 app.use('/api/v1/admin/riders', ridersRoutes);
 app.use('/api/v1/admin/vendors', vendorsRoutes);
 app.use('/api/v1/admin/customers', customersRoutes);
+app.use('/api/v1/admin/payments', paymentsRoutes);
+app.use('/api/v1/admin/payouts', payoutsRoutes);
 
 // 404 handler
 app.use(notFoundHandler);

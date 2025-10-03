@@ -1,5 +1,5 @@
 import React, { ReactNode, useState } from 'react'
-import { FaBars, FaBell, FaChartBar, FaClipboardList, FaCog, FaCreditCard, FaHistory, FaHome, FaMotorcycle, FaSignOutAlt, FaStore, FaUsers, FaTruck } from 'react-icons/fa'
+import { FaBars, FaBell, FaChartBar, FaClipboardList, FaCog, FaCreditCard, FaHistory, FaHome, FaMotorcycle, FaSignOutAlt, FaStore, FaUsers, FaTruck, FaMoneyBillWave } from 'react-icons/fa'
 import { FaTimes } from 'react-icons/fa'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAdminStore } from '../../stores/adminStore'
@@ -57,6 +57,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             href: '/admin/payments', 
             icon: FaCreditCard,
             permission: 'payments.read'
+        },
+        { 
+            name: 'Payouts', 
+            href: '/admin/payouts', 
+            icon: FaMoneyBillWave,
+            permission: 'payouts.read'
         },
         { 
             name: 'Notifications', 

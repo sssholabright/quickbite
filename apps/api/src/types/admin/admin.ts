@@ -123,7 +123,7 @@ export interface AdminPermissions {
     'payments.read': boolean;
     'payments.write': boolean;
     'payments.refund': boolean;
-    'payments.payout': boolean;
+    'payments.retry': boolean;
     
     // Notifications
     'notifications.read': boolean;
@@ -140,6 +140,11 @@ export interface AdminPermissions {
     
     // Audit
     'audit.read': boolean;
+    
+    // Payouts
+    'payouts.read': boolean;
+    'payouts.create': boolean;
+    'payouts.update': boolean;
 }
 
 export type AdminPermissionKey = keyof AdminPermissions;
@@ -158,11 +163,14 @@ export const ADMIN_ROLES = {
             'logistics.read', 'logistics.write', 'logistics.suspend', 'logistics.block',
             'vendors.read', 'vendors.write', 'vendors.approve', 'vendors.suspend', 'vendors.delete',
             'customers.read', 'customers.write', 'customers.ban', 'customers.delete',
-            'payments.read', 'payments.write', 'payments.refund', 'payments.payout',
+            'payments.read', 'payments.write', 'payments.refund', 'payments.retry',
             'notifications.read', 'notifications.send', 'notifications.broadcast',
             'reports.read', 'reports.export',
             'settings.read', 'settings.write',
-            'audit.read'
+            'audit.read',
+            'payouts.read',
+            'payouts.create',
+            'payouts.update'
         ]
     },
     OPS_MANAGER: {
@@ -180,7 +188,9 @@ export const ADMIN_ROLES = {
             'payments.read',
             'notifications.read', 'notifications.send',
             'reports.read', 'reports.export',
-            'audit.read'
+            'audit.read',
+            'payouts.read',
+            'payouts.create'
         ]
     },
     SUPPORT_STAFF: {
@@ -196,7 +206,7 @@ export const ADMIN_ROLES = {
             'riders.read',
             'logistics.read',
             'notifications.read', 'notifications.send',
-            'reports.read'
+            'reports.read',
         ]
     }
 } as const;

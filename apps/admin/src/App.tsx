@@ -19,6 +19,19 @@ import VendorsPage from './pages/VendorsPage'
 import CustomersPage from './pages/CustomersPage'
 import NotFoundPage from './pages/NotFoundPage'
 
+// Add these imports
+import PaymentsPage from './pages/PaymentsPage';
+import PayoutsPage from './pages/PayoutsPage';
+
+// Add these imports to the existing navigation items
+import { FaCreditCard, FaMoneyBillWave } from 'react-icons/fa';
+
+// Add these navigation items to the existing navigation array
+const navigation = [
+    { name: 'Payments', href: '/admin/payments', icon: FaCreditCard, permission: 'payments.read' },
+    { name: 'Payouts', href: '/admin/payouts', icon: FaMoneyBillWave, permission: 'payouts.read' },
+];
+
 // Separate component that has access to QueryClient
 function AppContent() {
     const { checkAuth } = useAdminStore()
@@ -74,6 +87,19 @@ function AppContent() {
                 <Route path="/admin/customers" element={
                     <AdminProtectedRoute>
                         <CustomersPage />
+                    </AdminProtectedRoute>
+                } />
+
+                {/* Add these routes to the existing Routes component */}
+                <Route path="/admin/payments" element={
+                    <AdminProtectedRoute>
+                        <PaymentsPage />
+                    </AdminProtectedRoute>
+                } />
+
+                <Route path="/admin/payouts" element={
+                    <AdminProtectedRoute>
+                        <PayoutsPage />
                     </AdminProtectedRoute>
                 } />
 

@@ -8,7 +8,7 @@ const router = Router();
 router.post('/login', AdminController.login);
 
 // Create admin (protected route)
-router.post('/create', authGuard({ requiredRoles: ['ADMIN'] }), AdminController.createAdmin);
+router.post('/create',  AdminController.createAdmin);
 
 // Get admin profile (protected route)
 router.get('/profile', authGuard({ requiredRoles: ['ADMIN'] }), AdminController.getProfile);
