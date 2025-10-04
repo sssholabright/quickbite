@@ -105,7 +105,7 @@ function AppTabs() {
 			>
 				<Tab.Screen name="Home" component={HomeScreen} />
 				<Tab.Screen name="Earnings" component={EarningsScreen} />
-				<Tab.Screen name="History" component={HistoryScreen} />
+				{/* <Tab.Screen name="History" component={HistoryScreen} /> */}
 				<Tab.Screen name="Profile" component={ProfileScreen} />
 			</Tab.Navigator>
 		</>
