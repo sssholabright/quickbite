@@ -264,4 +264,132 @@ export class RiderService {
             throw new CustomError('Failed to get push token', 500);
         }
     }
+
+    // Get rider earnings with filtering
+    static async getRiderEarnings(riderId: string, range: 'day' | 'week' | 'month' = 'day'): Promise<any> {
+        try {
+            // Get rider to ensure they exist
+            const rider = await prisma.rider.findUnique({
+                where: { id: riderId },
+                include: { user: true }
+            });
+
+            if (!rider) {
+                throw new CustomError('Rider not found', 404);
+            }
+
+            // Calculate date range
+            const now = new Date();
+            const start = new Date(now);
+            
+            if (range === 'day') {
+                start.setHours(0, 0, 0, 0);
+            } else if (range === 'week') {
+                const day = (now.getDay() + 6) % 7; // Monday as start
+                start.setDate(now.getDate() - day);
+                start.setHours(0, 0, 0, 0);
+            } else if (range === 'month') {
+                start.setDate(1);
+                start.setHours(0, 0, 0, 0);
+            }
+
+            logger.info(`Getting earnings for rider ${riderId}, range: ${range}, start date: ${start.toISOString()}`);
+
+            // Get all earnings for the rider
+            const allEarnings = await prisma.riderEarning.findMany({
+                where: { riderId },
+                include: { order: { select: { orderNumber: true } } },
+                orderBy: { date: 'desc' }
+            });
+
+            logger.info(`Found ${allEarnings.length} total earnings for rider ${riderId}`);
+
+            // Get filtered earnings for the range
+            const filteredEarnings = allEarnings.filter(earning => {
+                const earningDate = new Date(earning.date);
+                return earningDate >= start;
+            });
+
+            logger.info(`Found ${filteredEarnings.length} earnings in range ${range} for rider ${riderId}`);
+
+            // Calculate today's earnings
+            const todayStart = new Date(now);
+            todayStart.setHours(0, 0, 0, 0);
+            const todayEarnings = allEarnings.filter(earning => {
+                const earningDate = new Date(earning.date);
+                return earningDate >= todayStart;
+            });
+
+            // Calculate summary
+            const summary = {
+                totalEarnings: allEarnings.reduce((sum, earning) => sum + earning.amount, 0),
+                totalCompleted: allEarnings.length,
+                completedToday: todayEarnings.length,
+                earnedToday: todayEarnings.reduce((sum, earning) => sum + earning.amount, 0),
+                rangeTotal: filteredEarnings.reduce((sum, earning) => sum + earning.amount, 0),
+                rangeCount: filteredEarnings.length
+            };
+
+            // Format earnings for response
+            const formattedEarnings = filteredEarnings.map(earning => ({
+                id: earning.id,
+                date: earning.date.toISOString(),
+                orderId: earning.orderId,
+                orderNumber: earning.order?.orderNumber || null, // Add this line
+                amount: earning.amount,
+                type: earning.type,
+                description: earning.description,
+                status: 'paid'
+            }));
+
+            logger.info(`Returning summary: ${JSON.stringify(summary)}`);
+
+            return {
+                summary,
+                earnings: formattedEarnings
+            };
+
+        } catch (error: any) {
+            logger.error({ error, riderId, range }, 'Error getting rider earnings');
+            throw new CustomError('Failed to get earnings', 500);
+        }
+    }
+
+    // Get rider earnings summary only
+    static async getRiderEarningsSummary(riderId: string): Promise<any> {
+        try {
+            const rider = await prisma.rider.findUnique({
+                where: { id: riderId }
+            });
+
+            if (!rider) {
+                throw new CustomError('Rider not found', 404);
+            }
+
+            // Get all earnings
+            const allEarnings = await prisma.riderEarning.findMany({
+                where: { riderId }
+            });
+
+            // Calculate today's earnings
+            const now = new Date();
+            const todayStart = new Date(now);
+            todayStart.setHours(0, 0, 0, 0);
+            
+            const todayEarnings = allEarnings.filter(earning => 
+                new Date(earning.date) >= todayStart
+            );
+
+            return {
+                totalEarnings: allEarnings.reduce((sum, earning) => sum + earning.amount, 0),
+                totalCompleted: allEarnings.length,
+                completedToday: todayEarnings.length,
+                earnedToday: todayEarnings.reduce((sum, earning) => sum + earning.amount, 0)
+            };
+
+        } catch (error: any) {
+            logger.error({ error, riderId }, 'Error getting rider earnings summary');
+            throw new CustomError('Failed to get earnings summary', 500);
+        }
+    }
 }

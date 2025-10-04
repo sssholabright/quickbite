@@ -5,6 +5,7 @@ import { logger } from '../../utils/logger.js';
 import { ResponseHandler } from '../../utils/response.js';
 import { RiderService } from './rider.service.js';
 import { DeliveryJobService } from '../delivery/deliveryJob.service.js';
+import { prisma } from '../../config/db.js';
 
 interface AuthenticatedRequest extends Request {
     user?: {
@@ -17,6 +18,32 @@ interface AuthenticatedRequest extends Request {
 interface UpdateRiderStatusData {
     isOnline?: boolean | undefined;
 }
+
+export interface EarningEntry {
+    id: string;
+    date: string; // ISO date
+    orderId: string | null;
+    amount: number;
+    type: 'DELIVERY_FEE' | 'BONUS' | 'TIP' | 'PENALTY';
+    description: string | null;
+    status: 'pending' | 'paid';
+}
+
+export interface EarningsSummary {
+    totalEarnings: number;
+    totalCompleted: number;
+    completedToday: number;
+    earnedToday: number;
+    rangeTotal: number;
+    rangeCount: number;
+}
+
+export interface EarningsResponse {
+    summary: EarningsSummary;
+    earnings: EarningEntry[];
+}
+
+export type EarningsRange = 'day' | 'week' | 'month';
 
 export class RiderController {
     // Update rider status (online/offline, available/unavailable)
@@ -266,6 +293,71 @@ export class RiderController {
             const pushToken = await RiderService.getPushToken(userId);
             
             ResponseHandler.success(res as any, { pushToken }, 'Push token retrieved successfully');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    // 🚀 NEW: Earnings routes
+    static async getEarnings(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+        try {
+            const userId = req.user?.userId;
+            
+            if (!userId) {
+                ResponseHandler.unauthorized(res as any, 'User not authenticated');
+                return;
+            }
+
+            // Get rider ID from user ID
+            const rider = await prisma.rider.findUnique({
+                where: { userId }
+            });
+
+            if (!rider) {
+                ResponseHandler.notFound(res as any, 'Rider not found');
+                return;
+            }
+
+            // Get range from query params (default to 'day')
+            const range = (req.query.range as 'day' | 'week' | 'month') || 'day';
+            
+            // Validate range
+            if (!['day', 'week', 'month'].includes(range)) {
+                ResponseHandler.validationError(res as any, 'Invalid range parameter', 'Range must be day, week, or month');
+                return;
+            }
+
+            const earnings = await RiderService.getRiderEarnings(rider.id, range);
+            
+            ResponseHandler.success(res as any, earnings, 'Earnings retrieved successfully');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    // Get rider earnings summary
+    static async getEarningsSummary(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+        try {
+            const userId = req.user?.userId;
+            
+            if (!userId) {
+                ResponseHandler.unauthorized(res as any, 'User not authenticated');
+                return;
+            }
+
+            // Get rider ID from user ID
+            const rider = await prisma.rider.findUnique({
+                where: { userId }
+            });
+
+            if (!rider) {
+                ResponseHandler.notFound(res as any, 'Rider not found');
+                return;
+            }
+
+            const summary = await RiderService.getRiderEarningsSummary(rider.id);
+            
+            ResponseHandler.success(res as any, summary, 'Earnings summary retrieved successfully');
         } catch (error) {
             next(error);
         }

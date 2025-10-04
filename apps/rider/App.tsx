@@ -4,7 +4,7 @@ import { QueryProvider } from "./src/providers/QueryProvider";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { useAuthStore } from './src/stores/auth';
 import { SocketProvider } from './src/contexts/SocketContext';
 import React from 'react';
@@ -12,8 +12,7 @@ import { useLocationMonitor } from './src/hooks/useLocationMonitor';
 import { useRiderStore } from "./src/stores/rider";
 // 🚀 NEW: Import auto-logout setup
 import { setAutoLogoutCallback } from './src/services/api';
-
-const queryClient = new QueryClient();
+import { queryClient } from './src/lib/queryClient';
 
 function AppContent() {
   const { hydrate, autoLogout } = useAuthStore();

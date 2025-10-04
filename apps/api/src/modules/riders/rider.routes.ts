@@ -23,4 +23,8 @@ router.post('/delivery-jobs/:orderId/reject', RiderController.rejectDeliveryJob)
 router.put('/location', RiderController.updateLocation);
 router.get('/location', RiderController.getCurrentLocation);
 
+// 🚀 NEW: Earnings routes
+router.get('/earnings', RiderController.getEarnings);
+router.get('/earnings/summary', RiderController.getEarningsSummary);
+
 export default router;

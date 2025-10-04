@@ -106,6 +106,7 @@ model RiderEarning {
     riderId     String
     rider       Rider    @relation(fields: [riderId], references: [id], onDelete: Cascade)
     orderId     String?  // Optional - might be from different sources
+    order       Order?   @relation(fields: [orderId], references: [id]) // Add this line
     amount      Float
     type        EarningType @default(DELIVERY_FEE)
     description String?
@@ -120,6 +121,7 @@ model RiderOrderHistory {
     id        String              @id @default(cuid())
     riderId   String
     orderId   String
+    order     Order?              @relation(fields: [orderId], references: [id], onDelete: Cascade)
     status    OrderHistoryStatus
     timestamp DateTime            @default(now())
     notes     String?
@@ -261,14 +263,14 @@ model Order {
     vendor                Vendor      @relation(fields: [vendorId], references: [id])
     riderId               String?
     rider                 Rider?      @relation(fields: [riderId], references: [id])
-    payments              Payment[]   // Add this line
+    payments              Payment[]
     status                OrderStatus @default(PENDING)
     subtotal              Float
     deliveryFee           Float
     serviceFee            Float
     total                 Float?
     items                 OrderItem[]
-    deliveryQueue   DeliveryQueue?
+    deliveryQueue         DeliveryQueue?
     deliveryAddress       Json
     specialInstructions   String?
     estimatedDeliveryTime DateTime?
@@ -277,6 +279,8 @@ model Order {
     createdAt             DateTime    @default(now())
     updatedAt             DateTime    @updatedAt
 
+    riderOrderHistory     RiderOrderHistory[]
+    riderEarnings         RiderEarning[] // Add this line
     @@map("orders")
 }
 
