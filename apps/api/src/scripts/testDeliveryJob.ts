@@ -52,7 +52,7 @@ async function testDeliveryJob() {
         });
         
         console.log(`👥 Available riders: ${availableRiders.length}`);
-        availableRiders.forEach(rider => {
+        availableRiders.forEach((rider: any) => {
             console.log(`  - ${rider.user.name} (${rider.user.email})`);
         });
         

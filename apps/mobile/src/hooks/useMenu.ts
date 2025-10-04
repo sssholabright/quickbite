@@ -6,15 +6,20 @@ export const menuKeys = {
     vendors: (params?: { search?: string; hasAvailableItems?: boolean }) => ['vendors', params] as const,
     vendorCategories: (vendorId: string) => ['vendorCategories', vendorId] as const,
     vendorItems: (vendorId: string, params?: { categoryId?: string; search?: string }) => ['vendorItems', vendorId, params] as const,
+    allCategories: () => ['allCategories'] as const,
 }
 
 // Vendors Hook
-export const useVendors = (params?: { search?: string; hasAvailableItems?: boolean }) =>
-    useQuery({
-        queryKey: menuKeys.vendors(params),
-        queryFn: () => menuService.getVendors(params),
+export const useVendors = (filters?: { hasAvailableItems?: boolean }) => {
+    return useQuery({
+        queryKey: ['vendors', filters],
+        queryFn: async () => {
+            const response = await menuService.getVendors(filters);
+            return response;
+        },
         staleTime: 2 * 60 * 1000, // 2 minutes
-    })
+    });
+};
 
 // Vendor Categories Hook
 export const useVendorCategories = (vendorId: string) =>
@@ -31,5 +36,13 @@ export const useVendorMenuItems = (vendorId: string, params?: { categoryId?: str
         queryKey: menuKeys.vendorItems(vendorId, params),
         queryFn: () => menuService.getVendorItems(vendorId, params),
         enabled: !!vendorId,
+        staleTime: 2 * 60 * 1000, // 2 minutes
+    })
+
+// All Categories Hook
+export const useAllCategories = () =>
+    useQuery({
+        queryKey: menuKeys.allCategories(),
+        queryFn: () => menuService.getAllCategories(),
         staleTime: 2 * 60 * 1000, // 2 minutes
     })

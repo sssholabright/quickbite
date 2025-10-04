@@ -47,7 +47,12 @@ export const useCreateVendor = () => {
     const queryClient = useQueryClient();
     
     return useMutation({
-        mutationFn: (request: CreateVendorRequest) => vendorsService.createVendor(request),
+        mutationFn: async ({ request, logoFile }: { 
+            request: CreateVendorRequest; 
+            logoFile?: File 
+        }) => {
+            return await vendorsService.createVendor(request, logoFile);
+        },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: vendorsKeys.lists() });
         },
@@ -59,8 +64,13 @@ export const useUpdateVendor = () => {
     const queryClient = useQueryClient();
     
     return useMutation({
-        mutationFn: ({ vendorId, request }: { vendorId: string; request: UpdateVendorRequest }) => 
-            vendorsService.updateVendor(vendorId, request),
+        mutationFn: async ({ vendorId, request, logoFile }: { 
+            vendorId: string; 
+            request: UpdateVendorRequest; 
+            logoFile?: File 
+        }) => {
+            return await vendorsService.updateVendor(vendorId, request, logoFile);
+        },
         onSuccess: (_, { vendorId }) => {
             queryClient.invalidateQueries({ queryKey: vendorsKeys.lists() });
             queryClient.invalidateQueries({ queryKey: vendorsKeys.detail(vendorId) });

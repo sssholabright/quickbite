@@ -3,6 +3,14 @@ import { logger } from '../../../utils/logger.js';
 import { vendorsService } from './vendor.service.js';
 import { VendorFilters } from '../../../types/admin/vendors.js';
 
+interface AuthenticatedRequest extends Request {
+    user?: {
+        userId: string;
+        email: string;
+        role: 'CUSTOMER' | 'RIDER' | 'VENDOR' | 'ADMIN';
+    };
+}
+
 export class VendorsController {
     // Get vendors list
     async getVendorsList(req: Request, res: Response) {
@@ -77,9 +85,9 @@ export class VendorsController {
     }
 
     // Create vendor
-    async createVendor(req: Request, res: Response) {
+    async createVendor(req: AuthenticatedRequest, res: Response) {
         try {
-            const result = await vendorsService.createVendor(req.body);
+            const result = await vendorsService.createVendor(req.body, req.file);
             return res.status(201).json(result);
         } catch (error: any) {
             logger.error({ error }, 'Error creating vendor');
@@ -90,10 +98,10 @@ export class VendorsController {
     }
 
     // Update vendor
-    async updateVendor(req: Request, res: Response) {
+    async updateVendor(req: AuthenticatedRequest, res: Response) {
         try {
             const { id } = req.params;
-            const result = await vendorsService.updateVendor(id as string, req.body);
+            const result = await vendorsService.updateVendor(id as string, req.body, req.file);
             return res.json(result);
         } catch (error: any) {
             logger.error({ error }, 'Error updating vendor');

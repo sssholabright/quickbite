@@ -1,4 +1,4 @@
-import { PrismaClient, CustomerStatus } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 import { CustomersListParams, CustomersListResponse, UpdateCustomerRequest, CustomerDetails, ActionResponse } from '../../../types/admin/customers.js';
 import { CustomError } from '../../../middlewares/errorHandler.js';
 
@@ -57,7 +57,7 @@ export class CustomersService {
             take: limit
         });
 
-        const data = customers.map(customer => {
+        const data = customers.map((customer: any) => {
             const completionRate = customer.totalOrders > 0 
                 ? (customer.completedOrders / customer.totalOrders) * 100 
                 : 0;
@@ -178,7 +178,7 @@ export class CustomersService {
                 completionRate,
                 lastOrderDate: lastOrder?.createdAt.toISOString() || null
             },
-            addresses: customer.addresses.map(addr => ({
+            addresses: customer.addresses.map((addr: any) => ({
                 id: addr.id,
                 title: addr.title,
                 address: addr.address,
@@ -189,7 +189,7 @@ export class CustomersService {
                 lat: addr.lat,
                 lng: addr.lng
             })),
-            recentOrders: customer.orders.map(order => ({
+            recentOrders: customer.orders.map((order: any) => ({
                 id: order.id,
                 orderNumber: order.orderNumber,
                 status: order.status,
@@ -252,12 +252,12 @@ export class CustomersService {
             });
 
             // If blocking customer, also deactivate user account
-            if (data.status === CustomerStatus.BLOCKED) {
+            if (data.status === 'BLOCKED') {
                 await prisma.user.update({
                     where: { id: customer.userId },
                     data: { isActive: false }
                 });
-            } else if (data.status === CustomerStatus.ACTIVE) {
+            } else if (data.status === 'ACTIVE') {
                 // If activating customer, also activate user account
                 await prisma.user.update({
                     where: { id: customer.userId },
@@ -280,13 +280,13 @@ export class CustomersService {
             throw new CustomError('Customer not found', 404);
         }
 
-        if (customer.status === CustomerStatus.SUSPENDED) {
+        if (customer.status === 'SUSPENDED') {
             throw new CustomError('Customer is already suspended', 400);
         }
 
         await prisma.customer.update({
             where: { id: customerId },
-            data: { status: CustomerStatus.SUSPENDED }
+            data: { status: 'SUSPENDED' }
         });
 
         return {
@@ -306,13 +306,13 @@ export class CustomersService {
             throw new CustomError('Customer not found', 404);
         }
 
-        if (customer.status === CustomerStatus.BLOCKED) {
+        if (customer.status === 'BLOCKED') {
             throw new CustomError('Customer is already blocked', 400);
         }
 
         await prisma.customer.update({
             where: { id: customerId },
-            data: { status: CustomerStatus.BLOCKED }
+            data: { status: 'BLOCKED' }
         });
 
         // Also deactivate user account
@@ -338,13 +338,13 @@ export class CustomersService {
             throw new CustomError('Customer not found', 404);
         }
 
-        if (customer.status === CustomerStatus.ACTIVE) {
+        if (customer.status === 'ACTIVE') {
             throw new CustomError('Customer is already active', 400);
         }
 
         await prisma.customer.update({
             where: { id: customerId },
-            data: { status: CustomerStatus.ACTIVE }
+            data: { status: 'ACTIVE' }
         });
 
         // Also activate user account
@@ -396,7 +396,7 @@ export class CustomersService {
         });
 
         return {
-            data: orders.map(order => ({
+            data: orders.map((order: any) => ({
                 id: order.id,
                 orderNumber: order.orderNumber,
                 status: order.status,

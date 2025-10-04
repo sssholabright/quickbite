@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useCreateVendor } from '../../hooks/useVendors';
 import { CreateVendorRequest } from '../../types/vendors';
 import Swal from 'sweetalert2';
-import { FaTimes, FaUser, FaPhone, FaEnvelope, FaBuilding, FaMapMarkerAlt, FaClock, FaCalendarAlt, FaEye, FaEyeSlash } from 'react-icons/fa';
+import { FaTimes, FaUser, FaPhone, FaEnvelope, FaBuilding, FaMapMarkerAlt, FaClock, FaCalendarAlt, FaEye, FaEyeSlash, FaCamera, FaImage, FaLocationArrow, FaSpinner } from 'react-icons/fa';
 
 interface CreateVendorModalProps {
     isOpen: boolean;
@@ -27,12 +27,123 @@ export default function CreateVendorModal({ isOpen, onClose, onSuccess }: Create
     });
 
     const [showPassword, setShowPassword] = useState(false);
+    const [logoFile, setLogoFile] = useState<File | null>(null);
+    const [logoPreview, setLogoPreview] = useState<string | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [isGettingLocation, setIsGettingLocation] = useState(false);
 
     const createVendorMutation = useCreateVendor();
 
     const operatingDaysOptions = [
         'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
     ];
+
+    const handleLogoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file) {
+            // Validate file type
+            if (!file.type.startsWith('image/')) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Invalid File Type',
+                    text: 'Please select an image file.',
+                    confirmButtonColor: '#DC2626'
+                });
+                return;
+            }
+
+            // Validate file size (5MB)
+            if (file.size > 5 * 1024 * 1024) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'File Too Large',
+                    text: 'Please select an image smaller than 5MB.',
+                    confirmButtonColor: '#DC2626'
+                });
+                return;
+            }
+
+            setLogoFile(file);
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                setLogoPreview(e.target?.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const handleLogoClick = () => {
+        fileInputRef.current?.click();
+    };
+
+    const handleRemoveLogo = () => {
+        setLogoFile(null);
+        setLogoPreview(null);
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+    };
+
+    const getCurrentLocation = () => {
+        if (!navigator.geolocation) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Geolocation Not Supported',
+                text: 'Your browser does not support geolocation.',
+                confirmButtonColor: '#DC2626'
+            });
+            return;
+        }
+
+        setIsGettingLocation(true);
+
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const { latitude, longitude } = position.coords;
+                setFormData(prev => ({
+                    ...prev,
+                    latitude: latitude.toString(),
+                    longitude: longitude.toString()
+                }));
+                setIsGettingLocation(false);
+                
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Location Retrieved',
+                    text: 'Current location has been set successfully.',
+                    confirmButtonColor: '#059669'
+                });
+            },
+            (error) => {
+                setIsGettingLocation(false);
+                let errorMessage = 'Failed to get current location.';
+                
+                switch (error.code) {
+                    case error.PERMISSION_DENIED:
+                        errorMessage = 'Location access denied by user.';
+                        break;
+                    case error.POSITION_UNAVAILABLE:
+                        errorMessage = 'Location information is unavailable.';
+                        break;
+                    case error.TIMEOUT:
+                        errorMessage = 'Location request timed out.';
+                        break;
+                }
+                
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Location Error',
+                    text: errorMessage,
+                    confirmButtonColor: '#DC2626'
+                });
+            },
+            {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 300000
+            }
+        );
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -95,7 +206,7 @@ export default function CreateVendorModal({ isOpen, onClose, onSuccess }: Create
                 operatingDays: formData.operatingDays.length > 0 ? formData.operatingDays : undefined
             };
 
-            await createVendorMutation.mutateAsync(request);
+            await createVendorMutation.mutateAsync({ request, logoFile: logoFile || undefined });
             
             await Swal.fire({
                 icon: 'success',
@@ -132,6 +243,11 @@ export default function CreateVendorModal({ isOpen, onClose, onSuccess }: Create
             operatingDays: []
         });
         setShowPassword(false);
+        setLogoFile(null);
+        setLogoPreview(null);
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
         onClose();
     };
 
@@ -186,6 +302,60 @@ export default function CreateVendorModal({ isOpen, onClose, onSuccess }: Create
                     <form onSubmit={handleSubmit}>
                         <div className="bg-white px-4 pb-4 sm:p-6 max-h-96 overflow-y-auto">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {/* Logo Upload */}
+                                <div className="md:col-span-2">
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        <FaImage className="w-3 h-3 inline mr-1" />
+                                        Business Logo
+                                    </label>
+                                    <div className="flex items-center space-x-4">
+                                        <div className="flex-shrink-0">
+                                            {logoPreview ? (
+                                                <img
+                                                    className="h-16 w-16 rounded-full object-cover border-2 border-gray-200"
+                                                    src={logoPreview}
+                                                    alt="Logo preview"
+                                                />
+                                            ) : (
+                                                <div className="h-16 w-16 rounded-full bg-gray-100 border-2 border-gray-200 flex items-center justify-center">
+                                                    <FaImage className="w-6 h-6 text-gray-400" />
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="flex-1">
+                                            <div className="flex space-x-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={handleLogoClick}
+                                                    className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                                                >
+                                                    <FaCamera className="w-4 h-4 mr-1" />
+                                                    {logoFile ? 'Change Logo' : 'Upload Logo'}
+                                                </button>
+                                                {logoFile && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleRemoveLogo}
+                                                        className="inline-flex items-center px-3 py-2 border border-red-300 shadow-sm text-sm leading-4 font-medium rounded-md text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                                                    >
+                                                        Remove
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <p className="mt-1 text-xs text-gray-500">
+                                                PNG, JPG, WEBP up to 5MB
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <input
+                                        ref={fileInputRef}
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={handleLogoChange}
+                                        className="hidden"
+                                    />
+                                </div>
+
                                 {/* Name */}
                                 <div className="md:col-span-2">
                                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -294,32 +464,49 @@ export default function CreateVendorModal({ isOpen, onClose, onSuccess }: Create
                                 </div>
 
                                 {/* Coordinates */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Latitude
-                                    </label>
-                                    <input
-                                        type="number"
-                                        step="any"
-                                        value={formData.latitude}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, latitude: e.target.value }))}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
-                                        placeholder="6.5244"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Longitude
-                                    </label>
-                                    <input
-                                        type="number"
-                                        step="any"
-                                        value={formData.longitude}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, longitude: e.target.value }))}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
-                                        placeholder="3.3792"
-                                    />
+                                <div className="md:col-span-2">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <label className="block text-sm font-medium text-gray-700">
+                                            Location Coordinates
+                                        </label>
+                                        <button
+                                            type="button"
+                                            onClick={getCurrentLocation}
+                                            disabled={isGettingLocation}
+                                            className="inline-flex items-center px-3 py-1 text-xs border border-primary-300 shadow-sm font-medium rounded-md text-primary-700 bg-primary-50 hover:bg-primary-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50"
+                                        >
+                                            {isGettingLocation ? (
+                                                <FaSpinner className="w-3 h-3 mr-1 animate-spin" />
+                                            ) : (
+                                                <FaLocationArrow className="w-3 h-3 mr-1" />
+                                            )}
+                                            {isGettingLocation ? 'Getting...' : 'Get Current Location'}
+                                        </button>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div>
+                                            <label className="block text-xs text-gray-500 mb-1">Latitude</label>
+                                            <input
+                                                type="number"
+                                                step="any"
+                                                value={formData.latitude}
+                                                onChange={(e) => setFormData(prev => ({ ...prev, latitude: e.target.value }))}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
+                                                placeholder="6.5244"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs text-gray-500 mb-1">Longitude</label>
+                                            <input
+                                                type="number"
+                                                step="any"
+                                                value={formData.longitude}
+                                                onChange={(e) => setFormData(prev => ({ ...prev, longitude: e.target.value }))}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
+                                                placeholder="3.3792"
+                                            />
+                                        </div>
+                                    </div>
                                 </div>
 
                                 {/* Description */}

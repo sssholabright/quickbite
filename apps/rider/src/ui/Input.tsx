@@ -12,6 +12,7 @@ export const Input = forwardRef<TextInput, TextInputProps & { label?: string; er
 					ref={ref}
 					placeholderTextColor={theme.mode === "dark" ? "#64748b" : "#94a3b8"}
 					style={[{
+						marginBottom: 15,
 						backgroundColor: theme.colors.surface,
 						color: theme.colors.text,
 						paddingVertical: 14, paddingHorizontal: 14,

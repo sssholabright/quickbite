@@ -17,18 +17,6 @@ export function VendorCard({ vendor }: VendorCardProps) {
         return "₦";
     };    
 
-    // Get cuisine tags based on category
-    const getCuisineTags = (category: string) => {
-        const tagMap: Record<string, string[]> = {
-            lunch: ["Rice", "Main Course", "Healthy"],
-            breakfast: ["Pastries", "Coffee", "Fresh"],
-            snacks: ["Quick Bites", "Fast Food", "Snacks"],
-            drinks: ["Coffee", "Tea", "Beverages"],
-            dinner: ["Dinner", "Evening", "Comfort"]
-        };
-        return tagMap[category] || [category];
-    };
-
     // Create a local copy to avoid mutating props
     const vendorData = {
         ...vendor,
@@ -36,7 +24,6 @@ export function VendorCard({ vendor }: VendorCardProps) {
     };
 
     const priceIndicator = getPriceIndicator(vendorData.rating);
-    const cuisineTags = getCuisineTags(vendorData.category);
     
     const handlePress = () => {
         // Don't navigate if vendor is closed
@@ -136,36 +123,56 @@ export function VendorCard({ vendor }: VendorCardProps) {
                     {vendorData.name}
                 </Text>
 
-                {/* Cuisine / Category Tags */}
-                <View style={{
-                    flexDirection: "row",
-                    flexWrap: "wrap",
-                    marginBottom: 5,
-                    gap: 6
-                }}>
-                    {cuisineTags.map((tag, index) => (
-                        <View
-                            key={index}
-                            style={{
+                {/* Real Categories from API */}
+                {vendorData.categories && vendorData.categories.length > 0 && (
+                    <View style={{
+                        flexDirection: "row",
+                        flexWrap: "wrap",
+                        marginBottom: 5,
+                        gap: 6
+                    }}>
+                        {vendorData.categories.slice(0, 3).map((category, index) => (
+                            <View
+                                key={category.id}
+                                style={{
+                                    backgroundColor: theme.colors.background,
+                                    paddingVertical: 2,
+                                    borderRadius: 8,
+                                    borderWidth: 1,
+                                    borderColor: theme.colors.border
+                                }}
+                            >
+                                <Text style={{
+                                    fontSize: 10,
+                                    paddingHorizontal: 6,
+                                    textTransform: "capitalize",
+                                    color: theme.colors.muted,
+                                    fontWeight: "500"
+                                }}>
+                                    {category.name}
+                                </Text>
+                            </View>
+                        ))}
+                        {vendorData.categories.length > 3 && (
+                            <View style={{
                                 backgroundColor: theme.colors.background,
                                 paddingVertical: 2,
                                 borderRadius: 8,
                                 borderWidth: 1,
                                 borderColor: theme.colors.border
-                            }}
-                        >
-                            <Text style={{
-                                fontSize: 10,
-                                paddingHorizontal: 6,
-                                textTransform: "capitalize",
-                                color: theme.colors.muted,
-                                fontWeight: "500"
                             }}>
-                                {tag}
-                            </Text>
-                        </View>
-                    ))}
-                </View>
+                                <Text style={{
+                                    fontSize: 10,
+                                    paddingHorizontal: 6,
+                                    color: theme.colors.muted,
+                                    fontWeight: "500"
+                                }}>
+                                    +{vendorData.categories.length - 3} more
+                                </Text>
+                            </View>
+                        )}
+                    </View>
+                )}
 
                 {/* Pickup Time / ETA */}
                 <View style={{
@@ -192,41 +199,6 @@ export function VendorCard({ vendor }: VendorCardProps) {
                         </Text>
                     )}
                 </View>
-
-                {/* ⭐ Rating + Reviews */}
-                {/* {!vendorData?.rating && (
-                    <View style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                    }}>
-                        <View style={{
-                            flexDirection: "row",
-                            alignItems: "center",
-                            backgroundColor: theme.colors.background,
-                            paddingHorizontal: 6,
-                            paddingVertical: 4,
-                            borderRadius: 8,
-                            marginRight: 8
-                        }}>
-                            <Icon name="star" size={14} color="#fbbf24" />
-                            <Text style={{
-                                marginLeft: 4,
-                                fontSize: 12,
-                                fontWeight: "600",
-                                color: theme.colors.text
-                            }}>
-                                {vendorData.rating}
-                            </Text>
-                            <Text style={{
-                                marginLeft: 4,
-                                fontSize: 10,
-                                color: theme.colors.muted
-                            }}>
-                                (200+)
-                            </Text>
-                        </View>
-                    </View>
-                )} */}
             </View>
             
             {/* 🔽 BOTTOM: Call-to-action */}

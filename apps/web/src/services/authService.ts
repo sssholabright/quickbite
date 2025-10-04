@@ -6,7 +6,11 @@ class AuthService {
     // Login user
     async login(credentials: LoginCredentials): Promise<AuthResult> {
         try {
-            const response = await api.post<ApiResponse<AuthResult>>('/auth/login', credentials)
+            const response = await api.post<ApiResponse<AuthResult>>('/auth/login', credentials, {
+                headers: {
+                    'X-App-Type': 'vendor'
+                }
+            })
             const { user, tokens } = response.data.data as AuthResult
 
             // Store tokens in localStorage
@@ -15,6 +19,11 @@ class AuthService {
 
             return { user, tokens }
         } catch (error: any) {
+            // Handle role-based access errors
+            if (error.response?.status === 403 && error.response?.data?.message?.includes('Access denied')) {
+                throw new Error('This account is not authorized for this app. Please use the mobile app or admin interface.');
+            }
+            
             throw new Error(error.response?.data?.message || 'Login failed')
         }
     }
@@ -70,6 +79,15 @@ class AuthService {
             // Clear tokens from localStorage
             localStorage.removeItem('accessToken')
             localStorage.removeItem('refreshToken')
+        }
+    }
+
+    // Change password
+    async changePassword(data: { currentPassword: string; newPassword: string; confirmPassword: string }): Promise<void> {
+        try {
+            await api.put<ApiResponse<void>>('/auth/change-password', data)
+        } catch (error: any) {
+            throw new Error(error.response?.data?.message || 'Failed to change password')
         }
     }
 }

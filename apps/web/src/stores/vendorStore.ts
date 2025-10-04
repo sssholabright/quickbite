@@ -1,157 +1,63 @@
 import { create } from 'zustand'
 import { VendorProfile, ChangePasswordData } from '../types/vendor'
+import { vendorService, VendorProfileData, VendorSettings, VendorStats } from '../services/vendorService'
+import { authService } from '../services/authService'
 
 interface VendorStore {
     profile: VendorProfile | null
+    stats: VendorStats | null
     isLoading: boolean
     error: string | null
     setProfile: (profile: VendorProfile) => void
+    setStats: (stats: VendorStats) => void
     setLoading: (loading: boolean) => void
     setError: (error: string | null) => void
     fetchProfile: () => Promise<void>
-    updateProfile: (updates: Partial<VendorProfile>) => Promise<void>
+    updateProfile: (updates: Partial<VendorProfile>, logoFile?: File) => Promise<void>
+    updateSettings: (settings: Partial<VendorProfile['settings']>) => Promise<void>
+    fetchStats: () => Promise<void>
     changePassword: (data: ChangePasswordData) => Promise<void>
     updateBankDetails: (bankDetails: Partial<VendorProfile['bankDetails']>) => Promise<void>
-    updateSettings: (settings: Partial<VendorProfile['settings']>) => Promise<void>
 }
 
 export const useVendorStore = create<VendorStore>((set, get) => ({
     profile: null,
+    stats: null,
     isLoading: false,
     error: null,
 
     setProfile: (profile) => set({ profile }),
+    setStats: (stats) => set({ stats }),
     setLoading: (isLoading) => set({ isLoading }),
     setError: (error) => set({ error }),
 
     fetchProfile: async () => {
         set({ isLoading: true, error: null })
         
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 500))
-        
         try {
-            // Mock profile data
-            const mockProfile: VendorProfile = {
-                id: '1',
-                name: 'Tasty Bites Restaurant',
-                email: 'vendor@tastybites.com',
-                phone: '+234 801 234 5678',
-                logo: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400&h=300&fit=crop',
-                description: 'Authentic Nigerian cuisine with a modern twist',
-                address: {
-                    street: '123 Victoria Island',
-                    city: 'Lagos',
-                    state: 'Lagos',
-                    country: 'Nigeria',
-                    postalCode: '101241',
-                    coordinates: {
-                        lat: 6.4281,
-                        lng: 3.4219
-                    }
-                },
-                bankDetails: {
-                    bankName: 'Access Bank',
-                    accountNumber: '1234567890',
-                    accountName: 'Tasty Bites Restaurant',
-                    bankCode: '044',
-                    isVerified: true
-                },
-                settings: {
-                    notifications: {
-                        email: true,
-                        sms: true,
-                        push: true,
-                        orderUpdates: true,
-                        paymentUpdates: true,
-                        marketing: false
-                    },
-                    business: {
-                        isOpen: true,
-                        operatingHours: {
-                            monday: { open: '08:00', close: '22:00', isOpen: true },
-                            tuesday: { open: '08:00', close: '22:00', isOpen: true },
-                            wednesday: { open: '08:00', close: '22:00', isOpen: true },
-                            thursday: { open: '08:00', close: '22:00', isOpen: true },
-                            friday: { open: '08:00', close: '23:00', isOpen: true },
-                            saturday: { open: '09:00', close: '23:00', isOpen: true },
-                            sunday: { open: '10:00', close: '21:00', isOpen: true }
-                        },
-                        deliveryRadius: 10,
-                        minimumOrderAmount: 1000
-                    }
-                },
-                createdAt: '2024-01-15T10:00:00Z',
-                updatedAt: '2024-01-15T10:00:00Z'
-            }
-            
-            set({ profile: mockProfile, isLoading: false })
+            const vendorProfile = await vendorService.getProfile()
+            set({ profile: vendorProfile, isLoading: false })
         } catch (error: any) {
             set({ error: error.message, isLoading: false })
         }
     },
 
-    updateProfile: async (updates) => {
-        set({ isLoading: true })
-        
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 300))
+    updateProfile: async (updates, logoFile) => {
+        set({ isLoading: true, error: null })
         
         try {
-            const currentProfile = get().profile
-            if (!currentProfile) throw new Error('No profile found')
+            // Prepare data for vendor service
+            const vendorData: VendorProfileData = {}
             
-            const updatedProfile = {
-                ...currentProfile,
-                ...updates,
-                updatedAt: new Date().toISOString()
-            }
-            
-            set({ profile: updatedProfile, isLoading: false })
-        } catch (error: any) {
-            set({ error: error.message, isLoading: false })
-            throw error
-        }
-    },
+            if (updates.name) vendorData.businessName = updates.name
+            if (updates.description) vendorData.description = updates.description
+            if (updates.logo) vendorData.logo = updates.logo
+            if (updates.address?.street) vendorData.businessAddress = updates.address.street
+            if (updates.address?.coordinates?.lat) vendorData.latitude = updates.address.coordinates.lat
+            if (updates.address?.coordinates?.lng) vendorData.longitude = updates.address.coordinates.lng
+            if (updates.settings?.business?.isOpen !== undefined) vendorData.isOpen = updates.settings.business.isOpen
 
-    changePassword: async (data) => {
-        set({ isLoading: true })
-        
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 500))
-        
-        try {
-            // Simulate password change
-            if (data.newPassword !== data.confirmPassword) {
-                throw new Error('New passwords do not match')
-            }
-            
-            set({ isLoading: false })
-        } catch (error: any) {
-            set({ error: error.message, isLoading: false })
-            throw error
-        }
-    },
-
-    updateBankDetails: async (bankDetails) => {
-        set({ isLoading: true })
-        
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 300))
-        
-        try {
-            const currentProfile = get().profile
-            if (!currentProfile) throw new Error('No profile found')
-            
-            const updatedProfile = {
-                ...currentProfile,
-                bankDetails: {
-                    ...currentProfile.bankDetails,
-                    ...bankDetails
-                },
-                updatedAt: new Date().toISOString()
-            }
-            
+            const updatedProfile = await vendorService.updateProfile(vendorData, logoFile)
             set({ profile: updatedProfile, isLoading: false })
         } catch (error: any) {
             set({ error: error.message, isLoading: false })
@@ -160,25 +66,64 @@ export const useVendorStore = create<VendorStore>((set, get) => ({
     },
 
     updateSettings: async (settings) => {
-        set({ isLoading: true })
-        
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 300))
+        set({ isLoading: true, error: null })
         
         try {
-            const currentProfile = get().profile
-            if (!currentProfile) throw new Error('No profile found')
+            const vendorSettings: VendorSettings = {}
             
-            const updatedProfile = {
-                ...currentProfile,
-                settings: {
-                    ...currentProfile.settings,
-                    ...settings
-                },
-                updatedAt: new Date().toISOString()
+            if (settings.business?.isOpen !== undefined) {
+                vendorSettings.isOpen = settings.business.isOpen
             }
-            
+
+            const updatedProfile = await vendorService.updateSettings(vendorSettings)
             set({ profile: updatedProfile, isLoading: false })
+        } catch (error: any) {
+            set({ error: error.message, isLoading: false })
+            throw error
+        }
+    },
+
+    fetchStats: async () => {
+        set({ isLoading: true, error: null })
+        
+        try {
+            const stats = await vendorService.getStats()
+            set({ stats, isLoading: false })
+        } catch (error: any) {
+            set({ error: error.message, isLoading: false })
+            throw error
+        }
+    },
+
+    changePassword: async (data) => {
+        set({ isLoading: true, error: null })
+        
+        try {
+            // Use authService for password change
+            await authService.changePassword(data)
+            set({ isLoading: false })
+        } catch (error: any) {
+            set({ error: error.message, isLoading: false })
+            throw error
+        }
+    },
+
+    updateBankDetails: async (bankDetails) => {
+        set({ isLoading: true, error: null })
+        
+        try {
+            // Note: Backend doesn't have bank details endpoint yet
+            // This would need to be implemented
+            console.warn('Bank details update not implemented in backend')
+            
+            const currentProfile = get().profile
+            if (currentProfile) {
+                const updatedProfile = {
+                    ...currentProfile,
+                    bankDetails: { ...currentProfile.bankDetails, ...bankDetails }
+                }
+                set({ profile: updatedProfile, isLoading: false })
+            }
         } catch (error: any) {
             set({ error: error.message, isLoading: false })
             throw error

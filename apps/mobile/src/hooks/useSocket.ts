@@ -4,9 +4,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../stores/auth';
 import { useRealtimeStore } from '../stores/realtime';
 
-// 🚀 ENHANCED: Complete socket event interfaces matching backend
-
 const API_SOCKET_URL = process.env.EXPO_PUBLIC_API_SOCKET_URL
+
 interface SocketEvents {
     // Order events
     order_status_update: (data: { orderId: string; status: string; timestamp: string; riderId?: string }) => void;
@@ -15,7 +14,7 @@ interface SocketEvents {
     rider_assigned: (data: { orderId: string; rider: any; timestamp: string }) => void;
     no_riders_available: (data: { orderId: string; message: string; timestamp: string }) => void;
     
-    // 🚀 NEW: Additional events from backend
+    // Additional events from backend
     order_ready_for_pickup: (data: { orderId: string; timestamp: string }) => void;
     order_picked_up: (data: { orderId: string; riderId: string; timestamp: string }) => void;
     order_out_for_delivery: (data: { orderId: string; riderId: string; timestamp: string }) => void;
@@ -23,7 +22,7 @@ interface SocketEvents {
     rider_location_update: (data: { orderId: string; riderId: string; location: { lat: number; lng: number }; timestamp: string }) => void;
     eta_update: (data: { orderId: string; eta: number; timestamp: string }) => void;
 
-    // 🚀 NEW: Notification events
+    // Notification events
     notification_received: (data: {
         id: string;
         type: 'order' | 'delivery' | 'payment' | 'system';
@@ -37,7 +36,7 @@ interface SocketEvents {
         expiresAt?: string;
     }) => void;
     
-    // 🚀 NEW: New order events
+    // New order events
     new_order: (data: {
         orderId: string;
         orderNumber: string;
@@ -49,72 +48,182 @@ interface SocketEvents {
 interface SocketEmitEvents {
     join_order: (orderId: string) => void;
     leave_order: (orderId: string) => void;
-    //  NEW: Additional emit events
     request_order_update: (orderId: string) => void;
     customer_feedback: (data: { orderId: string; rating: number; comment?: string }) => void;
 }
 
 export const useSocket = () => {
     const [isConnected, setIsConnected] = useState(false);
-    // 🚀 FIXED: Rename local state setter to avoid conflict
-    const [connectionStatus, setLocalConnectionStatus] = useState<'connected' | 'disconnected' | 'reconnecting'>('disconnected');
+    const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'reconnecting'>('disconnected');
     const [socket, setSocket] = useState<Socket<SocketEvents, SocketEmitEvents> | null>(null);
-    const { tokens, user } = useAuthStore();
+    const { tokens, user, refreshToken } = useAuthStore();
     const queryClient = useQueryClient();
-    const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     
     // Real-time store actions
     const { 
         updateOrderStatus, 
         updateOrderRider, 
         updateOrderETA,
-        setConnectionStatus // Keep this one from store
+        setConnectionStatus: setStoreConnectionStatus
     } = useRealtimeStore();
 
-    // 🚀 ENHANCED: Connection management with persistence
-    const connectSocket = useCallback(() => {
-        if (!tokens?.accessToken || !user) return;
+    const socketInstanceRef = useRef<Socket | null>(null);
+    const socketCreationInProgress = useRef(false);
+    const reconnectAttempts = useRef(0);
+    const maxReconnectAttempts = 5;
 
-        // Clear any existing reconnect timeout
-        if (reconnectTimeoutRef.current) {
-            clearTimeout(reconnectTimeoutRef.current);
-            reconnectTimeoutRef.current = null;
+    // 🚀 FIXED: Get valid token with refresh capability
+    const getValidToken = useCallback(async (): Promise<string | null> => {
+        try {
+            if (!tokens?.accessToken) {
+                console.log('❌ No access token available');
+                return null;
+            }
+
+            // Simple token check - just verify it exists and isn't empty
+            if (tokens.accessToken.length < 10) {
+                console.log('🔄 Token seems invalid, refreshing...');
+                await refreshToken();
+                const newTokens = useAuthStore.getState().tokens;
+                return newTokens?.accessToken || null;
+            }
+            
+            return tokens.accessToken;
+        } catch (error) {
+            console.error('❌ Failed to get valid token:', error);
+            return null;
+        }
+    }, [tokens?.accessToken, refreshToken]);
+
+    // 🚀 FIXED: Clean socket creation
+    const createSocketConnection = useCallback(async () => {
+        if (socketCreationInProgress.current) {
+            console.log('⚠️ Socket creation already in progress, skipping...');
+            return null;
         }
 
-        const socketInstance = io(API_SOCKET_URL, {
-            auth: {
-                token: tokens.accessToken
-            },
-            transports: ['websocket', 'polling'],
-            timeout: 10000,
-            reconnection: true,
-            reconnectionAttempts: 5,
-            reconnectionDelay: 1000,
-            reconnectionDelayMax: 5000,
+        if (!user) {
+            console.log('❌ No user available for socket connection');
+            return null;
+        }
+
+        try {
+            socketCreationInProgress.current = true;
+            console.log('🔑 Starting mobile socket creation process...');
+            
+            const token = await getValidToken();
+            if (!token) {
+                console.log('❌ No valid token available');
+                return null;
+            }
+
+            console.log('🔑 Creating mobile socket connection...');
+            
+            const socketInstance = io(API_SOCKET_URL, {
+                auth: { token },
+                transports: ['websocket', 'polling'],
+                timeout: 10000,
+                reconnection: true,
+                reconnectionAttempts: 5,
+                reconnectionDelay: 1000,
+                reconnectionDelayMax: 5000,
+                forceNew: true
+            });
+
+            console.log('📡 Mobile socket instance created');
+            
+            // Set up listeners immediately
+            setupSocketListeners(socketInstance);
+            
+            console.log('✅ Mobile socket instance created successfully');
+            return socketInstance;
+        } catch (error) {
+            console.error('❌ Failed to create mobile socket:', error);
+            return null;
+        } finally {
+            socketCreationInProgress.current = false;
+        }
+    }, [getValidToken, user]);
+
+    // 🚀 FIXED: Simplified reconnection
+    const attemptReconnection = useCallback(async () => {
+        if (reconnectAttempts.current >= maxReconnectAttempts) {
+            console.log('❌ Max reconnection attempts reached');
+            return;
+        }
+
+        reconnectAttempts.current++;
+        console.log(`🔄 Mobile reconnection attempt ${reconnectAttempts.current}/${maxReconnectAttempts}`);
+        
+        setTimeout(async () => {
+            if (user && !socket) {
+                const socketInstance = await createSocketConnection();
+                if (socketInstance) {
+                    setSocket(socketInstance);
+                    socketInstanceRef.current = socketInstance;
+                }
+            }
+        }, 2000);
+    }, [user, socket, createSocketConnection]);
+
+    // 🚀 FIXED: Clean listener setup
+    const setupSocketListeners = useCallback((socketInstance: Socket) => {
+        console.log('🔧 Setting up mobile socket listeners for socket:', socketInstance.id);
+
+        // Add the catch-all event listener first
+        socketInstance.onAny((eventName, ...args) => {
+            console.log(`🔍 Mobile received event: ${eventName}`, args);
         });
 
+        // Connection handler
         socketInstance.on('connect', () => {
-            console.log('📱 Mobile Socket connected:', socketInstance.id, 'User:', user.id);
+            console.log('📱 Mobile Socket connected:', socketInstance.id, 'User:', user?.id);
             setIsConnected(true);
-            setLocalConnectionStatus('connected');
             setConnectionStatus('connected');
+            setStoreConnectionStatus('connected');
+            reconnectAttempts.current = 0;
         });
 
+        // Disconnect handler
         socketInstance.on('disconnect', (reason) => {
             console.log('📱 Mobile Socket disconnected:', reason);
             setIsConnected(false);
-            setLocalConnectionStatus('disconnected');
             setConnectionStatus('disconnected');
+            setStoreConnectionStatus('disconnected');
+            
+            // Only attempt reconnection if it's not a manual disconnect
+            if (reason !== 'io client disconnect') {
+                console.log('🔄 Attempting mobile reconnection...');
+                attemptReconnection();
+            }
         });
 
+        // Connection error handler
         socketInstance.on('connect_error', (error) => {
             console.error('📱 Mobile Socket connection error:', error);
             setIsConnected(false);
-            setLocalConnectionStatus('reconnecting');
             setConnectionStatus('reconnecting');
+            setStoreConnectionStatus('reconnecting');
+            
+            // If it's an auth error, try to refresh token
+            if (error.message.includes('Authentication') || error.message.includes('token')) {
+                console.log('🔄 Auth error detected, attempting token refresh...');
+                getValidToken().then(() => {
+                    attemptReconnection();
+                });
+            } else {
+                attemptReconnection();
+            }
         });
 
-        // 🚀 ENHANCED: All socket event handlers
+        // Reconnection handler
+        socketInstance.on('reconnect_attempt', (attemptNumber) => {
+            console.log(`🔄 Mobile reconnection attempt ${attemptNumber}`);
+            setConnectionStatus('reconnecting');
+            setStoreConnectionStatus('reconnecting');
+        });
+
+        // Order status update handler
         socketInstance.on('order_status_update', (data) => {
             console.log('📱 Mobile: Order status updated:', data);
             updateOrderStatus(data.orderId, data.status);
@@ -127,7 +236,7 @@ export const useSocket = () => {
             });
             queryClient.invalidateQueries({ queryKey: ['orders'] });
             
-            // 🚀 NEW: Handle additional data from new notification system
+            // Handle additional data from notification system
             if (data.rider) {
                 updateOrderRider(data.orderId, data.rider);
             }
@@ -136,6 +245,7 @@ export const useSocket = () => {
             }
         });
 
+        // Order updated handler
         socketInstance.on('order_updated', (data) => {
             console.log('📱 Order updated:', data);
             const { order } = data;
@@ -154,6 +264,7 @@ export const useSocket = () => {
             queryClient.invalidateQueries({ queryKey: ['orders'] });
         });
 
+        // Order cancelled handler
         socketInstance.on('order_cancelled', (data) => {
             console.log('📱 Order cancelled:', data);
             updateOrderStatus(data.orderId, 'CANCELLED');
@@ -167,6 +278,7 @@ export const useSocket = () => {
             queryClient.invalidateQueries({ queryKey: ['orders'] });
         });
 
+        // Rider assigned handler
         socketInstance.on('rider_assigned', (data) => {
             console.log('📱 Mobile: Rider assigned to order:', data);
             updateOrderStatus(data.orderId, 'ASSIGNED');
@@ -185,12 +297,13 @@ export const useSocket = () => {
             queryClient.invalidateQueries({ queryKey: ['orders'] });
         });
 
+        // No riders available handler
         socketInstance.on('no_riders_available', (data) => {
             console.log('📱 No riders available for order:', data);
             queryClient.invalidateQueries({ queryKey: ['orders'] });
         });
 
-        // 🚀 NEW: Additional event handlers
+        // Additional event handlers
         socketInstance.on('order_ready_for_pickup', (data) => {
             console.log('📱 Order ready for pickup:', data);
             updateOrderStatus(data.orderId, 'READY_FOR_PICKUP');
@@ -219,7 +332,7 @@ export const useSocket = () => {
             console.log('📱 Rider location update:', data);
             updateOrderRider(data.orderId, {
                 id: data.riderId,
-                name: '', // 🚀 FIXED: Add required name field
+                name: '',
                 location: {
                     latitude: data.location.lat,
                     longitude: data.location.lng
@@ -242,74 +355,82 @@ export const useSocket = () => {
             });
         });
 
-        // 🚀 NEW: Notification event handlers
+        // Notification event handlers
         socketInstance.on('notification_received', (data) => {
-            console.log('🔔 Web notification received:', data);
-            
-            // Add to notification store
-            try {
-                // Assuming addNotification and showBrowserNotification are available globally or imported
-                // For now, we'll just log and show SweetAlert for simplicity
-                console.log('✅ Web notification added to store successfully');
-                // Example: addNotification({ ...data, type: 'order' }); // Assuming addNotification exists
-                // showBrowserNotification(data); // Assuming showBrowserNotification exists
-                // showSweetAlertNotification(data); // Assuming showSweetAlertNotification exists
-            } catch (error) {
-                console.error('❌ Error adding web notification to store:', error);
-            }
-            
-            // Show browser notification
-            // showBrowserNotification(data); // Assuming showBrowserNotification exists
-            
-            // Show SweetAlert for high priority
-            // showSweetAlertNotification(data); // Assuming showSweetAlertNotification exists
+            console.log('🔔 Mobile notification received:', data);
+            // Handle notification logic here
         });
 
-        // Add handler for new_order events (web-specific)
         socketInstance.on('new_order', (data) => {
-            console.log('🌐 New order received:', data);
-            
-            // Invalidate orders query to refresh the list
+            console.log('📱 New order received:', data);
             queryClient.invalidateQueries({ queryKey: ['orders'] });
-            
-            // Add new order notification
-            // Assuming addNotification is available globally or imported
-            // addNotification({
-            //     id: `new-order-${data.orderId}-${Date.now()}`,
-            //     type: 'order',
-            //     title: '🆕 New Order!',
-            //     message: `New order #${data.orderNumber} received`,
-            //     priority: 'urgent',
-            //     data: { 
-            //         orderId: data.orderId, 
-            //         orderNumber: data.orderNumber,
-            //         totalAmount: data.total
-            //     },
-            //     timestamp: data.timestamp || new Date().toISOString(),
-            //     read: false
-            // });
         });
 
-        setSocket(socketInstance);
-        return socketInstance;
-    }, [tokens?.accessToken, user, updateOrderStatus, updateOrderRider, updateOrderETA, setConnectionStatus, queryClient]);
+        console.log('✅ Mobile socket listeners setup complete');
+    }, [user, updateOrderStatus, updateOrderRider, updateOrderETA, setStoreConnectionStatus, queryClient, getValidToken, attemptReconnection]);
 
-    // 🚀 ENHANCED: Socket lifecycle management
+    // 🚀 FIXED: Main effect with proper cleanup - REMOVE createSocketConnection from dependencies
     useEffect(() => {
-        const socketInstance = connectSocket();
-        
-        return () => {
-            if (socketInstance) {
-                socketInstance.disconnect();
+        let mounted = true;
+
+        const initializeSocket = async () => {
+            console.log('🔍 Socket initialization check:', {
+                user: !!user,
+                tokens: !!tokens,
+                socket: !!socket,
+                mounted
+            });
+
+            if (!user) {
+                console.log('❌ No user available, disconnecting socket');
+                if (socket) {
+                    socket.disconnect();
+                    setSocket(null);
+                    socketInstanceRef.current = null;
+                    setIsConnected(false);
+                    setConnectionStatus('disconnected');
+                    setStoreConnectionStatus('disconnected');
+                }
+                return;
+            }
+
+            // Only create socket if we don't have one and user is available
+            if (!socket && mounted) {
+                try {
+                    console.log('🚀 Attempting to create socket connection...');
+                    const socketInstance = await createSocketConnection();
+                    if (socketInstance && mounted) {
+                        console.log('✅ Socket created and set successfully');
+                        setSocket(socketInstance);
+                        socketInstanceRef.current = socketInstance;
+                    } else {
+                        console.log('❌ Socket creation failed or component unmounted');
+                    }
+                } catch (error) {
+                    console.error('❌ Failed to create mobile socket:', error);
+                }
             }
         };
-    }, [connectSocket]);
 
-    // 🚀 ENHANCED: Socket utility functions
+        initializeSocket();
+
+        return () => {
+            mounted = false;
+            // Clean up socket on unmount
+            if (socketInstanceRef.current) {
+                socketInstanceRef.current.disconnect();
+                socketInstanceRef.current = null;
+            }
+        };
+    }, [user, setStoreConnectionStatus]); // 🚀 FIXED: Removed createSocketConnection from dependencies
+
+    // Socket utility functions
     const joinOrderRoom = useCallback((orderId: string) => {
         if (socket && isConnected) {
             console.log(`📱 Joining order room: ${orderId}`);
             socket.emit('join_order', orderId);
+        } else {
+            console.warn('⚠️ Cannot join order room: socket not connected');
         }
     }, [socket, isConnected]);
 
@@ -317,6 +438,8 @@ export const useSocket = () => {
         if (socket && isConnected) {
             console.log(`📱 Leaving order room: ${orderId}`);
             socket.emit('leave_order', orderId);
+        } else {
+            console.warn('⚠️ Cannot leave order room: socket not connected');
         }
     }, [socket, isConnected]);
 
@@ -324,6 +447,8 @@ export const useSocket = () => {
         if (socket && isConnected) {
             console.log(`📱 Requesting order update: ${orderId}`);
             socket.emit('request_order_update', orderId);
+        } else {
+            console.warn('⚠️ Cannot request order update: socket not connected');
         }
     }, [socket, isConnected]);
 
@@ -331,6 +456,8 @@ export const useSocket = () => {
         if (socket && isConnected) {
             console.log(`📱 Sending customer feedback for order: ${orderId}`);
             socket.emit('customer_feedback', { orderId, rating, comment });
+        } else {
+            console.warn('⚠️ Cannot send customer feedback: socket not connected');
         }
     }, [socket, isConnected]);
 

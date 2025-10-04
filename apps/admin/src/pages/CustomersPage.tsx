@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useCustomersList } from '../hooks/useCustomers';
 import { CustomerFilters, CustomerSort } from '../types/customers';
 import CustomersFilters from '../components/customers/CustomersFilters';
@@ -14,6 +14,10 @@ const CustomersPage: React.FC = () => {
     const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
 
     const { data, isLoading, error, refetch } = useCustomersList(page, limit, filters, sort);
+
+    useEffect(() => {
+        console.log("Customers: ", data)
+    }, [data])
 
     const handleFiltersChange = (newFilters: CustomerFilters) => {
         setFilters(newFilters);

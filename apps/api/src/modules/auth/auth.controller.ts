@@ -45,10 +45,13 @@ export class AuthController {
             // Validate request body
             const validatedData = loginSchema.parse(req.body);
             
-            // Login user
-            const result = await AuthService.login(validatedData as LoginCredentials);
+            // Get app type from headers or query params
+            const appType = req.headers['x-app-type'] as string || req.query.appType as string;
             
-            logger.info(`User logged in successfully: ${result.user.email}`);
+            // Login user with app type validation
+            const result = await AuthService.login(validatedData as LoginCredentials, appType as 'customer' | 'rider' | 'vendor' | 'admin');
+            
+            logger.info(`User logged in successfully: ${result.user.email} to ${appType || 'unknown'} app`);
             
             ResponseHandler.success(res as any, result, 'Login successful');
         } catch (error) {

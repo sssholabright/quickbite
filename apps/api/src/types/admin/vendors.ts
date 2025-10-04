@@ -72,6 +72,7 @@ export interface CreateVendorRequest {
     latitude?: number;
     longitude?: number;
     description?: string;
+    logo?: string; // Add logo field
     openingTime?: string; // HH:MM format
     closingTime?: string; // HH:MM format
     operatingDays?: string[]; // ['Monday', 'Tuesday', ...]
@@ -86,6 +87,7 @@ export interface UpdateVendorRequest {
     latitude?: number;
     longitude?: number;
     description?: string;
+    logo?: string; // Add logo field
     openingTime?: string;
     closingTime?: string;
     operatingDays?: string[];

@@ -414,4 +414,14 @@ export class MenuController {
             next(error);
         }
     }
+
+    static async getAllCategories(req: Request, res: Response, next: NextFunction): Promise<void> {
+        try {
+            const categories = await MenuService.getAllCategories();
+            console.log(categories);
+            ResponseHandler.success(res as any, categories, 'Categories retrieved successfully');
+        } catch (error) {
+            next(error);
+        }
+    }
 }

@@ -1,9 +1,10 @@
-import { VendorStatus } from "@prisma/client";
 import { prisma } from "../../../config/db.js";
 import { CustomError } from "../../../middlewares/errorHandler.js";
 import { ActionResponse } from "../../../types/admin/logistics.js";
 import { CreateVendorRequest, UpdateVendorLocationRequest, UpdateVendorRequest, VendorDetails, VendorsListParams, VendorsListResponse } from "../../../types/admin/vendors.js";
 import { PasswordService } from "../../../utils/password.js";
+import { CloudinaryService } from "../../../services/cloudinary.service.js";
+import { logger } from "../../../utils/logger.js";
 
 class VendorsService {
     // Get list of vendors with pagination, filters, and sorting
@@ -57,7 +58,7 @@ class VendorsService {
             take: limit
         });
 
-        const data = vendors.map(vendor => ({
+        const data = vendors.map((vendor: any) => ({
             id: vendor.id,
             businessName: vendor.businessName,
             email: vendor?.user?.email,
@@ -171,7 +172,7 @@ class VendorsService {
     }
 
     // Create vendor
-    async createVendor(data: CreateVendorRequest): Promise<ActionResponse> {
+    async createVendor(data: CreateVendorRequest, logoFile?: Express.Multer.File): Promise<ActionResponse> {
         // Check if email or phone already exists
         const existingUser = await prisma.user.findFirst({
             where: {
@@ -189,6 +190,19 @@ class VendorsService {
         // Hash password
         const hashedPassword = await PasswordService.hashPassword(data.password);
 
+        // Handle logo upload if present
+        let logoUrl = data.logo;
+        if (logoFile) {
+            try {
+                const uploadResult = await CloudinaryService.uploadVendorLogo(logoFile.buffer, `vendor-${Date.now()}`);
+                logoUrl = uploadResult.secure_url;
+                logger.info(`Vendor logo uploaded: ${uploadResult.public_id}`);
+            } catch (uploadError) {
+                logger.error({ uploadError }, 'Failed to upload vendor logo');
+                throw new CustomError('Failed to upload logo. Please try again.', 400);
+            }
+        }
+
         // Create user and vendor
         await prisma.user.create({
             data: {
@@ -201,13 +215,14 @@ class VendorsService {
                     create: {
                         businessName: data.businessName,
                         businessAddress: data.businessAddress || null,
-                        latitude: data.latitude ?? null,
-                        longitude: data.longitude ?? null,
+                        latitude: data.latitude !== undefined ? (typeof data.latitude === 'string' ? parseFloat(data.latitude) : data.latitude) : null,
+                        longitude: data.longitude !== undefined ? (typeof data.longitude === 'string' ? parseFloat(data.longitude) : data.longitude) : null,
                         description: data.description || null,
+                        logo: logoUrl || null,
                         openingTime: data.openingTime || null,
                         closingTime: data.closingTime || null,
                         operatingDays: data.operatingDays || [],
-                        status: VendorStatus.PENDING
+                        status: 'PENDING'
                     }
                 }
             }
@@ -220,7 +235,7 @@ class VendorsService {
     }
 
     // Update vendor
-    async updateVendor(vendorId: string, data: UpdateVendorRequest): Promise<ActionResponse> {
+    async updateVendor(vendorId: string, data: UpdateVendorRequest, logoFile?: Express.Multer.File): Promise<ActionResponse> {
         const vendor = await prisma.vendor.findUnique({
             where: { id: vendorId },
             include: { user: true }
@@ -251,6 +266,34 @@ class VendorsService {
             }
         }
 
+        // Handle logo upload if present
+        let logoUrl = data.logo;
+        if (logoFile) {
+            try {
+                // Delete existing images if they exist
+                const imagesToDelete = [];
+                if (vendor.logo) imagesToDelete.push(vendor.logo);
+                if (vendor.coverImage) imagesToDelete.push(vendor.coverImage);
+
+                // Delete all existing images
+                for (const imageUrl of imagesToDelete) {
+                    try {
+                        await CloudinaryService.deleteImage(imageUrl);
+                        logger.info(`Deleted existing image: ${imageUrl}`);
+                    } catch (deleteError) {
+                        logger.warn({ deleteError, imageUrl }, 'Failed to delete existing image, continuing');
+                    }
+                }
+
+                const uploadResult = await CloudinaryService.uploadVendorLogo(logoFile.buffer, vendorId);
+                logoUrl = uploadResult.secure_url;
+                logger.info(`Vendor logo uploaded: ${uploadResult.public_id}`);
+            } catch (uploadError) {
+                logger.error({ uploadError }, 'Failed to upload vendor logo');
+                throw new CustomError('Failed to upload logo. Please try again.', 400);
+            }
+        }
+
         // Update user data
         if (data.name || data.email || data.phone) {
             await prisma.user.update({
@@ -263,15 +306,16 @@ class VendorsService {
             });
         }
 
-        // Update vendor data
+        // Update vendor data - Convert strings to numbers for latitude/longitude
         await prisma.vendor.update({
             where: { id: vendorId },
             data: {
                 ...(data.businessName && { businessName: data.businessName }),
                 ...(data.businessAddress !== undefined && { businessAddress: data.businessAddress }),
-                ...(data.latitude !== undefined && { latitude: data.latitude }),
-                ...(data.longitude !== undefined && { longitude: data.longitude }),
+                ...(data.latitude !== undefined && { latitude: typeof data.latitude === 'string' ? parseFloat(data.latitude) : data.latitude }),
+                ...(data.longitude !== undefined && { longitude: typeof data.longitude === 'string' ? parseFloat(data.longitude) : data.longitude }),
                 ...(data.description !== undefined && { description: data.description }),
+                ...(logoUrl !== undefined && { logo: logoUrl }),
                 ...(data.openingTime !== undefined && { openingTime: data.openingTime }),
                 ...(data.closingTime !== undefined && { closingTime: data.closingTime }),
                 ...(data.operatingDays !== undefined && { operatingDays: data.operatingDays }),
@@ -316,13 +360,13 @@ class VendorsService {
             throw new CustomError('Vendor not found', 404);
         }
 
-        if (vendor.status === VendorStatus.APPROVED) {
+        if (vendor.status === 'APPROVED') {
             throw new CustomError('Vendor is already approved', 400);
         }
 
         await prisma.vendor.update({
             where: { id: vendorId },
-            data: { status: VendorStatus.APPROVED, isActive: true }
+            data: { status: 'APPROVED', isActive: true }
         });
 
         return {
@@ -339,14 +383,14 @@ class VendorsService {
             throw new CustomError('Vendor not found', 404);
         }
 
-        if (vendor.status === VendorStatus.SUSPENDED) {
+        if (vendor.status === 'SUSPENDED') {
             throw new CustomError('Vendor is already suspended', 400);
         }
 
         await prisma.vendor.update({
             where: { id: vendorId },
             data: { 
-                status: VendorStatus.SUSPENDED, 
+                status: 'SUSPENDED', 
                 isActive: false,
                 isOpen: false
             }
@@ -366,14 +410,14 @@ class VendorsService {
             throw new CustomError('Vendor not found', 404);
         }
 
-        if (vendor.status === VendorStatus.REJECTED) {
+        if (vendor.status === 'REJECTED') {
             throw new CustomError('Vendor is already rejected', 400);
         }
 
         await prisma.vendor.update({
             where: { id: vendorId },
             data: { 
-                status: VendorStatus.REJECTED,
+                status: 'REJECTED',
                 isActive: false,
                 isOpen: false
             }
@@ -393,14 +437,14 @@ class VendorsService {
             throw new CustomError('Vendor not found', 404);
         }
 
-        if (vendor.status === VendorStatus.BLOCKED) {
+        if (vendor.status === 'BLOCKED') {
             throw new CustomError('Vendor is already blocked', 400);
         }
 
         await prisma.vendor.update({
             where: { id: vendorId },
             data: { 
-                status: VendorStatus.BLOCKED,
+                status: 'BLOCKED',
                 isActive: false,
                 isOpen: false
             }
@@ -426,14 +470,14 @@ class VendorsService {
             throw new CustomError('Vendor not found', 404);
         }
 
-        if (vendor.status === VendorStatus.BLOCKED) {
+        if (vendor.status === 'BLOCKED') {
             throw new CustomError('Cannot activate a blocked vendor. Please unblock first.', 400);
         }
 
         await prisma.vendor.update({
             where: { id: vendorId },
             data: { 
-                status: VendorStatus.APPROVED,
+                status: 'APPROVED',
                 isActive: true
             }
         });
@@ -468,7 +512,7 @@ class VendorsService {
 
         const isOperatingDay = vendor.operatingDays.includes(currentDay);
         const isWithinHours = currentTime >= vendor.openingTime && currentTime <= vendor.closingTime;
-        const shouldBeOpen = isOperatingDay && isWithinHours && vendor.status === VendorStatus.APPROVED;
+        const shouldBeOpen = isOperatingDay && isWithinHours && vendor.status === 'APPROVED';
 
         // Only update if different
         if (vendor.isOpen !== shouldBeOpen) {

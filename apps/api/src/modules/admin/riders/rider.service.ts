@@ -57,9 +57,9 @@ export class RiderService {
             }
 
             // Handle online status filter
-            if (filters.isOnline !== undefined) {
-                where.isOnline = filters.isOnline;
-            }
+            // if (filters.isOnline !== undefined) {
+            //     where.isOnline = filters.isOnline;
+            // }
 
             // Build orderBy clause
             const orderBy: any = {};
@@ -103,7 +103,7 @@ export class RiderService {
             ]);
 
             // Transform riders to match response format
-            const riderList: RiderListItem[] = riders.map(rider => ({
+            const riderList: RiderListItem[] = riders.map((rider: any) => ({
                 id: rider.id,
                 name: rider.user?.name,
                 phone: rider.user?.phone || '',
@@ -221,7 +221,7 @@ export class RiderService {
             const hashedPassword = await PasswordService.hashPassword(password);
 
             // Create user and rider in transaction
-            const result = await prisma.$transaction(async (tx) => {
+            const result = await prisma.$transaction(async (tx: any) => {
                 // Create user
                 const user = await tx.user.create({
                     data: {
@@ -320,7 +320,7 @@ export class RiderService {
             }
 
             // Update rider and user data
-            const result = await prisma.$transaction(async (tx) => {
+            const result = await prisma.$transaction(async (tx: any) => {
                 // Update user if name, phone, or email provided
                 if (name || phone || email) {
                     await tx.user.update({

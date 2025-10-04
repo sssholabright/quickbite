@@ -7,7 +7,7 @@ export class CustomerService {
     static async updatePushToken(userId: string, pushToken: string): Promise<any> {
         try {
             // Use transaction to ensure atomic update
-            const updatedCustomer = await prisma.$transaction(async (tx) => {
+            const updatedCustomer = await prisma.$transaction(async (tx: any) => {
                 // Check if customer exists
                 const existingCustomer = await tx.customer.findUnique({
                     where: { userId },

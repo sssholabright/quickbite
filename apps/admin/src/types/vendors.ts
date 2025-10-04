@@ -55,6 +55,13 @@ export interface VendorDetails extends VendorListItem {
     };
 }
 
+export interface VendorsListParams {
+    page: number;
+    limit: number;
+    filters: VendorFilters;
+    sort: VendorSort;
+}
+
 export interface CreateVendorRequest {
     name: string;
     email: string;
@@ -65,6 +72,7 @@ export interface CreateVendorRequest {
     latitude?: number;
     longitude?: number;
     description?: string;
+    logo?: string; // Add logo field
     openingTime?: string;
     closingTime?: string;
     operatingDays?: string[];
@@ -79,6 +87,7 @@ export interface UpdateVendorRequest {
     latitude?: number;
     longitude?: number;
     description?: string;
+    logo?: string; // Add logo field
     openingTime?: string;
     closingTime?: string;
     operatingDays?: string[];

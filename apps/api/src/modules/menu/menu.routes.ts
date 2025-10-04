@@ -72,6 +72,9 @@ router.delete('/categories/:categoryId',
     MenuController.deleteCategory
 );
 
+// Add this route (public, no auth required)
+router.get('/categories/all', MenuController.getAllCategories);
+
 // Public routes (no auth required)
 router.get('/vendors', MenuController.getCustomerVendors);
 router.get('/vendors/:vendorId/categories', MenuController.getCustomerCategories);

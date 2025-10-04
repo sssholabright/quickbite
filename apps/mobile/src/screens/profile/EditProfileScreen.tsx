@@ -162,48 +162,8 @@ export default function EditProfileScreen() {
 					</Text>
 				</View>
 
-				{/* Profile Picture Section */}
-				<View style={{
-					alignItems: 'center',
-					paddingVertical: 32,
-					backgroundColor: theme.colors.surface,
-					marginBottom: 24,
-				}}>
-					<View style={{
-						width: 100,
-						height: 100,
-						borderRadius: 50,
-						backgroundColor: theme.colors.primary,
-						alignItems: 'center',
-						justifyContent: 'center',
-						marginBottom: 16,
-					}}>
-						<Icon name="person" size={40} color="#fff" />
-					</View>
-					<Pressable style={{
-						flexDirection: 'row',
-						alignItems: 'center',
-						paddingHorizontal: 16,
-						paddingVertical: 8,
-						borderRadius: 20,
-						backgroundColor: theme.colors.background,
-						borderWidth: 1,
-						borderColor: theme.colors.border,
-					}}>
-						<Icon name="camera" size={16} color={theme.colors.primary} />
-						<Text style={{
-							marginLeft: 8,
-							fontSize: 14,
-							fontWeight: '600',
-							color: theme.colors.primary,
-						}}>
-							Change Photo
-						</Text>
-					</Pressable>
-				</View>
-
 				{/* Form Fields */}
-				<View style={{ paddingHorizontal: 20 }}>
+				<View style={{ paddingHorizontal: 20, marginTop: 20 }}>
 					<Input
 						value={profile.name}
 						onChangeText={handleNameChange}

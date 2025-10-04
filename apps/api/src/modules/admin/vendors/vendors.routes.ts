@@ -4,6 +4,8 @@ import { authGuard } from '../../../middlewares/authGuard.js';
 import { requirePermission } from '../../../middlewares/adminPermission.js';
 import { createVendorValidation, vendorDetailsValidation, vendorsListValidation, updateVendorValidation, updateVendorLocationValidation, suspendVendorValidation, rejectVendorValidation, blockVendorValidation } from '../../../validations/admin/vendors.js';
 import { validateRequest } from '../../../middlewares/validateRequest.js';
+import { uploadSingleImage, handleUploadError } from '../../../middlewares/upload.middleware.js';
+import { fileUploadRateLimit } from '../../../middlewares/rateLimiter.js';
 
 const router = Router();
 
@@ -16,11 +18,25 @@ router.get('/', requirePermission('vendors.read'), validateRequest(vendorsListVa
 // Get vendor details
 router.get('/:id', requirePermission('vendors.read'), validateRequest(vendorDetailsValidation), vendorsController.getVendorDetails);
 
-// Create vendor
-router.post('/', requirePermission('vendors.write'), validateRequest(createVendorValidation), vendorsController.createVendor);
+// Create vendor with logo upload support
+router.post('/', 
+    fileUploadRateLimit,
+    uploadSingleImage,
+    handleUploadError,
+    requirePermission('vendors.write'), 
+    validateRequest(createVendorValidation), 
+    vendorsController.createVendor
+);
 
-// Update vendor
-router.put('/:id', requirePermission('vendors.write'), validateRequest(updateVendorValidation), vendorsController.updateVendor);
+// Update vendor with logo upload support
+router.put('/:id', 
+    fileUploadRateLimit,
+    uploadSingleImage,
+    handleUploadError,
+    requirePermission('vendors.write'), 
+    validateRequest(updateVendorValidation), 
+    vendorsController.updateVendor
+);
 
 // Update vendor location
 router.patch('/:id/location', requirePermission('vendors.write'), validateRequest(updateVendorLocationValidation), vendorsController.updateVendorLocation);

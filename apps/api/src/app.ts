@@ -15,6 +15,7 @@ import orderRoutes from './modules/orders/order.routes.js';
 import menuRoutes from './modules/menu/menu.routes.js';
 import riderRoutes from './modules/riders/rider.routes.js';
 import customerRoutes from './modules/customers/customer.routes.js';
+import vendorRoutes from './modules/vendors/vendor.routes.js';
 
 // Admin routes
 import adminRoutes from './modules/admin/admins/admin.routes.js';
@@ -26,6 +27,9 @@ import vendorsRoutes from './modules/admin/vendors/vendors.routes.js';
 import customersRoutes from './modules/admin/customers/customers.routes.js';
 import paymentsRoutes from './modules/admin/payments/payments.routes.js';
 import payoutsRoutes from './modules/admin/payouts/payouts.routes.js';
+
+// Add this import
+import { VendorStatusUpdaterJob } from './jobs/vendorStatusUpdater.job.js';
 
 const app = express();
 
@@ -80,6 +84,7 @@ app.use('/api/v1/orders', orderRoutes);
 app.use('/api/v1/menu', menuRoutes);
 app.use('/api/v1/riders', riderRoutes);
 app.use('/api/v1/customers', customerRoutes);
+app.use('/api/v1/vendors', vendorRoutes);
 
 // Admin routes
 app.use('/api/v1/admin', adminRoutes);
@@ -97,6 +102,9 @@ app.use(notFoundHandler);
 
 // Global error handler
 app.use(errorHandler);
+
+// Start vendor status updater job
+VendorStatusUpdaterJob.start();
 
 // Initialize WebSocket after creating HTTP server
 export { app };

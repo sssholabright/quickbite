@@ -1,4 +1,4 @@
-import { Button, FlatList, Pressable, ScrollView, Text, View } from 'react-native'
+import { Button, FlatList, Pressable, ScrollView, Text, View, RefreshControl } from 'react-native'
 import { useTheme } from '../../theme/theme'
 import { SearchBar } from '../../ui/SearchBar'
 import { useMemo, useState } from 'react';
@@ -9,15 +9,18 @@ import { MealCard } from '../../ui/MealCard';
 import { VendorCard } from '../../ui/VendorCard';
 import { Icon } from '../../ui/Icon';
 import CartScreen from '../cart/CartScreen';
-import { useVendors } from '../../hooks/useMenu'
+import { useAllCategories, useVendors } from '../../hooks/useMenu'
 import { useNavigation } from '@react-navigation/native'
 import { useCartStore } from '../../stores/cart'
 import { SafeAreaWrapper } from '../../ui/SafeAreaWrapper'
+import { useQuery } from '@tanstack/react-query';
+import { menuService } from '../../services/menuService';
 
 export default function HomeScreen() {
 	const [searchQuery, setSearchQuery] = useState("");
 	const [selectedCategory, setSelectedCategory] = useState("all");
 	const [showCart, setShowCart] = useState(false);
+	const [refreshing, setRefreshing] = useState(false);
 	
 	const theme = useTheme()
 	const navigation = useNavigation<any>()
@@ -26,14 +29,43 @@ export default function HomeScreen() {
 	const { items: cartItems, getTotalItems, updateQuantity, removeItem } = useCartStore()
 
 	// Load active vendors from API (only those with available items)
-	const { data: vendors = [], isLoading: vendorsLoading } = useVendors({ hasAvailableItems: true })
+	const { data: vendors = [], isLoading: vendorsLoading, refetch: refetchVendors } = useVendors({ hasAvailableItems: true })
 
-	const featuredMeals = useMemo(() => {
-		return mockMeals.filter(meal => meal.popular);
-	}, []);
+	// Load all categories from API
+	const { data: categories = [], isLoading: categoriesLoading, refetch: refetchCategories } = useAllCategories()
 
-	// Get featured meals from all vendors
-	// const { data: featuredMeals = [] } = useVendorMenuItems(undefined, { isAvailable: true })
+	// Add this hook to fetch featured menu items
+	const { data: featuredMenuItems = [], isLoading: featuredLoading } = useQuery({
+    queryKey: ['featured-menu-items'],
+    queryFn: async () => {
+        // Get all vendors first
+        const vendorsResponse = await menuService.getVendors({ hasAvailableItems: true });
+        const vendors = vendorsResponse;
+        
+        // Get menu items from all vendors
+        const allMenuItems = [];
+        for (const vendor of vendors.slice(0, 3)) { // Limit to first 3 vendors for performance
+            try {
+                const itemsResponse = await menuService.getVendorItems(vendor.id, {});
+                const items = itemsResponse;
+                allMenuItems.push(...items.map(item => ({
+                    ...item,
+                    vendorId: vendor.id,
+                    vendorName: vendor.businessName,
+                    vendorImage: vendor.logo || vendor.coverImage
+                })));
+            } catch (error) {
+                console.error(`Error fetching items for vendor ${vendor.id}:`, error);
+            }
+        }
+        
+        // Sort by rating/price and return top 5
+        return allMenuItems
+            .sort((a, b) => b.price - a.price) // Sort by price descending
+            .slice(0, 5);
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+});
 
 	// Map API vendors to UI shape expected by VendorCard
 	const uiVendors = useMemo(() => {
@@ -47,32 +79,43 @@ export default function HomeScreen() {
 			distance: '1.2 km',
 			category: 'all',
 			isOpen: !!v.isOpen,
-			featured: false
+			featured: false,
+			categories: v.categories || [] // Add categories from API
 		}));
 	}, [vendors]);
 
-	// Map API meals to UI shape for featured meals
+	// Update the featuredMeals mapping
 	const uiFeaturedMeals = useMemo(() => {
-		return featuredMeals.slice(0, 5).map(meal => ({
-			id: meal.id,
-			name: meal.name,
-			description: meal.description || '',
-			price: meal.price,
-			image: meal.image || 'https://via.placeholder.com/300',
-			vendorId: meal.vendorId,
-			category: meal.category || 'lunch',
-			popular: true,
-			preparationTime: meal.preparationTime
-		}));
-	}, [featuredMeals]);
+    return featuredMenuItems.map(item => ({
+        id: item.id,
+        name: item.name,
+        description: item.description || '',
+        price: item.price,
+        image: item.image || 'https://via.placeholder.com/300',
+        vendorId: item.vendorId,
+        vendorName: item.vendorName,
+        vendorImage: item.vendorImage,
+        category: item.category?.name || 'lunch',
+        popular: true,
+        preparationTime: item.preparationTime
+    }));
+}, [featuredMenuItems]);
+
+	// Remove the old mock featuredMeals
+	// const featuredMeals = useMemo(() => {
+	//     return mockMeals.filter(meal => meal.popular);
+	// }, []);
 
 	const filteredVendors = useMemo(() => {
 		return uiVendors.filter(vendor => {
 			const matchesSearch = vendor.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
 				vendor.description.toLowerCase().includes(searchQuery.toLowerCase());
-			// If you later tag vendors by category, replace this with real matching
-			const matchesCategory = selectedCategory === "all" || vendor.category === selectedCategory
-			return matchesSearch && matchesCategory
+			
+			// Filter by category - check if vendor has the selected category
+			const matchesCategory = selectedCategory === "all" || 
+				vendor.categories?.some((cat: any) => cat.id === selectedCategory);
+			
+			return matchesSearch && matchesCategory;
 		})
 	}, [uiVendors, searchQuery, selectedCategory])
 
@@ -83,6 +126,18 @@ export default function HomeScreen() {
 		if (meal) {
 			// For now, add without customization - you can integrate ItemCustomizeModal here later
 			updateQuantity(mealId, (cartItems[mealId]?.quantity || 0) + 1)
+		}
+	};
+
+	const onRefresh = async () => {
+		setRefreshing(true);
+		try {
+			await refetchVendors();
+			await refetchCategories();
+		} catch (error) {
+			console.error('Error refreshing vendors:', error);
+		} finally {
+			setRefreshing(false);
 		}
 	};
 
@@ -106,6 +161,21 @@ export default function HomeScreen() {
 		/>
 	);
 
+	const getRandomColor = (categoryName: string) => {
+		const colors = [
+			'#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
+			'#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9',
+			'#F8C471', '#82E0AA', '#F1948A', '#85C1E9', '#D7BDE2'
+		];
+		
+		// Use category name to generate consistent color for same category
+		let hash = 0;
+		for (let i = 0; i < categoryName.length; i++) {
+			hash = categoryName.charCodeAt(i) + ((hash << 5) - hash);
+		}
+		return colors[Math.abs(hash) % colors.length];
+	};
+
 	return (
 		<SafeAreaWrapper 
 			edges={["top"]} // Only apply top padding, let tab navigator handle bottom
@@ -122,6 +192,14 @@ export default function HomeScreen() {
 				<ScrollView
 					showsVerticalScrollIndicator={false}
 					contentContainerStyle={{ paddingBottom: 24 }}
+					refreshControl={
+						<RefreshControl
+							refreshing={refreshing}
+							onRefresh={onRefresh}
+							colors={[theme.colors.primary]}
+							tintColor={theme.colors.primary}
+						/>
+					}
 				>
 					{/* Categories */}
 					<View style={{ marginBottom: 20 }}>
@@ -135,10 +213,15 @@ export default function HomeScreen() {
 								isSelected={selectedCategory === "all"}
 								onPress={() => setSelectedCategory("all")}
 							/>
-							{categories.map(category => (
+							{categories.map((category: any) => (
 								<CategoryChip
 									key={category.id}
-									category={category}
+									category={{
+										id: category.id,
+										name: category.name,
+										icon: category.icon,
+										color: getRandomColor(category.name)
+									}}
 									isSelected={selectedCategory === category.id}
 									onPress={() => setSelectedCategory(category.id)}
 								/>
@@ -154,7 +237,7 @@ export default function HomeScreen() {
 					/> */}
 
 					{/* Featured Meals */}
-					{/* <View style={{ marginBottom: 20 }}>
+					<View style={{ marginBottom: 20 }}>
 						<View style={{
 							flexDirection: "row",
 							justifyContent: "space-between",
@@ -169,7 +252,7 @@ export default function HomeScreen() {
 							}}>
 								Popular This Near You
 							</Text>
-							<Pressable>
+							{/* <Pressable>
 								<Text style={{
 									fontSize: 14,
 									color: theme.colors.primary,
@@ -177,7 +260,7 @@ export default function HomeScreen() {
 								}}>
 									See all
 								</Text>
-							</Pressable>
+							</Pressable> */}
 						</View>
 
 						<FlatList
@@ -188,7 +271,7 @@ export default function HomeScreen() {
 							showsHorizontalScrollIndicator={false}
 							contentContainerStyle={{ paddingHorizontal: 16 }}
 						/>
-					</View> */}
+					</View>
 
 					{/* Vendors List */}
 					<View>
@@ -205,7 +288,7 @@ export default function HomeScreen() {
 								color: theme.colors.text
 							}}>
 								{selectedCategory === "all" ? "All Vendors" : 
-									categories.find(c => c.id === selectedCategory)?.name + " Vendors"}
+									categories.find((c: any) => c.id === selectedCategory)?.name + " Vendors"}
 							</Text>
 							<Text style={{
 								fontSize: 12,

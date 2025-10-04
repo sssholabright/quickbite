@@ -6,7 +6,11 @@ class AdminService {
     // Admin login
     async login(credentials: AdminLoginCredentials): Promise<AdminAuthResult> {
         try {
-            const response = await api.post<ApiResponse<AdminAuthResult>>('/login', credentials)
+            const response = await api.post<ApiResponse<AdminAuthResult>>('/login', credentials, {
+                headers: {
+                    'X-App-Type': 'admin'
+                }
+            })
             const { user, tokens } = response.data.data as AdminAuthResult
 
             // Store tokens in localStorage
@@ -15,6 +19,11 @@ class AdminService {
 
             return { user, tokens }
         } catch (error: any) {
+            // Handle role-based access errors
+            if (error.response?.status === 403 && error.response?.data?.message?.includes('Access denied')) {
+                throw new Error('This account is not authorized for this app. Please use the mobile app or web interface.');
+            }
+            
             throw new Error(error.response?.data?.message || 'Admin login failed')
         }
     }

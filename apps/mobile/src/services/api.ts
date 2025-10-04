@@ -82,9 +82,18 @@ apiClient.interceptors.response.use(
                 console.error('Token refresh failed:', refreshError);
                 // Clear refresh promise on failure
                 refreshTokenPromise = null;
-                // Refresh failed, redirect to login
+                
+                // Clear tokens from secure storage
                 await SecureStore.deleteItemAsync('access_token');
                 await SecureStore.deleteItemAsync('refresh_token');
+                
+                // Import and use auth store to logout
+                const { useAuthStore } = await import('../stores/auth');
+                const { logout } = useAuthStore.getState();
+                await logout();
+                
+                // Reject the original request
+                return Promise.reject(refreshError);
             } finally {
                 // Clear refresh promise when done
                 refreshTokenPromise = null;

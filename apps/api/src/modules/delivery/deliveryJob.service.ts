@@ -410,7 +410,7 @@ export class DeliveryJobService {
             lastBroadcastTime: this.lastBroadcastTime,
             cooldownPeriod: this.COOLDOWN_PERIOD,
             activeTimeouts: this.activeTimeouts.size,
-            orders: queueItems.map(item => ({
+            orders: queueItems.map((item: any) => ({
                 orderId: item.orderId,
                 orderNumber: item.order.orderNumber,
                 status: item.status,
@@ -470,7 +470,7 @@ export class DeliveryJobService {
                 }
             });
 
-            return riders.filter(rider => connectedRiderIds.includes(rider.id));
+            return riders.filter((rider: any) => connectedRiderIds.includes(rider.id));
         } catch (error) {
             logger.error(`❌ Error finding available riders: ${error}`);
             return [];

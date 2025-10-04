@@ -33,20 +33,84 @@ export const vendorsService = {
         }
     },
 
-    // Create vendor
-    async createVendor(request: CreateVendorRequest): Promise<ActionResponse> {
+    // Create vendor with file upload support
+    async createVendor(request: CreateVendorRequest, logoFile?: File): Promise<ActionResponse> {
         try {
-            const response = await api.post('/vendors', request);
+            const formData = new FormData();
+            
+            // Add text fields
+            formData.append('name', request.name);
+            formData.append('email', request.email);
+            formData.append('phone', request.phone);
+            formData.append('password', request.password);
+            formData.append('businessName', request.businessName);
+            
+            if (request.businessAddress) formData.append('businessAddress', request.businessAddress);
+            if (request.latitude !== undefined) formData.append('latitude', request.latitude.toString());
+            if (request.longitude !== undefined) formData.append('longitude', request.longitude.toString());
+            if (request.description) formData.append('description', request.description);
+            if (request.openingTime) formData.append('openingTime', request.openingTime);
+            if (request.closingTime) formData.append('closingTime', request.closingTime);
+            if (request.operatingDays) {
+                request.operatingDays.forEach(day => formData.append('operatingDays', day));
+            }
+            
+            // Add logo file if provided - use 'image' as field name to match backend middleware
+            if (logoFile) {
+                formData.append('image', logoFile);
+            } else if (request.logo) {
+                formData.append('logo', request.logo);
+            }
+
+            const response = await api.post('/vendors', formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data'
+                }
+            });
             return response.data;
         } catch (error) {
             throw error;
         }
     },
 
-    // Update vendor
-    async updateVendor(vendorId: string, request: UpdateVendorRequest): Promise<ActionResponse> {
+    // Update vendor with file upload support
+    async updateVendor(vendorId: string, request: UpdateVendorRequest, logoFile?: File): Promise<ActionResponse> {
         try {
-            const response = await api.put(`/vendors/${vendorId}`, request);
+            const formData = new FormData();
+            
+            // Add text fields
+            if (request.name) formData.append('name', request.name);
+            if (request.email) formData.append('email', request.email);
+            if (request.phone) formData.append('phone', request.phone);
+            if (request.businessName) formData.append('businessName', request.businessName);
+            if (request.businessAddress) formData.append('businessAddress', request.businessAddress);
+            
+            // Convert numbers to strings for FormData
+            if (request.latitude !== undefined) formData.append('latitude', request.latitude.toString());
+            if (request.longitude !== undefined) formData.append('longitude', request.longitude.toString());
+            
+            if (request.description) formData.append('description', request.description);
+            if (request.openingTime) formData.append('openingTime', request.openingTime);
+            if (request.closingTime) formData.append('closingTime', request.closingTime);
+            if (request.operatingDays) {
+                request.operatingDays.forEach(day => formData.append('operatingDays', day));
+            }
+            if (request.status) formData.append('status', request.status);
+            
+            // Add logo file if provided
+            if (logoFile) {
+                formData.append('image', logoFile);
+            } else if (request.logo) {
+                formData.append('logo', request.logo);
+            }
+
+            console.log(formData);
+
+            const response = await api.put(`/vendors/${vendorId}`, formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data'
+                }
+            });
             return response.data;
         } catch (error) {
             throw error;

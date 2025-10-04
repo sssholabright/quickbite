@@ -119,6 +119,74 @@ export class DeliveryOrchestratorService {
             
             logger.info(`✅ DeliveryOrchestrator: Order ${order.orderNumber} delivered by ${rider.user.name}`);
 
+            // 🚀 NEW: Update all party statistics in a transaction
+            await prisma.$transaction(async (tx) => {
+                // Update Customer Statistics
+                const customer = await tx.customer.update({
+                    where: { id: order.customerId },
+                    data: {
+                        totalOrders: { increment: 1 },
+                        completedOrders: { increment: 1 },
+                        totalSpent: { increment: order.total || 0 },
+                        avgOrderValue: {
+                            // Recalculate average: totalSpent / completedOrders
+                            set: await this.calculateNewAvgOrderValue(tx, order.customerId, order.total || 0)
+                        }
+                    }
+                });
+
+                // Update Vendor Statistics
+                const vendor = await tx.vendor.update({
+                    where: { id: order.vendorId },
+                    data: {
+                        totalOrders: { increment: 1 },
+                        completedOrders: { increment: 1 }
+                    }
+                });
+
+                // Update Rider Statistics
+                const rider = await tx.rider.update({
+                    where: { id: riderId },
+                    data: {
+                        completedOrders: { increment: 1 },
+                        earnings: { increment: order.deliveryFee }
+                    }
+                });
+
+                // Create Rider Earning Record
+                await tx.riderEarning.create({
+                    data: {
+                        riderId: riderId,
+                        orderId: orderId,
+                        amount: order.deliveryFee,
+                        type: 'DELIVERY_FEE',
+                        description: `Delivery fee for order ${order.orderNumber}`
+                    }
+                });
+
+                // Update Vendor Wallet (add order amount minus commission)
+                const commissionRate = 0.15; // 15% commission
+                const vendorEarning = (order.subtotal * (1 - commissionRate));
+                
+                await tx.vendorWallet.upsert({
+                    where: { vendorId: order.vendorId },
+                    update: {
+                        currentBalance: { increment: vendorEarning },
+                        totalEarnings: { increment: vendorEarning },
+                        totalCommission: { increment: (order.subtotal * commissionRate) }
+                    },
+                    create: {
+                        vendorId: order.vendorId,
+                        currentBalance: vendorEarning,
+                        totalEarnings: vendorEarning,
+                        totalCommission: (order.subtotal * commissionRate),
+                        commissionRate: commissionRate
+                    }
+                });
+
+                logger.info(`✅ Updated statistics for customer ${order.customerId}, vendor ${order.vendorId}, and rider ${riderId}`);
+            });
+
             // 🚀 FIXED: Mark rider as available for new orders
             setTimeout(async () => {
                 await prisma.rider.update({
@@ -136,7 +204,7 @@ export class DeliveryOrchestratorService {
             }
 
             logger.info(`✅ DeliveryOrchestrator: Completed order delivered orchestration for ${orderId}`);     
-        }  catch (error) {
+        } catch (error) {
             logger.error({ error, orderId, riderId }, 'DeliveryOrchestrator: Error in onOrderDelivered');
         }
     }
@@ -559,8 +627,23 @@ export class DeliveryOrchestratorService {
                 'onOrderPickedUp',
                 'onRiderRejectsOrder',
                 'onRiderAcceptsOrder',
-                'onOrderCancelled' // 🚀 NEW: Added order cancellation
+                'onOrderCancelled'
             ]
         };
+    }
+
+    // Helper method to calculate new average order value
+    private static async calculateNewAvgOrderValue(tx: any, customerId: string, newOrderTotal: number): Promise<number> {
+        const customer = await tx.customer.findUnique({
+            where: { id: customerId },
+            select: { totalSpent: true, completedOrders: true }
+        });
+        
+        if (!customer) return 0;
+        
+        const newTotalSpent = customer.totalSpent + newOrderTotal;
+        const newCompletedOrders = customer.completedOrders + 1;
+        
+        return newCompletedOrders > 0 ? newTotalSpent / newCompletedOrders : 0;
     }
 }

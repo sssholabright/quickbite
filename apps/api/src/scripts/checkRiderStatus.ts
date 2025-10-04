@@ -27,7 +27,7 @@ async function checkRiderStatus() {
 
         console.log(`📊 Found ${riders.length} riders:`);
         
-        riders.forEach((rider, index) => {
+        riders.forEach((rider: any, index: number) => {
             console.log(`\n🚴 Rider ${index + 1}:`);
             console.log(`   ID: ${rider.id}`);
             console.log(`   Name: ${rider.user.name}`);
@@ -41,19 +41,19 @@ async function checkRiderStatus() {
         });
 
         // Check for online riders
-        const onlineRiders = riders.filter(r => r.isOnline);
+        const onlineRiders = riders.filter((r: any) => r.isOnline);
         console.log(`\n🟢 Online riders: ${onlineRiders.length}`);
 
         // Check for available riders
-        const availableRiders = riders.filter(r => r.isOnline);
+        const availableRiders = riders.filter((r: any) => r.isOnline);
         console.log(`🟡 Available riders: ${availableRiders.length}`);
 
         // Check for riders with location
-        const ridersWithLocation = riders.filter(r => r.currentLat && r.currentLng);
+        const ridersWithLocation = riders.filter((r: any) => r.currentLat && r.currentLng);
         console.log(`📍 Riders with location: ${ridersWithLocation.length}`);
 
         // Check for riders that meet all criteria
-        const eligibleRiders = riders.filter(r => 
+        const eligibleRiders = riders.filter((r: any) => 
             r.isOnline && 
             r.currentLat && 
             r.currentLng
@@ -68,7 +68,7 @@ async function checkRiderStatus() {
             console.log('2. Make sure your rider has location data');
         } else {
             console.log('\n✅ Found eligible riders!');
-            eligibleRiders.forEach(rider => {
+            eligibleRiders.forEach((rider: any) => {
                 console.log(`   - ${rider.user.name} (${rider.id})`);
             });
         }

@@ -1,4 +1,4 @@
-import { v2 as cloudinary, UploadApiOptions } from 'cloudinary';
+import { v2 as cloudinary, UploadApiOptions, UploadApiResponse } from 'cloudinary';
 import { env } from '../config/env.js';
 import { logger } from '../utils/logger.js';
 
@@ -112,16 +112,31 @@ export class CloudinaryService {
     /**
      * Upload vendor logo
      */
-    static async uploadVendorLogo(file: Buffer | string, vendorId: string): Promise<CloudinaryUploadResult> {
-        return this.uploadImageWithTransformations(file, 'vendor-logos', {
-            width: 200,
-            height: 200,
-            crop: 'fill',
-            gravity: 'center',
-            additional: [
-                { radius: 10 }, // Rounded corners
-                { border: '2px_solid_rgb:ffffff' }
-            ]
+    static async uploadVendorLogo(buffer: Buffer, vendorId: string): Promise<UploadApiResponse> {
+        return new Promise((resolve, reject) => {
+            const uploadOptions: UploadApiOptions = {
+                resource_type: 'image',
+                public_id: `vendors/logos/${vendorId}`,
+                transformation: [
+                    { width: 400, height: 400, crop: 'fill' },
+                    { quality: 'auto' },
+                    { format: 'webp' }
+                ],
+                folder: 'quickbite/vendors'
+            };
+
+            cloudinary.uploader.upload_stream(
+                uploadOptions,
+                (error, result) => {
+                    if (error) {
+                        reject(error);
+                    } else if (result) {
+                        resolve(result);
+                    } else {
+                        reject(new Error('Upload failed'));
+                    }
+                }
+            ).end(buffer);
         });
     }
 

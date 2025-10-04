@@ -17,6 +17,7 @@ export type AppTabParamList = {
 export type RootStackParamList = {
     AuthStack: NavigatorScreenParams<AuthStackParamList>;
     AppTabs: NavigatorScreenParams<AppTabParamList>;
+    Unauthorized: undefined; // Add this
     LocationPermission: undefined;
     Menu: { vendorId: string };
     Checkout: { vendorId: string; items: any[]; total: number };

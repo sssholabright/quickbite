@@ -1,4 +1,4 @@
-import { FaClipboardList, FaUtensils, FaDollarSign, FaClock, FaCheckCircle, FaTimes, FaExclamationTriangle, FaMotorcycle } from 'react-icons/fa'
+import { FaClipboardList, FaUtensils, FaDollarSign, FaClock, FaCheckCircle, FaMotorcycle, FaUsers, FaChartLine, FaArrowRight } from 'react-icons/fa'
 import { Link } from 'react-router-dom'
 import VendorLayout from '../../components/layout/VendorLayout'
 import { useOrderStats, useOrders } from '../../hooks/useOrders'
@@ -72,169 +72,219 @@ export default function VendorDashboard() {
 
     return (
         <VendorLayout>
-            <div className="space-y-8">
-                {/* Page Header */}
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-3xl font-bold text-gray-900">Dashboard Overview</h1>
-                        <p className="mt-2 text-gray-600">Welcome back! Here's what's happening with your restaurant today.</p>
-                    </div>
-                    
-                    {/* Connection Status */}
-                    <div className="flex items-center gap-2">
-                        <div className={`w-2 h-2 rounded-full ${
-                            connectionStatus === 'connected' ? 'bg-green-500' : 'bg-red-500'
-                        }`} />
-                        <span className="text-sm text-gray-600">
-                            {connectionStatus === 'connected' ? 'Live Updates' : 'Offline'}
-                        </span>
-                    </div>
-                </div>
-
-                {/* Stats Grid */}
-                <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    {/* Pending Orders */}
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                        <div className="flex items-center">
-                            <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-                                <FaClock className="w-6 h-6 text-yellow-600" />
+            <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+                <div className="space-y-8">
+                    {/* Page Header */}
+                    <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-4">
+                                <div className="w-16 h-16 bg-gradient-to-br from-primary-500 to-primary-600 rounded-2xl flex items-center justify-center shadow-lg">
+                                    <FaChartLine className="w-8 h-8 text-white" />
+                                </div>
+                                <div>
+                                    <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
+                                        Dashboard Overview
+                                    </h1>
+                                    <p className="mt-2 text-gray-600 text-lg">Welcome back! Here's what's happening with your restaurant today.</p>
+                                </div>
                             </div>
-                            <div className="ml-4">
-                                <p className="text-sm font-medium text-gray-600">Pending Orders</p>
-                                <p className="text-2xl font-bold text-gray-900">
-                                    {statsLoading ? '...' : orderStats?.pending || 0}
-                                </p>
+                            
+                            {/* Connection Status */}
+                            <div className="flex items-center space-x-3 bg-gray-50 rounded-2xl px-6 py-3">
+                                <div className={`w-3 h-3 rounded-full ${
+                                    connectionStatus === 'connected' ? 'bg-green-500 animate-pulse' : 'bg-red-500'
+                                }`} />
+                                <span className="text-sm font-medium text-gray-700">
+                                    {connectionStatus === 'connected' ? 'Live Updates' : 'Offline'}
+                                </span>
                             </div>
                         </div>
                     </div>
 
-                    {/* Preparing Orders */}
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                        <div className="flex items-center">
-                            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                                <FaUtensils className="w-6 h-6 text-blue-600" />
-                            </div>
-                            <div className="ml-4">
-                                <p className="text-sm font-medium text-gray-600">Preparing</p>
-                                <p className="text-2xl font-bold text-gray-900">
-                                    {statsLoading ? '...' : orderStats?.preparing || 0}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Ready Orders */}
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                        <div className="flex items-center">
-                            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                                <FaCheckCircle className="w-6 h-6 text-green-600" />
-                            </div>
-                            <div className="ml-4">
-                                <p className="text-sm font-medium text-gray-600">Ready for Pickup</p>
-                                <p className="text-2xl font-bold text-gray-900">
-                                    {statsLoading ? '...' : orderStats?.ready || 0}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Today's Revenue */}
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                        <div className="flex items-center">
-                            <div className="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center">
-                                <FaDollarSign className="w-6 h-6 text-emerald-600" />
-                            </div>
-                            <div className="ml-4">
-                                <p className="text-sm font-medium text-gray-600">Today's Revenue</p>
-                                <p className="text-2xl font-bold text-gray-900">
-                                    {formatNaira(todayRevenue)}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Quick Actions */}
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                    <h2 className="text-xl font-bold text-gray-900 mb-6">Quick Actions</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <Link 
-                            to="/vendor/orders"
-                            className="flex items-center p-6 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-colors group"
-                        >
-                            <div className="w-12 h-12 bg-blue-100 group-hover:bg-blue-200 rounded-lg flex items-center justify-center transition-colors">
-                                <FaClipboardList className="w-6 h-6 text-blue-600" />
-                            </div>
-                            <div className="ml-4 text-left">
-                                <h3 className="text-lg font-semibold text-blue-900">View Orders</h3>
-                                <p className="text-sm text-blue-700">Manage incoming and active orders</p>
-                            </div>
-                        </Link>
-
-                        <Link 
-                            to="/vendor/menu"
-                            className="flex items-center p-6 bg-green-50 hover:bg-green-100 rounded-lg border border-green-200 transition-colors group"
-                        >
-                            <div className="w-12 h-12 bg-green-100 group-hover:bg-green-200 rounded-lg flex items-center justify-center transition-colors">
-                                <FaUtensils className="w-6 h-6 text-green-600" />
-                            </div>
-                            <div className="ml-4 text-left">
-                                <h3 className="text-lg font-semibold text-green-900">Update Menu</h3>
-                                <p className="text-sm text-green-700">Add, edit, or remove menu items</p>
-                            </div>
-                        </Link>
-                    </div>
-                </div>
-
-                {/* Recent Orders Preview */}
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                    <div className="flex items-center justify-between mb-6">
-                        <h2 className="text-xl font-bold text-gray-900">Recent Orders</h2>
-                        <Link 
-                            to="/vendor/orders"
-                            className="text-primary-600 hover:text-primary-700 font-medium"
-                        >
-                            View All
-                        </Link>
-                    </div>
-                    
-                    {ordersLoading ? (
-                        <div className="flex items-center justify-center py-8">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
-                            <span className="ml-2 text-gray-600">Loading orders...</span>
-                        </div>
-                    ) : recentOrders.length === 0 ? (
-                        <div className="text-center py-8">
-                            <FaClipboardList className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                            <p className="text-gray-600">No recent orders</p>
-                        </div>
-                    ) : (
-                        <div className="space-y-4">
-                            {recentOrders.map((order) => (
-                                <div key={order.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                                    <div className="flex items-center">
-                                        <div className={`w-3 h-3 rounded-full mr-3 ${getStatusColor(order.status)}`}></div>
-                                        <div>
-                                            <p className="font-medium text-gray-900">{order.orderNumber}</p>
-                                            <p className="text-sm text-gray-600">
-                                                {order.customerName} • {order.items.length} items
-                                                {order.rider && (
-                                                    <span className="ml-2 text-blue-600">
-                                                        <FaMotorcycle className="inline w-3 h-3 mr-1" />
-                                                        {order.rider.name}
-                                                    </span>
-                                                )}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="font-semibold text-gray-900">{formatNaira(order.items.reduce((acc, item) => acc + item.totalPrice, 0))}</p>
-                                        <p className="text-sm text-gray-500">{formatTimeAgo(order.createdAt)}</p>
+                    {/* Stats Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        {/* Pending Orders */}
+                        <div className="group bg-white rounded-3xl shadow-sm border border-gray-100 p-8 hover:shadow-xl hover:scale-[1.02] transition-all duration-300">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm font-semibold text-gray-600 mb-2">Pending Orders</p>
+                                    <p className="text-3xl font-bold text-gray-900">
+                                        {statsLoading ? '...' : orderStats?.pending || 0}
+                                    </p>
+                                    <div className="flex items-center mt-2 text-sm text-yellow-600">
+                                        <FaChartLine className="w-3 h-3 mr-1" />
+                                        <span>Awaiting confirmation</span>
                                     </div>
                                 </div>
-                            ))}
+                                <div className="w-16 h-16 bg-gradient-to-br from-yellow-100 to-yellow-200 rounded-2xl flex items-center justify-center group-hover:from-yellow-200 group-hover:to-yellow-300 transition-all duration-300">
+                                    <FaClock className="w-8 h-8 text-yellow-600" />
+                                </div>
+                            </div>
                         </div>
-                    )}
+
+                        {/* Preparing Orders */}
+                        <div className="group bg-white rounded-3xl shadow-sm border border-gray-100 p-8 hover:shadow-xl hover:scale-[1.02] transition-all duration-300">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm font-semibold text-gray-600 mb-2">Preparing</p>
+                                    <p className="text-3xl font-bold text-gray-900">
+                                        {statsLoading ? '...' : orderStats?.preparing || 0}
+                                    </p>
+                                    <div className="flex items-center mt-2 text-sm text-blue-600">
+                                        <FaUtensils className="w-3 h-3 mr-1" />
+                                        <span>In kitchen</span>
+                                    </div>
+                                </div>
+                                <div className="w-16 h-16 bg-gradient-to-br from-blue-100 to-blue-200 rounded-2xl flex items-center justify-center group-hover:from-blue-200 group-hover:to-blue-300 transition-all duration-300">
+                                    <FaUtensils className="w-8 h-8 text-blue-600" />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Ready Orders */}
+                        <div className="group bg-white rounded-3xl shadow-sm border border-gray-100 p-8 hover:shadow-xl hover:scale-[1.02] transition-all duration-300">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm font-semibold text-gray-600 mb-2">Ready for Pickup</p>
+                                    <p className="text-3xl font-bold text-gray-900">
+                                        {statsLoading ? '...' : orderStats?.ready || 0}
+                                    </p>
+                                    <div className="flex items-center mt-2 text-sm text-green-600">
+                                        <FaCheckCircle className="w-3 h-3 mr-1" />
+                                        <span>Ready to go</span>
+                                    </div>
+                                </div>
+                                <div className="w-16 h-16 bg-gradient-to-br from-green-100 to-green-200 rounded-2xl flex items-center justify-center group-hover:from-green-200 group-hover:to-green-300 transition-all duration-300">
+                                    <FaCheckCircle className="w-8 h-8 text-green-600" />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Today's Revenue */}
+                        <div className="group bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-3xl shadow-lg p-8 hover:shadow-xl hover:scale-[1.02] transition-all duration-300">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm font-semibold text-emerald-100 mb-2">Today's Revenue</p>
+                                    <p className="text-3xl font-bold text-white">
+                                        {formatNaira(todayRevenue)}
+                                    </p>
+                                    <div className="flex items-center mt-2 text-sm text-emerald-100">
+                                        <FaDollarSign className="w-3 h-3 mr-1" />
+                                        <span>Total earnings</span>
+                                    </div>
+                                </div>
+                                <div className="w-16 h-16 bg-white bg-opacity-20 rounded-2xl flex items-center justify-center">
+                                    <FaDollarSign className="w-8 h-8 text-white" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Quick Actions */}
+                    <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8">
+                        <div className="flex items-center space-x-3 mb-8">
+                            <div className="w-12 h-12 bg-gradient-to-br from-primary-100 to-primary-200 rounded-2xl flex items-center justify-center">
+                                <FaUsers className="w-6 h-6 text-primary-600" />
+                            </div>
+                            <h2 className="text-2xl font-bold text-gray-900">Quick Actions</h2>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <Link 
+                                to="/vendor/orders"
+                                className="group flex items-center justify-between p-8 bg-gradient-to-r from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 rounded-2xl border border-blue-200 transition-all duration-300 hover:shadow-lg hover:scale-[1.02]"
+                            >
+                                <div className="flex items-center space-x-4">
+                                    <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300">
+                                        <FaClipboardList className="w-8 h-8 text-white" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-xl font-bold text-blue-900">View Orders</h3>
+                                        <p className="text-blue-700 font-medium">Manage incoming and active orders</p>
+                                    </div>
+                                </div>
+                                <FaArrowRight className="w-6 h-6 text-blue-600 group-hover:translate-x-1 transition-transform duration-300" />
+                            </Link>
+
+                            <Link 
+                                to="/vendor/menu"
+                                className="group flex items-center justify-between p-8 bg-gradient-to-r from-green-50 to-green-100 hover:from-green-100 hover:to-green-200 rounded-2xl border border-green-200 transition-all duration-300 hover:shadow-lg hover:scale-[1.02]"
+                            >
+                                <div className="flex items-center space-x-4">
+                                    <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300">
+                                        <FaUtensils className="w-8 h-8 text-white" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-xl font-bold text-green-900">Update Menu</h3>
+                                        <p className="text-green-700 font-medium">Add, edit, or remove menu items</p>
+                                    </div>
+                                </div>
+                                <FaArrowRight className="w-6 h-6 text-green-600 group-hover:translate-x-1 transition-transform duration-300" />
+                            </Link>
+                        </div>
+                    </div>
+
+                    {/* Recent Orders Preview */}
+                    <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8">
+                        <div className="flex items-center justify-between mb-8">
+                            <div className="flex items-center space-x-3">
+                                <div className="w-12 h-12 bg-gradient-to-br from-purple-100 to-purple-200 rounded-2xl flex items-center justify-center">
+                                    <FaClipboardList className="w-6 h-6 text-purple-600" />
+                                </div>
+                                <h2 className="text-2xl font-bold text-gray-900">Recent Orders</h2>
+                            </div>
+                            <Link 
+                                to="/vendor/orders"
+                                className="group flex items-center space-x-2 text-primary-600 hover:text-primary-700 font-semibold transition-colors duration-200"
+                            >
+                                <span>View All</span>
+                                <FaArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-200" />
+                            </Link>
+                        </div>
+                        
+                        {ordersLoading ? (
+                            <div className="flex items-center justify-center py-16">
+                                <div className="relative">
+                                    <div className="w-16 h-16 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin"></div>
+                                    <FaClipboardList className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-primary-600" size={20} />
+                                </div>
+                                <span className="ml-4 text-gray-600 text-lg">Loading orders...</span>
+                            </div>
+                        ) : recentOrders.length === 0 ? (
+                            <div className="text-center py-16">
+                                <div className="w-24 h-24 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                                    <FaClipboardList className="w-12 h-12 text-gray-400" />
+                                </div>
+                                <h3 className="text-xl font-semibold text-gray-900 mb-2">No recent orders</h3>
+                                <p className="text-gray-600">Orders will appear here as they come in</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                {recentOrders.map((order) => (
+                                    <div key={order.id} className="group flex items-center justify-between p-6 bg-gradient-to-r from-gray-50 to-gray-100 hover:from-gray-100 hover:to-gray-200 rounded-2xl transition-all duration-300 hover:shadow-md">
+                                        <div className="flex items-center space-x-4">
+                                            <div className={`w-4 h-4 rounded-full ${getStatusColor(order.status)} shadow-sm`}></div>
+                                            <div>
+                                                <p className="font-bold text-gray-900 text-lg">{order.orderNumber}</p>
+                                                <p className="text-gray-600 font-medium">
+                                                    {order.customerName} • {order.items.length} items
+                                                    {order.rider && (
+                                                        <span className="ml-3 inline-flex items-center px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
+                                                            <FaMotorcycle className="w-3 h-3 mr-1" />
+                                                            {order.rider.name}
+                                                        </span>
+                                                    )}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="font-bold text-gray-900 text-lg">{formatNaira(order.items.reduce((acc, item) => acc + item.totalPrice, 0))}</p>
+                                            <p className="text-gray-500 font-medium">{formatTimeAgo(order.createdAt)}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
         </VendorLayout>

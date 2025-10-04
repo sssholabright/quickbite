@@ -122,7 +122,7 @@ export class OrdersService {
             ]);
 
             // Transform orders to match response format
-            const orderList: OrderListItem[] = orders.map(order => ({
+            const orderList: OrderListItem[] = orders.map((order: any) => ({
                 id: order.id,
                 orderNumber: order.orderNumber,
                 customer: {

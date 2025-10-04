@@ -57,7 +57,7 @@ export class LogisticsService {
             ]);
 
             // Transform companies to match response format
-            const companyList: LogisticsCompanyListItem[] = companies.map(company => ({
+            const companyList: LogisticsCompanyListItem[] = companies.map((company: any) => ({
                 id: company.id,
                 name: company.name,
                 contactPerson: company.contactPerson,
@@ -65,8 +65,8 @@ export class LogisticsService {
                 email: company.email,
                 status: company.status,
                 ridersCount: company.riders.length,
-                onlineRidersCount: company.riders.filter(rider => rider.isOnline).length,
-                totalEarnings: company.riders.reduce((sum, rider) => sum + rider.earnings, 0),
+                onlineRidersCount: company.riders.filter((rider: any) => rider.isOnline).length,
+                totalEarnings: company.riders.reduce((sum: any, rider: any) => sum + rider.earnings, 0),
                 createdAt: company.createdAt.toISOString()
             }));
 

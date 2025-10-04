@@ -27,12 +27,19 @@ async function testQueueService() {
             deliveryAddress: '456 Delivery Ave, Test City',
             deliveryFee: 5.99,
             distance: 2.5,
+            estimatedDistance: 2.5,
+            expiresIn: 5 * 60 * 1000,
+            timer: 5 * 60 * 1000,
+            totalAmount: 12.99,
+            orderNumber: '1234567890',
             items: [
                 {
                     id: 'item-1',
                     name: 'Test Burger',
                     quantity: 1,
-                    price: 12.99
+                    price: 12.99,
+                    unitPrice: 12.99,
+                    totalPrice: 12.99
                 }
             ],
             createdAt: new Date(),

@@ -152,7 +152,7 @@ export class AuthService {
     }
 
     // Login user
-    static async login(credentials: LoginCredentials): Promise<AuthResult> {
+    static async login(credentials: LoginCredentials, appType?: 'customer' | 'rider' | 'vendor' | 'admin'): Promise<AuthResult> {
         try {
             // Find user by email
             const user = await prisma.user.findUnique({
@@ -181,6 +181,14 @@ export class AuthService {
                 throw new CustomError('Account is deactivated', 403);
             }
 
+            // 🚀 NEW: App-specific role validation
+            if (appType) {
+                const isAuthorizedForApp = this.validateAppAccess(user.role, appType);
+                if (!isAuthorizedForApp) {
+                    throw new CustomError(`Access denied: ${user.role} role is not authorized for ${appType} app`, 403);
+                }
+            }
+
             // Generate tokens
             const tokens = JWTService.generateTokenPair({
                 userId: user.id,
@@ -188,7 +196,7 @@ export class AuthService {
                 role: user.role as 'CUSTOMER' | 'RIDER' | 'VENDOR' | 'ADMIN'
             });
 
-            logger.info(`User logged in: ${user.email} (${user.role})`);
+            logger.info(`User logged in: ${user.email} (${user.role}) to ${appType || 'unknown'} app`);
 
             return {
                 user: {
@@ -198,7 +206,7 @@ export class AuthService {
                     phone: user.phone || '',
                     avatar: user.avatar || '',
                     role: user.role || '',
-                    isActive,
+                    isActive: user.isActive,
                     createdAt: user.createdAt.toISOString(),
                     updatedAt: user.updatedAt.toISOString(),
                     ...((user as any).rider && { rider: (user as any).rider }),
@@ -208,7 +216,7 @@ export class AuthService {
                 tokens
             };
         } catch (error) {
-            logger.error({ error }, 'Login error');
+            logger.error({ error, email: credentials.email }, 'Login failed');
             if (error instanceof CustomError) {
                 throw error;
             }
@@ -466,5 +474,18 @@ export class AuthService {
             default:
                 return false;
             }
+    }
+
+    // 🚀 NEW: Validate app access based on role
+    private static validateAppAccess(userRole: string, appType: string): boolean {
+        const roleAppMapping = {
+            'CUSTOMER': ['customer'],
+            'VENDOR': ['vendor', 'admin'],
+            'RIDER': ['rider', 'admin'], // Assuming riders use web/admin interface
+            'ADMIN': ['admin']
+        };
+
+        const allowedApps = roleAppMapping[userRole as keyof typeof roleAppMapping] || [];
+        return allowedApps.includes(appType);
     }
 }

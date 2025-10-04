@@ -207,7 +207,7 @@ export default function ProfileScreen() {
 				</View>
 
 				{/* Account */}
-				<View style={{ marginBottom: 5 }}>
+				{/* <View style={{ marginBottom: 5 }}>
 					<Text style={{
 						fontSize: 16,
 						fontWeight: "600",
@@ -223,7 +223,7 @@ export default function ProfileScreen() {
 						"Manage your delivery addresses",
 						() => navigation.navigate("AddressManagement")
 					)}
-				</View>
+				</View> */}
 
 				{/* Settings */}
 				<View style={{ marginBottom: 5 }}>

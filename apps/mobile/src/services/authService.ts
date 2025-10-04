@@ -5,10 +5,20 @@ class AuthService {
     // Login user
     static async login(credentials: LoginCredentials): Promise<AuthResult> {
         try {
-            const response = await apiClient.post<ApiResponse<AuthResult>>('/auth/login', credentials);
+            const response = await apiClient.post<ApiResponse<AuthResult>>('/auth/login', credentials, {
+                headers: {
+                    'X-App-Type': 'customer'
+                }
+            });
             return response.data.data;
         } catch(error: any) {
             console.error("Error logging in: ", error)
+            
+            // Handle role-based access errors
+            if (error.response?.status === 403 && error.response?.data?.message?.includes('Access denied')) {
+                throw new Error('This account is not authorized for the mobile app. Please use the web interface.');
+            }
+            
             throw new Error(error.response?.data?.message || 'Login failed');
         }
     }

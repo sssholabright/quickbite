@@ -8,9 +8,10 @@ export const createVendorValidation = z.object({
         password: z.string().min(6, 'Password must be at least 6 characters'),
         businessName: z.string().min(1, 'Business name is required'),
         businessAddress: z.string().optional(),
-        latitude: z.number().optional(),
-        longitude: z.number().optional(),
+        latitude: z.coerce.number().optional(),
+        longitude: z.coerce.number().optional(),
         description: z.string().optional(),
+        logo: z.string().url('Invalid logo URL').optional(),
         openingTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Opening time must be in HH:MM format').optional(),
         closingTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Closing time must be in HH:MM format').optional(),
         operatingDays: z.array(z.enum(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'])).optional()
@@ -24,9 +25,10 @@ export const updateVendorValidation = z.object({
         phone: z.string().min(10).optional(),
         businessName: z.string().min(1).optional(),
         businessAddress: z.string().optional(),
-        latitude: z.number().optional(),
-        longitude: z.number().optional(),
+        latitude: z.coerce.number().optional(),
+        longitude: z.coerce.number().optional(),
         description: z.string().optional(),
+        logo: z.string().url('Invalid logo URL').optional(),
         openingTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).optional(),
         closingTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).optional(),
         operatingDays: z.array(z.enum(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'])).optional(),
@@ -36,8 +38,8 @@ export const updateVendorValidation = z.object({
 
 export const updateVendorLocationValidation = z.object({
     body: z.object({
-        latitude: z.number(),
-        longitude: z.number(),
+        latitude: z.coerce.number(),
+        longitude: z.coerce.number(),
         businessAddress: z.string().optional()
     })
 });

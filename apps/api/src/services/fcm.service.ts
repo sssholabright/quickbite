@@ -364,7 +364,7 @@ export class FCMService {
             });
 
             // Filter riders within radius (simplified distance calculation)
-            const nearbyRiders = riders.filter(rider => {
+            const nearbyRiders = riders.filter((rider: any) => {
                 if (!rider.currentLat || !rider.currentLng) return false;
                 
                 const distance = this.calculateDistance(
@@ -375,7 +375,7 @@ export class FCMService {
                 return distance <= radiusKm;
             });
 
-            const riderIds = nearbyRiders.map(r => r.id);
+            const riderIds = nearbyRiders.map((r: any) => r.id);
             return await this.sendToMultipleRiders(riderIds, message, options);
         } catch (error) {
             logger.error({ error, latitude, longitude, radiusKm }, 'Error sending notifications to riders in area');

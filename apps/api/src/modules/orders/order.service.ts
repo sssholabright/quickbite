@@ -48,20 +48,20 @@ export class OrderService {
             // Validate add-ons for each item
             for (const item of orderData.items) {
                 if (item.addOns && item.addOns.length > 0) {
-                    const menuItem = menuItems.find(mi => mi.id === item.menuItemId);
+                    const menuItem = menuItems.find((mi: any) => mi.id === item.menuItemId);
                     if (!menuItem) continue;
 
-                    const addOnIds = item.addOns.map(addOn => addOn.addOnId);
-                    const validAddOns = menuItem.addOns.filter(addOn => addOnIds.includes(addOn.id));
+                    const addOnIds = item.addOns.map((addOn: any) => addOn.addOnId);
+                    const validAddOns = menuItem.addOns.filter((addOn: any) => addOnIds.includes(addOn.id));
 
                     if (validAddOns.length !== addOnIds.length) {
                         throw new CustomError(`Invalid add-ons for item ${menuItem.name}`, 400);
                     }
 
                     // Validate required add-ons
-                    const requiredAddOns = menuItem.addOns.filter(addOn => addOn.isRequired);
+                    const requiredAddOns = menuItem.addOns.filter((addOn: any) => addOn.isRequired);
                     for (const requiredAddOn of requiredAddOns) {
-                        const selectedAddOn = item.addOns.find(addOn => addOn.addOnId === requiredAddOn.id);
+                        const selectedAddOn = item.addOns.find((addOn: any) => addOn.addOnId === requiredAddOn.id);
                         if (!selectedAddOn || selectedAddOn.quantity < 1) {
                             throw new CustomError(`Required add-on ${requiredAddOn.name} is missing or quantity is less than 1`, 400);
                         }
@@ -69,7 +69,7 @@ export class OrderService {
 
                     // Vendor max quantities
                     for (const selectedAddOn of item.addOns) {
-                        const addOn = menuItem.addOns.find(addOn => addOn.id === selectedAddOn.addOnId);
+                        const addOn = menuItem.addOns.find((addOn: any) => addOn.id === selectedAddOn.addOnId);
                         if (addOn && selectedAddOn.quantity > addOn.maxQuantity) {
                             throw new CustomError(`Add-on ${addOn.name} quantity exceeds maximum allowed ${addOn.maxQuantity}`, 400);
                         }
@@ -95,7 +95,7 @@ export class OrderService {
                     deliveryAddress: orderData.deliveryAddress,
                     items: {
                         create: orderData.items.map(item => {
-                            const menuItem = menuItems.find(mi => mi.id === item.menuItemId);
+                            const menuItem = menuItems.find((mi: any) => mi.id === item.menuItemId);
                             const itemTotalPrice = this.calculateItemTotalPrice(item, menuItem!);
 
                             const orderItemData: any = {
@@ -110,8 +110,8 @@ export class OrderService {
 
                             if (item.addOns && item.addOns.length > 0) {
                                 orderItemData.addOns = {
-                                    create: item.addOns.map(addOn => {
-                                        const menuAddOn = menuItem!.addOns.find(ao => ao.id === addOn.addOnId);
+                                    create: item.addOns.map((addOn: any) => {
+                                        const menuAddOn = menuItem!.addOns.find((ao: any) => ao.id === addOn.addOnId);
                                         return {
                                             addOn: {
                                                 connect: { id: addOn.addOnId }
@@ -478,7 +478,7 @@ export class OrderService {
             ]);
 
             return {
-                orders: orders.map(order => this.formatOrderResponse(order)),
+                orders: orders.map((order: any) => this.formatOrderResponse(order)),
                 total,
                 page: filters.page || 1,
                 limit: filters.limit || 10
@@ -733,7 +733,7 @@ export class OrderService {
                         expiresIn: 30,
                         timer: 30,
                         distance: 0,
-                        items: order.items.map(item => ({
+                        items: order.items.map((item: any) => ({
                             id: item.id,
                             name: item.menuItem.name,
                             quantity: item.quantity,
@@ -804,7 +804,7 @@ export class OrderService {
             });
 
             // Convert to object
-            const byStatus = statusCounts.reduce((acc, item) => {
+            const byStatus = statusCounts.reduce((acc: any, item: any) => {
                 acc[item.status] = item._count.status;
                 return acc;
             }, {} as Record<string, number>);

@@ -1,4 +1,4 @@
-import { PrismaClient, PaymentStatus, RefundStatus } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 import { PaymentsListParams, PaymentsListResponse, ActionResponse, PaymentDetails, RefundRequest, RetryPaymentRequest } from '../../../types/admin/payments.js';
 import { CustomError } from '../../../middlewares/errorHandler.js';
 
@@ -104,7 +104,7 @@ export class PaymentsService {
         });
 
         // Transform data
-        const data = payments.map(payment => ({
+        const data = payments.map((payment: any) => ({
             id: payment.id,
             orderId: payment.orderId,
             orderNumber: payment.order.orderNumber,
@@ -126,7 +126,7 @@ export class PaymentsService {
             failedAt: payment.failedAt?.toISOString(),
             retryCount: payment.retryCount,
             maxRetries: payment.maxRetries,
-            refunds: payment.refunds.map(refund => ({
+            refunds: payment.refunds.map((refund: any) => ({
                 id: refund.id,
                 amount: refund.amount,
                 status: refund.status as any,
@@ -165,12 +165,12 @@ export class PaymentsService {
         const summary = {
             totalAmount: summaryData._sum.amount || 0,
             totalTransactions: summaryData._count.id || 0,
-            successfulAmount: statusSummary.find(s => s.status === PaymentStatus.SUCCESS)?._sum.amount || 0,
-            failedAmount: statusSummary.find(s => s.status === PaymentStatus.FAILED)?._sum.amount || 0,
-            pendingAmount: statusSummary.find(s => s.status === PaymentStatus.PENDING)?._sum.amount || 0,
-            refundedAmount: statusSummary.find(s => s.status === PaymentStatus.REFUNDED)?._sum.amount || 0,
+            successfulAmount: statusSummary.find((s: any) => s.status === 'SUCCESS')?._sum.amount || 0,
+            failedAmount: statusSummary.find((s: any) => s.status === 'FAILED')?._sum.amount || 0,
+            pendingAmount: statusSummary.find((s: any) => s.status === 'PENDING')?._sum.amount || 0,
+            refundedAmount: statusSummary.find((s: any) => s.status === 'REFUNDED')?._sum.amount || 0,
             successRate: summaryData._count.id > 0 
-                ? ((statusSummary.find(s => s.status === PaymentStatus.SUCCESS)?._count.id || 0) / summaryData._count.id) * 100 
+                ? ((statusSummary.find((s: any) => s.status === 'SUCCESS')?._count.id || 0) / summaryData._count.id) * 100 
                 : 0
         };
 
@@ -258,7 +258,7 @@ export class PaymentsService {
             ...(payment.failedAt && { failedAt: payment.failedAt.toISOString() }),
             retryCount: payment.retryCount,
             maxRetries: payment.maxRetries,
-            refunds: payment.refunds.map(refund => ({
+            refunds: payment.refunds.map((refund: any) => ({
                 id: refund.id,
                 amount: refund.amount,
                 status: refund.status as any,
@@ -300,14 +300,14 @@ export class PaymentsService {
             throw new CustomError('Payment not found', 404);
         }
 
-        if (payment.status !== PaymentStatus.SUCCESS) {
+        if (payment.status !== 'SUCCESS') {
             throw new CustomError('Only successful payments can be refunded', 400);
         }
 
         // Calculate refund amount
         const totalRefunded = payment.refunds
-            .filter(r => r.status === RefundStatus.SUCCESS)
-            .reduce((sum, r) => sum + r.amount, 0);
+            .filter((r: any) => r.status === 'SUCCESS')
+            .reduce((sum: any, r: any) => sum + r.amount, 0);
 
         const availableAmount = payment.amount - totalRefunded;
 
@@ -328,7 +328,7 @@ export class PaymentsService {
                 amount: refundAmount,
                 reason: request.reason,
                 initiatedBy: adminId,
-                status: RefundStatus.PENDING
+                status: 'PENDING'
             }
         });
 
@@ -353,7 +353,7 @@ export class PaymentsService {
             throw new CustomError('Payment not found', 404);
         }
 
-        if (payment.status !== PaymentStatus.FAILED) {
+        if (payment.status !== 'FAILED') {
             throw new CustomError('Only failed payments can be retried', 400);
         }
 
@@ -366,7 +366,7 @@ export class PaymentsService {
             where: { id: paymentId },
             data: {
                 retryCount: payment.retryCount + 1,
-                status: PaymentStatus.PROCESSING,
+                status: 'PROCESSING',
                 customerEmail: request.customerEmail || payment.customerEmail,
                 customerPhone: request.customerPhone || payment.customerPhone,
                 paymentMethod: request.paymentMethod || payment.paymentMethod,
@@ -391,7 +391,7 @@ export class PaymentsService {
             await prisma.refund.update({
                 where: { id: refundId },
                 data: {
-                    status: RefundStatus.SUCCESS,
+                    status: 'SUCCESS',
                     processedAt: new Date(),
                     completedAt: new Date(),
                     gatewayResponse: { simulated: true, message: 'Refund processed successfully' }
@@ -408,7 +408,7 @@ export class PaymentsService {
                 const totalRefunded = await prisma.refund.aggregate({
                     where: {
                         paymentId: refund.paymentId,
-                        status: RefundStatus.SUCCESS
+                        status: 'SUCCESS'
                     },
                     _sum: { amount: true }
                 });
@@ -416,7 +416,7 @@ export class PaymentsService {
                 if (totalRefunded._sum.amount && totalRefunded._sum.amount >= refund.payment.amount) {
                     await prisma.payment.update({
                         where: { id: refund.paymentId },
-                        data: { status: PaymentStatus.REFUNDED }
+                        data: { status: 'REFUNDED' }
                     });
                 }
             }
@@ -432,7 +432,7 @@ export class PaymentsService {
             await prisma.payment.update({
                 where: { id: paymentId },
                 data: {
-                    status: success ? PaymentStatus.SUCCESS : PaymentStatus.FAILED,
+                    status: success ? 'SUCCESS' : 'FAILED',
                     completedAt: success ? new Date() : null,
                     failedAt: success ? null : new Date(),
                     gatewayResponse: { 

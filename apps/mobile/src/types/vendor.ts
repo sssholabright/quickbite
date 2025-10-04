@@ -9,6 +9,12 @@ export interface Vendor {
     category: string;
     isOpen: boolean;
     featured: boolean;
+    categories?: Array<{
+        id: string;
+        name: string;
+        description?: string;
+        image?: string;
+    }>;
 }
   
 export interface Meal {
@@ -18,9 +24,10 @@ export interface Meal {
     price: number;
     image: string;
     vendorId: string;
+    vendorName?: string; // Add this
     category: string;
     popular: boolean;
-    preparationTime?: number;
+    preparationTime: number;
     discount?: number;
     reviewCount?: number;
     rating?: number;
@@ -59,8 +66,10 @@ export interface CategoryChipProps {
 
 export interface MealCardProps {
     meal: Meal;
-    onPress: () => void;
+    onPress?: () => void;
     onAddToCart?: () => void;
+    onRemoveFromCart?: () => void;
+    quantity?: number;
 }
 
 export interface PromoBannerProps {
@@ -116,5 +125,32 @@ export interface CheckoutScreenProps {
             cartItems: Record<string, number>;
             vendorId: string;
         };
+    };
+}
+
+// Update the PublicVendor interface to include categories
+export interface PublicVendor {
+    id: string;
+    businessName: string;
+    description?: string;
+    logo?: string;
+    coverImage?: string;
+    rating: number;
+    isOpen: boolean;
+    latitude?: number;
+    longitude?: number;
+    categories?: Array<{
+        id: string;
+        name: string;
+        description?: string;
+        image?: string;
+    }>;
+    menuItemsCount?: number;
+    user?: {
+        id: string;
+        name: string;
+        email: string;
+        phone?: string;
+        avatar?: string;
     };
 }

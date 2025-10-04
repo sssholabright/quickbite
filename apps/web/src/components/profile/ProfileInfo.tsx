@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { VendorProfile } from '../../types/vendor'
 import { useVendorStore } from '../../stores/vendorStore'
-import { showSuccess, showError } from '../../utils/sweetAlert'
-import { FaEdit, FaSave, FaTimes, FaUpload, FaUser, FaEnvelope, FaPhone } from 'react-icons/fa'
+import { showConfirm, showSuccess, showError } from '../../utils/sweetAlert'
+import { FaEdit, FaSave, FaTimes, FaUpload, FaUser, FaEnvelope, FaPhone, FaCamera } from 'react-icons/fa'
 
 interface ProfileInfoProps {
     profile: VendorProfile
@@ -11,6 +11,9 @@ interface ProfileInfoProps {
 export default function ProfileInfo({ profile }: ProfileInfoProps) {
     const [isEditing, setIsEditing] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
+    const [logoFile, setLogoFile] = useState<File | null>(null)
+    const [logoPreview, setLogoPreview] = useState<string | null>(null)
+    const fileInputRef = useRef<HTMLInputElement>(null)
     const { updateProfile } = useVendorStore()
     
     const [formData, setFormData] = useState({
@@ -21,16 +24,30 @@ export default function ProfileInfo({ profile }: ProfileInfoProps) {
     })
 
     const handleSave = async () => {
-        setIsLoading(true)
         try {
-            await updateProfile(formData)
-            setIsEditing(false)
-            showSuccess('Profile Updated', 'Your profile information has been updated successfully')
-        } catch (error) {
-            console.error('Failed to update profile:', error)
-            showError('Error', 'Failed to update profile. Please try again.')
+            // Show confirmation dialog
+            const confirmed = await showConfirm(
+                'Save Profile Changes',
+                'Are you sure you want to save these profile changes?',
+                'Save',
+                'Cancel'
+            );
+
+            if (!confirmed) {
+                return; // User cancelled
+            }
+
+            setIsLoading(true);
+            await updateProfile(formData, logoFile || undefined);
+            setIsEditing(false);
+            setLogoFile(null);
+            setLogoPreview(null);
+            showSuccess('Profile Updated', 'Your profile information has been updated successfully');
+        } catch (error: any) {
+            console.error('Failed to update profile:', error);
+            showError('Error', error.message || 'Failed to update profile. Please try again.');
         } finally {
-            setIsLoading(false)
+            setIsLoading(false);
         }
     }
 
@@ -41,7 +58,45 @@ export default function ProfileInfo({ profile }: ProfileInfoProps) {
             phone: profile.phone,
             description: profile.description || ''
         })
+        setLogoFile(null)
+        setLogoPreview(null)
         setIsEditing(false)
+    }
+
+    const handleLogoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0]
+        if (file) {
+            // Validate file type
+            if (!file.type.startsWith('image/')) {
+                showError('Invalid File Type', 'Please select an image file.')
+                return
+            }
+
+            // Validate file size (5MB)
+            if (file.size > 5 * 1024 * 1024) {
+                showError('File Too Large', 'Please select an image smaller than 5MB.')
+                return
+            }
+
+            setLogoFile(file)
+            const reader = new FileReader()
+            reader.onload = (e) => {
+                setLogoPreview(e.target?.result as string)
+            }
+            reader.readAsDataURL(file)
+        }
+    }
+
+    const handleLogoClick = () => {
+        fileInputRef.current?.click()
+    }
+
+    const handleRemoveLogo = () => {
+        setLogoFile(null)
+        setLogoPreview(null)
+        if (fileInputRef.current) {
+            fileInputRef.current.value = ''
+        }
     }
 
     return (
@@ -71,7 +126,7 @@ export default function ProfileInfo({ profile }: ProfileInfoProps) {
                             className="flex items-center px-3 py-2 text-sm bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors disabled:opacity-50"
                         >
                             <FaSave className="w-4 h-4 mr-2" />
-                            Save
+                            {isLoading ? 'Saving...' : 'Save'}
                         </button>
                     </div>
                 )}
@@ -83,17 +138,37 @@ export default function ProfileInfo({ profile }: ProfileInfoProps) {
                     <div className="text-center">
                         <div className="relative inline-block">
                             <img
-                                src={profile.logo || 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400&h=300&fit=crop'}
+                                src={logoPreview || profile.logo || 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400&h=300&fit=crop'}
                                 alt="Restaurant Logo"
                                 className="w-32 h-32 rounded-full object-cover border-4 border-gray-200"
                             />
                             {isEditing && (
-                                <button className="absolute bottom-0 right-0 w-8 h-8 bg-primary-600 hover:bg-primary-700 text-white rounded-full flex items-center justify-center transition-colors">
-                                    <FaUpload className="w-4 h-4" />
+                                <button 
+                                    onClick={handleLogoClick}
+                                    className="absolute bottom-0 right-0 w-8 h-8 bg-primary-600 hover:bg-primary-700 text-white rounded-full flex items-center justify-center transition-colors"
+                                >
+                                    <FaCamera className="w-4 h-4" />
                                 </button>
                             )}
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept="image/*"
+                                onChange={handleLogoChange}
+                                className="hidden"
+                            />
                         </div>
                         <p className="mt-2 text-sm text-gray-600">Restaurant Logo</p>
+                        {isEditing && (
+                            <div className="mt-2">
+                                <button
+                                    onClick={handleRemoveLogo}
+                                    className="text-xs text-red-600 hover:text-red-800"
+                                >
+                                    Remove Logo
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
 

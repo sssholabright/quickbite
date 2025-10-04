@@ -2,20 +2,7 @@ import { MenuItem } from '../../types/menu'
 import { useDeleteMenuItem, useToggleMenuItemAvailability } from '../../hooks/useMenu'
 import { showConfirm, showError, showSuccess } from '../../utils/sweetAlert'
 import { formatNaira } from '../../lib/mockMenu'
-import { 
-    FaEdit, 
-    FaTrash, 
-    FaToggleOn, 
-    FaToggleOff, 
-    FaClock,
-    FaEye,
-    FaEyeSlash,
-    FaSpinner,
-    FaExclamationTriangle,
-    FaCheckCircle,
-    FaImage,
-    FaPlus
-} from 'react-icons/fa'
+import { FaEdit, FaTrash, FaToggleOn, FaToggleOff, FaClock, FaEye, FaEyeSlash, FaSpinner, FaImage, FaPlus } from 'react-icons/fa' 
 import { useState } from 'react'
 
 interface MenuItemCardProps {

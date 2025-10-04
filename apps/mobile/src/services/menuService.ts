@@ -10,6 +10,12 @@ export interface PublicVendor {
     rating: number
     isOpen: boolean
     isActive: boolean
+    categories?: Array<{
+        id: string;
+        name: string;
+        description?: string;
+        image?: string;
+    }>;
 }
 
 export interface PublicCategory {
@@ -56,6 +62,17 @@ export const menuService = {
             return res.data.data;
         } catch (error) {
             console.error('Error fetching vendor categories:', error);
+            throw error;
+        }
+    },
+
+    getAllCategories: async () => {
+        try {
+            const res = await apiClient.get<ApiResponse<PublicCategory[]>>(`/menu/categories/all`);
+            console.log(res.data.data);
+            return res.data.data;
+        } catch (error) {
+            console.error('Error fetching all categories:', error);
             throw error;
         }
     },

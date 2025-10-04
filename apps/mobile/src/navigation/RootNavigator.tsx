@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { DefaultTheme, DarkTheme, NavigationContainer, Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -34,6 +34,8 @@ import LegalScreen from '../screens/profile/LegalScreen';
 import { useThemeStore } from '../stores/theme';
 import LocationPermissionScreen from '../screens/auth/LocationPermissionScreen';
 import notificationService from '../services/notificationService';
+import { SocketProvider } from '../providers/SocketProvider';
+import UnauthorizedScreen from '../screens/auth/UnauthorizedScreen';
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
@@ -144,20 +146,19 @@ function LoadingScreen() {
 }
 
 export default function RootNavigator() {
-	const { isAuthenticated, isLoading, hydrated, hydrate } = useAuthStore();
-	const { 
-		checkLocationStatus, 
-		isLocationEnabled, 
-		isLocationPermissionGranted, 
-		currentLocation
-	} = useLocationStore();
-	const appTheme = useTheme();
+	const { isAuthenticated, hydrated, user, hydrate } = useAuthStore();
+	const { isLocationEnabled, isLocationPermissionGranted, currentLocation, checkLocationStatus } = useLocationStore();
+	const theme = useTheme();
+
 	const navigationRef = useRef<any>(null);
 	
 	// 🚀 NEW: State to track location checking
 	const [isCheckingLocation, setIsCheckingLocation] = useState(true);
 	const [locationCheckTimeout, setLocationCheckTimeout] = useState(false);
 	const [hasNavigatedToApp, setHasNavigatedToApp] = useState(false);
+
+	// Check if user has unauthorized role
+	const isUnauthorizedRole = user && user.role !== 'CUSTOMER';
 
 	useEffect(() => { 
 		void hydrate();
@@ -239,87 +240,92 @@ export default function RootNavigator() {
 	}, []);
 
 	// Wait for auth to be hydrated
-	if (!hydrated || isLoading) {
+	if (!hydrated) {
 		return <LoadingScreen />;
 	}
 
-	const navTheme: Theme = appTheme.mode === "dark"
-		? { ...DarkTheme, colors: { ...DarkTheme.colors, background: appTheme.colors.background, card: appTheme.colors.surface, text: appTheme.colors.text, border: appTheme.colors.border, primary: appTheme.colors.primary } }
-		: { ...DefaultTheme, colors: { ...DefaultTheme.colors, background: appTheme.colors.background, card: appTheme.colors.surface, text: appTheme.colors.text, border: appTheme.colors.border, primary: appTheme.colors.primary } };
+	const navTheme: Theme = theme.mode === "dark"
+		? { ...DarkTheme, colors: { ...DarkTheme.colors, background: theme.colors.background, card: theme.colors.surface, text: theme.colors.text, border: theme.colors.border, primary: theme.colors.primary } }
+		: { ...DefaultTheme, colors: { ...DefaultTheme.colors, background: theme.colors.background, card: theme.colors.surface, text: theme.colors.text, border: theme.colors.border, primary: theme.colors.primary } };
 
 	// 🚀 ENHANCED: Show loading while checking location, then decide
 	const shouldShowLocationPermission = isAuthenticated && 
+		!isUnauthorizedRole &&
 		(isCheckingLocation ? false : (!isLocationEnabled || !isLocationPermissionGranted || !currentLocation || locationCheckTimeout));
 
 	return (
 		<NavigationContainer linking={linking} theme={navTheme} ref={navigationRef}>
-			<RootStack.Navigator screenOptions={{ headerShown: false }}>
-				{isAuthenticated ? (
-					shouldShowLocationPermission ? (
-						<RootStack.Screen name="LocationPermission" component={LocationPermissionScreen} />
+			<SocketProvider>
+				<RootStack.Navigator screenOptions={{ headerShown: false }}>
+					{isAuthenticated ? (
+						isUnauthorizedRole ? (
+							<RootStack.Screen name="Unauthorized" component={UnauthorizedScreen} />
+						) : shouldShowLocationPermission ? (
+							<RootStack.Screen name="LocationPermission" component={LocationPermissionScreen} />
+						) : (
+							<RootStack.Screen name="AppTabs" component={AppTabs} />
+						)
 					) : (
-						<RootStack.Screen name="AppTabs" component={AppTabs} />
-					)
-				) : (
-					<RootStack.Screen name="AuthStack" component={AuthStackNavigator} />
-				)}
-                <RootStack.Screen name="Menu" component={MenuScreen} options={{ headerShown: false }} />
-				<RootStack.Screen 
-					name="Checkout" 
-					component={CheckoutScreen} 
-					options={{ headerShown: false }} 
-				/>
-				<RootStack.Screen 
-					name="OrderConfirmation" 
-					component={OrderConfirmationScreen} 
-					options={{ headerShown: false }} 
-				/>
-				<RootStack.Screen 
-					name="OrderDetail" 
-					component={OrderDetailScreen} 
-					options={{ headerShown: false }} 
-				/>
-				<RootStack.Screen 
-					name="AddressManagement" 
-					component={AddressManagementScreen} 
-					options={{ headerShown: false }} 
-				/>
-				<RootStack.Screen 
-					name="Settings" 
-					component={SettingsScreen} 
-					options={{ headerShown: false }} 
-				/>
-				<RootStack.Screen 
-					name="AddAddress" 
-					component={AddAddressScreen} 
-					options={{ headerShown: false }} 
-				/>
-				<RootStack.Screen 
-					name="EditAddress" 
-					component={EditAddressScreen} 
-					options={{ headerShown: false }} 
-				/>
-				<RootStack.Screen 
-					name="EditProfile" 
-					component={EditProfileScreen} 
-					options={{ headerShown: false }} 
-				/>
-				<RootStack.Screen 
-					name="ChangePassword" 
-					component={ChangePasswordScreen} 
-					options={{ headerShown: false }} 
-				/>
-				<RootStack.Screen 
-					name="Support" 
-					component={SupportScreen} 
-					options={{ headerShown: false }} 
-				/>
-				<RootStack.Screen 
-					name="Legal" 
-					component={LegalScreen} 
-					options={{ headerShown: false }} 
-				/>
-			</RootStack.Navigator>
+						<RootStack.Screen name="AuthStack" component={AuthStackNavigator} />
+					)}
+	                <RootStack.Screen name="Menu" component={MenuScreen} options={{ headerShown: false }} />
+					<RootStack.Screen 
+						name="Checkout" 
+						component={CheckoutScreen} 
+						options={{ headerShown: false }} 
+					/>
+					<RootStack.Screen 
+						name="OrderConfirmation" 
+						component={OrderConfirmationScreen} 
+						options={{ headerShown: false }} 
+					/>
+					<RootStack.Screen 
+						name="OrderDetail" 
+						component={OrderDetailScreen} 
+						options={{ headerShown: false }} 
+					/>
+					<RootStack.Screen 
+						name="AddressManagement" 
+						component={AddressManagementScreen} 
+						options={{ headerShown: false }} 
+					/>
+					<RootStack.Screen 
+						name="Settings" 
+						component={SettingsScreen} 
+						options={{ headerShown: false }} 
+					/>
+					<RootStack.Screen 
+						name="AddAddress" 
+						component={AddAddressScreen} 
+						options={{ headerShown: false }} 
+					/>
+					<RootStack.Screen 
+						name="EditAddress" 
+						component={EditAddressScreen} 
+						options={{ headerShown: false }} 
+					/>
+					<RootStack.Screen 
+						name="EditProfile" 
+						component={EditProfileScreen} 
+						options={{ headerShown: false }} 
+					/>
+					<RootStack.Screen 
+						name="ChangePassword" 
+						component={ChangePasswordScreen} 
+						options={{ headerShown: false }} 
+					/>
+					<RootStack.Screen 
+						name="Support" 
+						component={SupportScreen} 
+						options={{ headerShown: false }} 
+					/>
+					<RootStack.Screen 
+						name="Legal" 
+						component={LegalScreen} 
+						options={{ headerShown: false }} 
+					/>
+				</RootStack.Navigator>
+			</SocketProvider>
 		</NavigationContainer>
 	);
 }

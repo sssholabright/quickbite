@@ -108,7 +108,7 @@ export const useSocket = () => {
     const [socket, setSocket] = useState<Socket | null>(null);
     
     const { tokens, refreshToken } = useAuthStore();
-    const { isOnline } = useRiderStore(); // Get isOnline from store instead of parameter
+    const { isOnline } = useRiderStore();
     const { addDeliveryJob, removeDeliveryJob, updateOrderStatus, updateOrderRider, updateOrderETA } = useRealtimeStore();
     const queryClient = useQueryClient();
     
@@ -117,9 +117,10 @@ export const useSocket = () => {
     const reconnectAttempts = useRef(0);
     const maxReconnectAttempts = 5;
     const reconnectDelay = useRef(1000);
-    const socketCreationInProgress = useRef(false); // 🚀 NEW: Track socket creation
+    const socketCreationInProgress = useRef(false);
+    const socketInstanceRef = useRef<Socket | null>(null); // 🚀 NEW: Track socket instance
 
-    // 🚀 NEW: Get fresh token with refresh capability
+    // 🚀 FIXED: Simplified token validation
     const getValidToken = useCallback(async (): Promise<string | null> => {
         try {
             if (!tokens?.accessToken) {
@@ -127,35 +128,22 @@ export const useSocket = () => {
                 return null;
             }
 
-            // Try to use current token first
-            try {
-                // Simple validation - if token is malformed, it will fail
-                const payload = JSON.parse(atob(tokens.accessToken.split('.')[1]));
-                const now = Math.floor(Date.now() / 1000);
-                
-                // If token expires in less than 5 minutes, refresh it
-                if (payload.exp - now < 300) {
-                    console.log('🔄 Token expires soon, refreshing...');
-                    await refreshToken();
-                    // Get the new token after refresh
-                    const newTokens = useAuthStore.getState().tokens;
-                    return newTokens?.accessToken || null;
-                }
-                
-                return tokens.accessToken;
-            } catch (error) {
-                console.log('🔄 Token validation failed, refreshing...');
+            // Simple token check - just verify it exists and isn't empty
+            if (tokens.accessToken.length < 10) {
+                console.log('🔄 Token seems invalid, refreshing...');
                 await refreshToken();
                 const newTokens = useAuthStore.getState().tokens;
                 return newTokens?.accessToken || null;
             }
+            
+            return tokens.accessToken;
         } catch (error) {
             console.error('❌ Failed to get valid token:', error);
             return null;
         }
     }, [tokens?.accessToken, refreshToken]);
 
-    // 🚀 FIXED: Create socket connection without duplicate listeners
+    // 🚀 FIXED: Clean socket creation
     const createSocketConnection = useCallback(async () => {
         if (socketCreationInProgress.current) {
             console.log('⚠️ Socket creation already in progress, skipping...');
@@ -178,13 +166,16 @@ export const useSocket = () => {
                 auth: { token },
                 transports: ['websocket', 'polling'],
                 timeout: 10000,
-                reconnection: false,
+                reconnection: true, // 🚀 FIXED: Enable reconnection
+                reconnectionAttempts: 5,
+                reconnectionDelay: 1000,
+                reconnectionDelayMax: 5000,
                 forceNew: true
             });
 
             console.log('📡 Socket instance created');
             
-            // 🚀 FIXED: Set up listeners ONLY ONCE
+            // 🚀 FIXED: Set up listeners immediately
             setupSocketListeners(socketInstance);
             
             console.log('✅ Socket instance created successfully');
@@ -197,30 +188,33 @@ export const useSocket = () => {
         }
     }, [getValidToken]);
 
-    // 🚀 FIXED: Basic reconnection function without duplicate setupSocketListeners
+    // 🚀 FIXED: Simplified reconnection
     const attemptReconnection = useCallback(async () => {
-        console.log('🔄 Attempting reconnection...');
-        setTimeout(() => {
+        if (reconnectAttempts.current >= maxReconnectAttempts) {
+            console.log('❌ Max reconnection attempts reached');
+            return;
+        }
+
+        reconnectAttempts.current++;
+        console.log(`🔄 Reconnection attempt ${reconnectAttempts.current}/${maxReconnectAttempts}`);
+        
+        setTimeout(async () => {
             if (isOnline && !socket) {
-                createSocketConnection().then(socketInstance => {
-                    if (socketInstance) {
-                        // 🚀 FIXED: Don't call setupSocketListeners again - it's already called in createSocketConnection
-                        setSocket(socketInstance);
-                    }
-                });
+                const socketInstance = await createSocketConnection();
+                if (socketInstance) {
+                    setSocket(socketInstance);
+                    socketInstanceRef.current = socketInstance;
+                }
             }
-        }, 2000);
+        }, reconnectDelay.current);
     }, [isOnline, socket, createSocketConnection]);
 
-    // 🚀 FIXED: Consolidated socket event handling
+    // 🚀 FIXED: Clean listener setup
     const setupSocketListeners = useCallback((socketInstance: Socket) => {
         console.log('🔧 Setting up socket listeners for socket:', socketInstance.id);
         
-        // 🚀 FIXED: Check if listeners are already added BEFORE setting to false
-        if (listenersAdded.current) {
-            console.log('⚠️ Listeners already added, skipping...');
-            return;
-        }
+        // 🚀 FIXED: Reset listeners flag for new socket
+        listenersAdded.current = false;
 
         console.log('📡 Adding event listeners...');
         listenersAdded.current = true;
@@ -230,7 +224,7 @@ export const useSocket = () => {
             console.log(`🔍 Received event: ${eventName}`, args);
         });
 
-        // 🚀 FIXED: Single connection handler
+        // 🚀 FIXED: Connection handler
         socketInstance.on('connect', () => {
             console.log('🚀 Rider Socket connected:', socketInstance.id);
             setIsConnected(true);
@@ -248,20 +242,20 @@ export const useSocket = () => {
             }
         });
 
-        // 🚀 NEW: Add connection state change listener
+        // 🚀 FIXED: Disconnect handler
         socketInstance.on('disconnect', (reason) => {
             console.log('❌ Rider Socket disconnected:', reason);
             setIsConnected(false);
             setConnectionStatus('disconnected');
             
-            // Only attempt reconnection if rider is online
+            // Only attempt reconnection if rider is online and it's not a manual disconnect
             if (isOnline && reason !== 'io client disconnect') {
                 console.log('🔄 Attempting reconnection...');
                 attemptReconnection();
             }
         });
 
-        // 🚀 NEW: Add connection error handler
+        // 🚀 FIXED: Connection error handler
         socketInstance.on('connect_error', (error) => {
             console.error('❌ Socket connection error:', error);
             setIsConnected(false);
@@ -278,7 +272,7 @@ export const useSocket = () => {
             }
         });
 
-        // 🚀 NEW: Add reconnection attempt handler
+        // 🚀 FIXED: Reconnection handler
         socketInstance.on('reconnect_attempt', (attemptNumber) => {
             console.log(`🔄 Reconnection attempt ${attemptNumber}`);
             setConnectionStatus('reconnecting');
@@ -488,7 +482,7 @@ export const useSocket = () => {
         console.log('✅ Socket listeners setup complete');
     }, [isOnline, addDeliveryJob, removeDeliveryJob, getValidToken, attemptReconnection, updateOrderStatus, updateOrderRider, updateOrderETA, queryClient]);
 
-    // 🚀 FIXED: Remove duplicate setupSocketListeners call
+    // 🚀 FIXED: Main effect with proper cleanup
     useEffect(() => {
         let mounted = true;
 
@@ -498,6 +492,7 @@ export const useSocket = () => {
                 if (socket) {
                     socket.disconnect();
                     setSocket(null);
+                    socketInstanceRef.current = null;
                     setIsConnected(false);
                     setConnectionStatus('disconnected');
                 }
@@ -509,8 +504,8 @@ export const useSocket = () => {
                 try {
                     const socketInstance = await createSocketConnection();
                     if (socketInstance && mounted) {
-                        // 🚀 FIXED: Don't call setupSocketListeners again
                         setSocket(socketInstance);
+                        socketInstanceRef.current = socketInstance;
                     }
                 } catch (error) {
                     console.error('❌ Failed to create socket:', error);
@@ -522,8 +517,13 @@ export const useSocket = () => {
 
         return () => {
             mounted = false;
+            // Clean up socket on unmount
+            if (socketInstanceRef.current) {
+                socketInstanceRef.current.disconnect();
+                socketInstanceRef.current = null;
+            }
         };
-    }, [isOnline]);
+    }, [isOnline, createSocketConnection]);
 
     // 🚀 IMPROVED: Socket actions with better error handling
     const joinOrderRoom = useCallback((orderId: string) => {

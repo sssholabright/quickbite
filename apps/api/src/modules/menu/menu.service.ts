@@ -1,10 +1,8 @@
 import { UpdateMenuItemData, CategoryData } from './../../types/menu.js';
 import { logger } from './../../utils/logger.js';
 import { MenuItemData } from "../../types/menu.js";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../../config/db.js";
 import { CloudinaryService } from './../../services/cloudinary.service.js';
-
-const prisma = new PrismaClient();
 
 class MenuService {
     // Create a new menu item
@@ -216,7 +214,7 @@ class MenuService {
                 const referencedAddOns = await prisma.orderItemAddOn.findMany({
                     where: {
                         addOnId: {
-                            in: existingAddOns.map(addOn => addOn.id)
+                            in: existingAddOns.map((addOn: any) => addOn.id)
                         },
                         orderItem: {
                             order: {
@@ -229,15 +227,15 @@ class MenuService {
                     select: { addOnId: true }
                 });
 
-                const referencedAddOnIds = new Set(referencedAddOns.map(ref => ref.addOnId));
+                const referencedAddOnIds = new Set(referencedAddOns.map((ref: any) => ref.addOnId));
 
                 // Delete only add-ons that are not referenced by active orders
-                const addOnsToDelete = existingAddOns.filter(addOn => !referencedAddOnIds.has(addOn.id));
+                const addOnsToDelete = existingAddOns.filter((addOn: any) => !referencedAddOnIds.has(addOn.id));
                 if (addOnsToDelete.length > 0) {
                     await prisma.menuAddOn.deleteMany({
                         where: {
                             id: {
-                                in: addOnsToDelete.map(addOn => addOn.id)
+                                in: addOnsToDelete.map((addOn: any) => addOn.id)
                             }
                         }
                     });
@@ -313,7 +311,7 @@ class MenuService {
             });
 
             if (activeOrders.length > 0) {
-                const orderNumbers = activeOrders.map(item => item.order.orderNumber).join(', ');
+                const orderNumbers = activeOrders.map((item: any) => item.order.orderNumber).join(', ');
                 throw new Error(`Cannot delete menu item. It is referenced by active orders: ${orderNumbers}. Only items from delivered orders can be deleted.`);
             }
 
@@ -497,42 +495,69 @@ class MenuService {
     }
 
     // Public (customer) - List active vendors (optionally onlt those with avaialble items)
-    static async getCustomerVendors(filters?: {
-        search?: string;
-        hasAvailableItems?: boolean;
-    }) {
+    static async getCustomerVendors(filters?: { hasAvailableItems?: boolean }) {
         try {
-            const where: any = { isActive: true };
-
-            if (filters?.search) {
-                where.OR = [
-                    { businessName: { contains: filters.search, mode: 'insensitive' } },
-                    { description: { contains: filters.search, mode: 'insensitive' } }
-                ];
-            }
-
-            if (filters?.hasAvailableItems !== undefined) {
-                where.menuItems = { some: { isAvailable: true } };
-            }
-
             const vendors = await prisma.vendor.findMany({
-                where,
-                select: {
-                    id: true,
-                    businessName: true,
-                    description: true,
-                    logo: true,
-                    coverImage: true,
-                    rating: true,
-                    isOpen: true,
+                where: {
                     isActive: true,
+                    status: 'APPROVED',
+                    ...(filters?.hasAvailableItems && {
+                        menuItems: {
+                            some: {
+                                isAvailable: true
+                            }
+                        }
+                    })
                 },
-                orderBy: { businessName: 'asc' }
+                include: {
+                    user: {
+                        select: {
+                            id: true,
+                            name: true,
+                            email: true,
+                            phone: true,
+                            avatar: true
+                        }
+                    },
+                    categories: {
+                        select: {
+                            id: true,
+                            name: true,
+                            description: true,
+                            image: true
+                        }
+                    },
+                    _count: {
+                        select: {
+                            menuItems: {
+                                where: {
+                                    isAvailable: true
+                                }
+                            }
+                        }
+                    }
+                },
+                orderBy: {
+                    rating: 'desc'
+                }
             });
 
-            return vendors;
+            return vendors.map(vendor => ({
+                id: vendor.id,
+                businessName: vendor.businessName,
+                description: vendor.description,
+                logo: vendor.logo,
+                coverImage: vendor.coverImage,
+                rating: vendor.rating,
+                isOpen: vendor.isOpen,
+                latitude: vendor.latitude,
+                longitude: vendor.longitude,
+                categories: vendor.categories,
+                menuItemsCount: vendor._count.menuItems,
+                user: vendor.user
+            }));
         } catch (error) {
-            logger.error({error}, 'Error fetching vendors');
+            logger.error({ error }, 'Error fetching customer vendors');
             throw error;
         }
     }
@@ -603,6 +628,25 @@ class MenuService {
             return items;
         } catch (error) {
             logger.error({error}, 'Error fetching menu items');
+            throw error;
+        }
+    }
+
+    static async getAllCategories() {
+        try {
+            const categories = await prisma.category.findMany({
+                where: { isActive: true },
+                select: {
+                    id: true,
+                    name: true,
+                    isActive: true,
+                },
+                orderBy: { name: 'asc' }
+            });
+
+            return categories;
+        } catch (error) {
+            logger.error({error}, 'Error fetching all categories');
             throw error;
         }
     }

@@ -46,7 +46,13 @@ export default function LoginScreen() {
 			clearError();
 			await login({ email: v.email, password: v.password });
 		} catch (e: any) {
-			console.error("Login failed, Please try again")
+			console.error("Login failed:", e.message);
+			
+			// Show specific error message for role-based access
+			if (e.message.includes('not authorized for this app')) {
+				// You could show a specific UI here or navigate to a different screen
+				console.log('User tried to login with non-rider role');
+			}
 		} finally {
 			setLoading(false);
 		}

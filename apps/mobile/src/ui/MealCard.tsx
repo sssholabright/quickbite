@@ -3,9 +3,13 @@ import { MealCardProps } from "../types/vendor";
 import { useTheme } from "../theme/theme";
 import { Icon } from "../ui/Icon";
 
-export function MealCard({ meal, onPress, onAddToCart }: MealCardProps) {
+export function MealCard({ meal, onPress }: MealCardProps) {
     const theme = useTheme();
-  
+    
+    const formatNaira = (amount: number): string => {
+        return `₦${amount.toLocaleString('en-NG')}`
+    }
+
     return (
         <Pressable
             onPress={onPress}
@@ -16,7 +20,12 @@ export function MealCard({ meal, onPress, onAddToCart }: MealCardProps) {
                 width: 200,
                 overflow: "hidden",
                 borderWidth: 1,
-                borderColor: theme.colors.border
+                borderColor: theme.colors.border,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.1,
+                shadowRadius: 4,
+                elevation: 3,
             }}
         >
             <View style={{ position: "relative" }}>
@@ -40,6 +49,23 @@ export function MealCard({ meal, onPress, onAddToCart }: MealCardProps) {
                         </Text>
                     </View>
                 )}
+                
+                {/* Preparation Time Badge */}
+                {meal.preparationTime && (
+                    <View style={{
+                        position: "absolute",
+                        top: 8,
+                        right: 8,
+                        backgroundColor: "rgba(0,0,0,0.7)",
+                        paddingHorizontal: 6,
+                        paddingVertical: 2,
+                        borderRadius: 8
+                    }}>
+                        <Text style={{ color: "white", fontSize: 10, fontWeight: "600" }}>
+                            {meal.preparationTime}min
+                        </Text>
+                    </View>
+                )}
             </View>
             
             <View style={{ padding: 12 }}>
@@ -51,40 +77,55 @@ export function MealCard({ meal, onPress, onAddToCart }: MealCardProps) {
                 }}>
                     {meal.name}
                 </Text>
-                <Text style={{
-                    fontSize: 12,
-                    color: theme.colors.muted,
-                    marginBottom: 8
-                }}>
+                <Text 
+                    style={{
+                        fontSize: 12,
+                        color: theme.colors.muted,
+                        marginBottom: 8
+                    }}
+                    numberOfLines={2}
+                >
                     {meal.description}
                 </Text>
+                
+                {/* Vendor Info */}
+                {meal.vendorName && (
+                    <Text style={{
+                        fontSize: 10,
+                        color: theme.colors.muted,
+                        marginBottom: 4
+                    }}>
+                        by {meal.vendorName}
+                    </Text>
+                )}
+                
                 <Text style={{
                     fontSize: 16,
                     fontWeight: "700",
                     color: theme.colors.primary
                 }}>
-                    ${meal.price.toFixed(2)}
+                    {formatNaira(meal.price)}
                 </Text>
             </View>
         
-            {onAddToCart && (
-                <Pressable
-                    onPress={(e) => {
-                        e.stopPropagation();
-                        onAddToCart();
-                    }}
-                    style={{
-                        position: 'absolute',
-                        bottom: 8,
-                        right: 8,
-                        backgroundColor: theme.colors.primary,
-                        borderRadius: 16,
-                        padding: 8,
-                    }}
-                >
-                    <Icon name="add" size={16} color="white" />
-                </Pressable>
-            )}
+            {/* View Menu Button */}
+            <View style={{
+                position: 'absolute',
+                bottom: 8,
+                right: 8,
+                backgroundColor: theme.colors.primary,
+                borderRadius: 16,
+                paddingHorizontal: 12,
+                paddingVertical: 6
+            }}>
+                <Text style={{
+                    color: "white",
+                    fontSize: 12,
+                    fontWeight: "600"
+                }}>
+                    View Menu
+                </Text>
+            </View>
         </Pressable>
     );
 }

@@ -119,10 +119,10 @@ export class DashboardService {
             ]);
 
             // Calculate order status counts for today
-            const pendingOrdersToday = orderStatusCounts.find(o => o.status === 'PENDING')?._count.status || 0;
-            const deliveredOrdersToday = orderStatusCounts.find(o => o.status === 'DELIVERED')?._count.status || 0;
-            const readyForPickupToday = orderStatusCounts.find(o => o.status === 'READY_FOR_PICKUP')?._count.status || 0;
-            const cancelledOrdersToday = orderStatusCounts.find(o => o.status === 'CANCELLED')?._count.status || 0;
+            const pendingOrdersToday = orderStatusCounts.find((o: any) => o.status === 'PENDING')?._count.status || 0;
+            const deliveredOrdersToday = orderStatusCounts.find((o: any) => o.status === 'DELIVERED')?._count.status || 0;
+            const readyForPickupToday = orderStatusCounts.find((o: any) => o.status === 'READY_FOR_PICKUP')?._count.status || 0;
+            const cancelledOrdersToday = orderStatusCounts.find((o: any) => o.status === 'CANCELLED')?._count.status || 0;
 
             // Calculate derived stats
             const revenue = totalRevenue._sum.total || 0;
@@ -184,7 +184,7 @@ export class DashboardService {
             });
 
             // Convert orders to activity feed items
-            const activityItems: ActivityFeedItem[] = recentOrders.map(order => {
+            const activityItems: ActivityFeedItem[] = recentOrders.map((order: any) => {
                 let message = '';
                 let type: ActivityFeedItem['type'] = 'order';
 
@@ -298,15 +298,15 @@ export class DashboardService {
                 })
             ]);
 
-            const completedOrders = orderStatusCounts.find(o => o.status === 'DELIVERED')?._count.status || 0;
-            const cancelledOrders = orderStatusCounts.find(o => o.status === 'CANCELLED')?._count.status || 0;
-            const pendingOrders = orderStatusCounts.find(o => o.status === 'PENDING')?._count.status || 0;
+            const completedOrders = orderStatusCounts.find((o: any) => o.status === 'DELIVERED')?._count.status || 0;
+            const cancelledOrders = orderStatusCounts.find((o: any) => o.status === 'CANCELLED')?._count.status || 0;
+            const pendingOrders = orderStatusCounts.find((o: any) => o.status === 'PENDING')?._count.status || 0;
 
             const revenue = totalRevenue._sum.total || 0;
             const averageOrderValue = completedOrders > 0 ? revenue / completedOrders : 0;
             const completionRate = totalOrders > 0 ? (completedOrders / totalOrders) * 100 : 0;
 
-            const ordersByStatus = orderStatusCounts.map(item => ({
+            const ordersByStatus = orderStatusCounts.map((item: any) => ({
                 status: item.status,
                 count: item._count.status,
                 percentage: totalOrders > 0 ? (item._count.status / totalOrders) * 100 : 0

@@ -17,7 +17,7 @@ export class RiderService {
     static async updateRiderStatus(userId: string, updateData: UpdateRiderStatusData): Promise<any> {
         try {
             // Use transaction to ensure atomic update
-            const updatedRider = await prisma.$transaction(async (tx) => {
+            const updatedRider = await prisma.$transaction(async (tx: any) => {
                 // Check if rider exists
                 const existingRider = await tx.rider.findUnique({
                     where: { userId },

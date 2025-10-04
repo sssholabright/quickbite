@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { Prisma } from '@prisma/client';
+import { PrismaClientKnownRequestError, PrismaClientValidationError } from '@prisma/client/runtime/library';
 import { ZodError } from 'zod';
 import { ResponseHandler } from '../utils/response.js';
 import { logger } from '../utils/logger.js';
@@ -63,8 +63,9 @@ export const errorHandler = (
         return ResponseHandler.validationError(res, message, JSON.stringify(validationErrors));
     }
 
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-        switch (error.code) {
+    if (error instanceof PrismaClientKnownRequestError) {
+        const prismaError = error as PrismaClientKnownRequestError;
+        switch (prismaError.code) {
             case 'P2002':
                 statusCode = 409;
                 message = 'Resource already exists';
@@ -83,7 +84,7 @@ export const errorHandler = (
             }
     }
 
-    if (error instanceof Prisma.PrismaClientValidationError) {
+    if (error instanceof PrismaClientValidationError) {
         statusCode = 400;
         message = 'Invalid data provided';
     }

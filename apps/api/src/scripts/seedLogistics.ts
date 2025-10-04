@@ -1,4 +1,3 @@
-import { VehicleType } from '@prisma/client';
 import { PasswordService } from '../utils/password.js';
 import { PrismaClient } from '@prisma/client';
 
@@ -88,7 +87,7 @@ async function main() {
                 create: {
                     userId: user.id,
                     companyId: company?.id || null,
-                    vehicleType: randomVehicleType as VehicleType,
+                    vehicleType: randomVehicleType as any,
                     isOnline: Math.random() > 0.5, // Random online status
                     isAvailable: Math.random() > 0.3,
                     earnings: Math.floor(Math.random() * 50000) + 10000,

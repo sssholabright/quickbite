@@ -10,25 +10,19 @@ export function CategoryChip({ category, isSelected, onPress }: CategoryChipProp
         <Pressable
             onPress={onPress}
             style={{
-                backgroundColor: isSelected ? category.color : theme.colors.surface,
+                backgroundColor: isSelected ? category.color : `${category.color}20`, // 20% opacity when not selected
                 paddingHorizontal: 16,
-                paddingVertical: 4,
+                paddingVertical: 8,
                 borderRadius: 20,
                 marginRight: 6,
                 flexDirection: "row",
                 alignItems: "center",
                 borderWidth: 1,
-                borderColor: isSelected ? category.color : theme.colors.border
+                borderColor: category.color
             }}
         >
-            <Icon 
-                name={category.icon} 
-                size={14} 
-                color={isSelected ? "white" : category.color} 
-                style={{ marginRight: 6 }}
-            />
             <Text style={{
-                color: isSelected ? "white" : theme.colors.text,
+                color: isSelected ? "white" : category.color,
                 fontWeight: isSelected ? "600" : "500",
                 fontSize: 12
             }}>

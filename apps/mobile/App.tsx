@@ -1,8 +1,8 @@
 import "react-native-gesture-handler";
+import React, { useEffect } from 'react';
 import RootNavigator from "./src/navigation/RootNavigator";
 import { QueryProvider } from "./src/providers/QueryProvider";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuthStore } from './src/stores/auth';

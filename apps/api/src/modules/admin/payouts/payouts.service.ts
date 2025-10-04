@@ -1,4 +1,4 @@
-import { PrismaClient, PayoutStatus, PayoutRecipient } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 import { PayoutsListParams, PayoutsListResponse, PayoutDetails, CreatePayoutRequest, UpdatePayoutRequest, WalletsListParams, WalletsListResponse, ActionResponse, PayoutListItem } from '../../../types/admin/payouts.js';
 import { CustomError } from '../../../middlewares/errorHandler.js';
 
@@ -57,12 +57,12 @@ export class PayoutsService {
         });
 
         // Get recipient details for each payout
-        const data = await Promise.all(payouts.map(async (payout) => {
+        const data = await Promise.all(payouts.map(async (payout: any) => {
             let recipientName = '';
             let recipientEmail = '';
             let recipientPhone = '';
 
-            if (payout.recipientType === PayoutRecipient.VENDOR) {
+            if (payout.recipientType === 'VENDOR') {
                 const vendor = await prisma.vendor.findUnique({
                     where: { id: payout.recipientId },
                     include: { user: true }
@@ -70,7 +70,7 @@ export class PayoutsService {
                 recipientName = vendor?.user.name || 'Unknown Vendor';
                 recipientEmail = vendor?.user.email || '';
                 recipientPhone = vendor?.user.phone || '';
-            } else if (payout.recipientType === PayoutRecipient.RIDER) {
+            } else if (payout.recipientType === 'RIDER') {
                 const rider = await prisma.rider.findUnique({
                     where: { id: payout.recipientId },
                     include: { user: true }
@@ -127,11 +127,11 @@ export class PayoutsService {
         const summary = {
             totalAmount: summaryData._sum.amount || 0,
             totalPayouts: summaryData._count.id || 0,
-            successfulAmount: statusSummary.find(s => s.status === PayoutStatus.SUCCESS)?._sum.amount || 0,
-            failedAmount: statusSummary.find(s => s.status === PayoutStatus.FAILED)?._sum.amount || 0,
-            pendingAmount: statusSummary.find(s => s.status === PayoutStatus.PENDING)?._sum.amount || 0,
+            successfulAmount: statusSummary.find((s: any) => s.status === 'SUCCESS')?._sum.amount || 0,
+            failedAmount: statusSummary.find((s: any) => s.status === 'FAILED')?._sum.amount || 0,
+            pendingAmount: statusSummary.find((s: any) => s.status === 'PENDING')?._sum.amount || 0,
             successRate: summaryData._count.id > 0 
-                ? ((statusSummary.find(s => s.status === PayoutStatus.SUCCESS)?._count.id || 0) / summaryData._count.id) * 100 
+                ? ((statusSummary.find((s: any) => s.status === 'SUCCESS')?._count.id || 0) / summaryData._count.id) * 100 
                 : 0
         };
 
@@ -200,7 +200,7 @@ export class PayoutsService {
                 ...(recipientType === 'VENDOR' && { take: limit })
             });
 
-            vendorWallets = vendors.map(wallet => ({
+            vendorWallets = vendors.map((wallet: any) => ({
                 id: wallet.id,
                 recipientType: 'VENDOR' as const,
                 recipientId: wallet.vendorId,
@@ -268,7 +268,7 @@ export class PayoutsService {
                 ...(recipientType === 'RIDER' && { take: limit })
             });
 
-            riderWallets = riders.map(wallet => ({
+            riderWallets = riders.map((wallet: any) => ({
                 id: wallet.id,
                 recipientType: 'RIDER' as const,
                 recipientId: wallet.riderId,
@@ -366,11 +366,11 @@ export class PayoutsService {
         // Create payout
         const payout = await prisma.payout.create({
             data: {
-                recipientType: recipientType as PayoutRecipient,
+                recipientType: recipientType as any,
                 recipientId,
                 amount,
                 currency: 'NGN',
-                status: PayoutStatus.PENDING,
+                status: 'PENDING',
                 bankDetails,
                 initiatedBy: adminId,
                 description: request.description || null,
@@ -446,7 +446,7 @@ export class PayoutsService {
         let recipient;
         let wallet;
 
-        if (payout.recipientType === PayoutRecipient.VENDOR) {
+        if (payout.recipientType === 'VENDOR') {
             const vendorWallet = await prisma.vendorWallet.findUnique({
                 where: { vendorId: payout.recipientId },
                 include: {
@@ -551,7 +551,7 @@ export class PayoutsService {
 
             if (!payout) return;
 
-            const status = success ? PayoutStatus.SUCCESS : PayoutStatus.FAILED;
+            const status = success ? 'SUCCESS' : 'FAILED';
 
             await prisma.payout.update({
                 where: { id: payoutId },
@@ -570,7 +570,7 @@ export class PayoutsService {
 
             // Update wallet if successful
             if (success) {
-                if (payout.recipientType === PayoutRecipient.VENDOR) {
+                if (payout.recipientType === 'VENDOR') {
                     await prisma.vendorWallet.update({
                         where: { vendorId: payout.recipientId },
                         data: {
@@ -591,7 +591,7 @@ export class PayoutsService {
                 }
             } else {
                 // Return money to current balance if failed
-                if (payout.recipientType === PayoutRecipient.VENDOR) {
+                if (payout.recipientType === 'VENDOR') {
                     await prisma.vendorWallet.update({
                         where: { vendorId: payout.recipientId },
                         data: {

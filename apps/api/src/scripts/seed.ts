@@ -1,4 +1,4 @@
-import { PrismaClient, AddOnCategory } from '@prisma/client'
+import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
@@ -120,7 +120,7 @@ async function main() {
                         price: 800,
                         isRequired: false,
                         maxQuantity: 2,
-                        category: AddOnCategory.EXTRA
+                        category: 'EXTRA'
                     },
                     {
                         name: 'Extra Rice',
@@ -128,7 +128,7 @@ async function main() {
                         price: 500,
                         isRequired: false,
                         maxQuantity: 1,
-                        category: AddOnCategory.SIZE
+                        category: 'SIZE'
                     }
                 ]
             },
@@ -146,7 +146,7 @@ async function main() {
                         price: 600,
                         isRequired: false,
                         maxQuantity: 2,
-                        category: AddOnCategory.EXTRA
+                        category: 'EXTRA'
                     }
                 ]
             },
@@ -173,7 +173,7 @@ async function main() {
                         price: 100,
                         isRequired: false,
                         maxQuantity: 3,
-                        category: AddOnCategory.CUSTOMIZATION
+                        category: 'CUSTOMIZATION'
                     }
                 ]
             }
