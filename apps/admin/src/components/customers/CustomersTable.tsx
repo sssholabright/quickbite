@@ -64,7 +64,6 @@ const CustomersTable: React.FC<CustomersTableProps> = ({
     };
 
     const handleSort = (field: 'name' | 'createdAt' | 'totalOrders' | 'totalSpent' | 'avgOrderValue') => {
-        // For now, just toggle between asc and desc
         onSort(field as any, 'desc');
     };
 

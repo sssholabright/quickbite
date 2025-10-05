@@ -8,13 +8,13 @@ import { redisService } from './config/redis.js';
 import { QueueService } from './modules/queues/queue.service.js';
 import { DeliveryJobService } from './modules/delivery/deliveryJob.service.js';
 
-// Create HTTP server
+// Create server
 const server = createServer(app);
 
-// Initialize Socket.IO with our custom manager
+// Initialize Socket.IO
 const socketManager = initializeSocket(server);
 
-// 🚀 FIXED: Set socket manager globally
+// Set socket manager globally
 setSocketManager(socketManager);
 logger.info('📡 Socket manager initialized and set globally');
 
@@ -45,7 +45,7 @@ const PORT = Number(env.PORT);
 
 server.listen(PORT, async () => {
     try {
-        // Initialize Redis connection
+        // Initialize Redis
         await redisService.connect();
         logger.info('🔴 Redis connected successfully');
         
@@ -53,11 +53,11 @@ server.listen(PORT, async () => {
         const queue = QueueService.getInstance();
         logger.info('📋 Queue service initialized successfully');
 
-        // After database connection is established
+        // Load delivery queue from database
         await DeliveryJobService.loadQueueFromDatabase();
         logger.info('🔔 Delivery queue loaded from database successfully');
         
-        // 🚀 REMOVED: Notification queue service (web-only, not needed for mobile)
+        // Notification queue service (web-only, not needed for mobile)
         logger.info('🔔 Unified notification service ready (mobile: socket+FCM, web: socket+queue)');
         
         logger.info(`🚀 Server running on port ${PORT}`);

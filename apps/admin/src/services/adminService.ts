@@ -7,9 +7,9 @@ class AdminService {
     async login(credentials: AdminLoginCredentials): Promise<AdminAuthResult> {
         try {
             const response = await api.post<ApiResponse<AdminAuthResult>>('/login', credentials, {
-                headers: {
-                    'X-App-Type': 'admin'
-                }
+                // headers: {
+                //     'X-App-Type': 'admin'
+                // }
             })
             const { user, tokens } = response.data.data as AdminAuthResult
 

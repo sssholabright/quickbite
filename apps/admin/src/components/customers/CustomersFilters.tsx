@@ -47,7 +47,6 @@ const CustomersFilters: React.FC<CustomersFiltersProps> = ({ filters, onFiltersC
         };
         setDateRange(newDateRange);
 
-        // Only apply filter if both dates are set
         if (newDateRange.start && newDateRange.end) {
             onFiltersChange({
                 ...filters,

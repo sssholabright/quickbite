@@ -26,12 +26,10 @@
             "@/*": ["./src/*"]
         },
 
-        /* Additional options to fix React type issues */
         "allowSyntheticDefaultImports": true,
         "esModuleInterop": true,
         "forceConsistentCasingInFileNames": true,
         
-        /* Fix for react-icons compatibility */
         "types": ["vite/client", "react", "react-dom"],
         "moduleResolution": "node"
     },

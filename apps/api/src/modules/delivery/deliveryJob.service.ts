@@ -78,7 +78,7 @@ export class DeliveryJobService {
 
             logger.info(`✅ Order ${orderId} added to database queue (position ${nextPosition})`);
 
-            // 🚀 FIXED: Only start processing if this is the first order in queue
+            // Only start processing if this is the first order in queue
             const queueLength = await this.getQueueLength();
             if (queueLength === 1) {
                 logger.info(`🚀 Starting queue processing for first order ${orderId}`);
@@ -93,9 +93,8 @@ export class DeliveryJobService {
         }
     }
 
-    /**
-     * 🚀 UPDATED: Process database queue
-     */
+    
+    // Process database queue
     private static async processQueue(): Promise<void> {
         if (this.isProcessing) {
             logger.info(`⏸️ Already processing queue`);
@@ -122,7 +121,7 @@ export class DeliveryJobService {
         logger.info(`🚀 Processing database FIFO queue (${queueLength} orders)`);
 
         try {
-            // 🚀 FIXED: Only process if no order is currently broadcasting
+            // Only process if no order is currently broadcasting
             const broadcastingOrder = await prisma.deliveryQueue.findFirst({
                 where: { status: 'BROADCASTING' }
             });
@@ -197,7 +196,7 @@ export class DeliveryJobService {
     }
 
     /**
-     * 🚀 NEW: Get queue length from database
+     * Get queue length from database
      */
     private static async getQueueLength(): Promise<number> {
         return await prisma.deliveryQueue.count({
@@ -208,7 +207,7 @@ export class DeliveryJobService {
     }
 
     /**
-     * 🚀 UPDATED: Handle rider acceptance
+     * Handle rider acceptance
      */
     public static async handleRiderAcceptsOrder(orderId: string, riderId: string): Promise<void> {
         try {
@@ -258,7 +257,7 @@ export class DeliveryJobService {
     }
 
     /**
-     * 🚀 UPDATED: Handle rider rejection
+     * Handle rider rejection
      */
     public static async handleRiderRejectsOrder(orderId: string, riderId: string): Promise<void> {
         try {
@@ -289,7 +288,7 @@ export class DeliveryJobService {
     }
 
     /**
-     * 🚀 UPDATED: Handle job timeout
+     * Handle job timeout
      */
     private static async handleJobTimeout(orderId: string): Promise<void> {
         try {
@@ -345,7 +344,7 @@ export class DeliveryJobService {
     }
 
     /**
-     * 🚀 NEW: Load queue from database on startup
+     * Load queue from database on startup
      */
     public static async loadQueueFromDatabase(): Promise<void> {
         try {
@@ -382,7 +381,7 @@ export class DeliveryJobService {
     }
 
     /**
-     * 🚀 UPDATED: Get queue status from database
+     * Get queue status from database
      */
     public static async getStatus(): Promise<any> {
         const queueItems = await prisma.deliveryQueue.findMany({
@@ -422,7 +421,7 @@ export class DeliveryJobService {
     }
 
     /**
-     * 🚀 DEBUG: Log current state
+     * Log current state
      */
     public static debugStatus(): void {
         this.getStatus().then(status => {
@@ -431,7 +430,7 @@ export class DeliveryJobService {
     }
 
     /**
-     * 🚀 HELPER: Find available riders (online and not assigned)
+     * Find available riders (online and not assigned)
     */
     private static async findAvailableRiders(): Promise<any[]> {
         try {
@@ -478,7 +477,7 @@ export class DeliveryJobService {
     }
 
     /**
-     * 🚀 HELPER: Broadcast order to available riders
+     * Broadcast order to available riders
      */
     private static async broadcastToRiders(queueItem: any, riders: any[]): Promise<void> {
         try {
@@ -519,7 +518,7 @@ export class DeliveryJobService {
     }
 
     /**
-     * 🚀 MAIN: Trigger queue processing when rider comes online
+     * Trigger queue processing when rider comes online
      */
     public static async onRiderComesOnline(): Promise<void> {
         logger.info(`🚀 Rider came online, triggering queue processing`);
@@ -527,7 +526,7 @@ export class DeliveryJobService {
     }
 
     /**
-     * 🚀 LEGACY: Keep for backward compatibility
+     * Keep for backward compatibility
      */
     public static async broadcastDeliveryJob(jobData: any, socketManager?: any): Promise<void> {
         // Convert to new system

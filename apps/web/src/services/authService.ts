@@ -7,9 +7,9 @@ class AuthService {
     async login(credentials: LoginCredentials): Promise<AuthResult> {
         try {
             const response = await api.post<ApiResponse<AuthResult>>('/auth/login', credentials, {
-                headers: {
-                    'X-App-Type': 'vendor'
-                }
+                // headers: {
+                //     'X-App-Type': 'vendor'
+                // }
             })
             const { user, tokens } = response.data.data as AuthResult
 

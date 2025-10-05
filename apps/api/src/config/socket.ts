@@ -99,14 +99,14 @@ export class SocketService {
             SocketService.debugCounter++;
             console.log(`🔍 DEBUG: Socket connection #${SocketService.debugCounter} - ID: ${socket.id}, User: ${socket.userId}, Role: ${socket.userRole}`);
     
-            // 🚀 CLEAN: Join role-specific rooms (authentication only)
+            // Join role-specific rooms (authentication only)
             if (socket.userRole === 'VENDOR' && socket.vendorId) {
                 socket.join(`vendor:${socket.vendorId}`);
                 socket.join('vendors');
                 socket.join(`vendor_orders:${socket.vendorId}`);
                 logger.info(`Vendor ${socket.vendorId} joined vendor rooms`);
                 
-                // 🚀 DELIVER PENDING NOTIFICATIONS (Web users only)
+                // DELIVER PENDING NOTIFICATIONS (Web users only)
                 try {
                     const { notificationQueueService } = await import('../services/notificationQueue.service.js');
                     await notificationQueueService.deliverPendingNotifications('vendor', socket.vendorId);
@@ -120,11 +120,11 @@ export class SocketService {
                 socket.join('customers');
                 logger.info(`Customer ${socket.customerId} joined customer rooms`);
                 
-                // 🚀 REMOVED: No pending notifications for mobile users (they use direct socket events)
+                // No pending notifications for mobile users (they use direct socket events)
                 logger.info(`📱 Customer ${socket.customerId} connected - using direct socket events`);
                 
             } else if (socket.userRole === 'RIDER' && socket.riderId) {
-                // 🚀 CRITICAL FIX: Check if rider already has active connections
+                // Check if rider already has active connections
                 const existingSockets = this.connectedRiders.get(socket.riderId) || [];
                 console.log(`🔍 DEBUG: Processing rider connection for ${socket.riderId}`);
                 console.log(`🔍 DEBUG: Existing sockets for rider ${socket.riderId}: ${existingSockets.length}`);
@@ -132,7 +132,7 @@ export class SocketService {
                 
                 if (existingSockets.length > 0) {
                     logger.warn(`🚫 Rider ${socket.riderId} already has ${existingSockets.length} active connections, disconnecting duplicate`);
-                    // 🚀 CRITICAL: Disconnect the duplicate socket immediately
+                    // Disconnect the duplicate socket immediately
                     socket.disconnect(true);
                     return;
                 }
@@ -152,7 +152,7 @@ export class SocketService {
                 logger.info(`Admin ${socket.userId} joined admin room`);
             }
 
-            // 🚀 CLEAN: Handle rider status changes - delegate to EventManager
+            // Handle rider status changes - delegate to EventManager
             socket.on('rider_status_change', async (data) => {
                 try {
                     const { isOnline } = data;
@@ -160,10 +160,10 @@ export class SocketService {
                     if (socket.userRole === 'RIDER' && socket.riderId) {
                         logger.info(`📡 Socket: Rider ${socket.riderId} status change - Online: ${isOnline}`);
                         
-                        // 🚀 DELEGATE: All business logic goes to EventManager
+                        // All business logic goes to EventManager
                         await EventManagerService.handleRiderStatusChange(socket.riderId, isOnline);
                         
-                        // 🚀 CLEAN: Only handle room management here
+                        // Only handle room management here
                         if (!isOnline) {
                             socket.leave('riders');
                             logger.info(`Rider ${socket.riderId} left 'riders' room due to going offline`);
@@ -177,7 +177,7 @@ export class SocketService {
                 }
             });
 
-            // 🚀 CLEAN: Handle order events - delegate to EventManager
+            // Handle order events - delegate to EventManager
             socket.on('order_status_change', async (data) => {
                 try {
                     const { orderId, status, riderId } = data;
@@ -185,7 +185,7 @@ export class SocketService {
                     if (socket.userRole === 'RIDER' && socket.riderId) {
                         logger.info(`📡 Socket: Order ${orderId} status change - Status: ${status}`);
                         
-                        // 🚀 DELEGATE: All business logic goes to EventManager
+                        // All business logic goes to EventManager
                         await EventManagerService.handleOrderStatusChange(orderId, status, riderId);
                     }
                 } catch (error) {
@@ -193,7 +193,7 @@ export class SocketService {
                 }
             });
 
-            // 🚀 CLEAN: Handle rider job acceptance/rejection - delegate to EventManager
+            // Handle rider job acceptance/rejection - delegate to EventManager
             socket.on('delivery_job_response', async (data) => {
                 try {
                     const { orderId, response, riderId } = data; // response: 'accept' | 'reject'
@@ -201,7 +201,7 @@ export class SocketService {
                     if (socket.userRole === 'RIDER' && socket.riderId) {
                         logger.info(`📡 Socket: Rider ${riderId} ${response}ed order ${orderId}`);
                         
-                        // 🚀 DELEGATE: All business logic goes to EventManager
+                        // All business logic goes to EventManager
                         if (response === 'accept') {
                             await EventManagerService.handleRiderAcceptsOrder(orderId, riderId);
                         } else if (response === 'reject') {
@@ -213,11 +213,11 @@ export class SocketService {
                 }
             });
 
-            // 🚀 CLEAN: Handle disconnect - only update connection tracking
+            // Handle disconnect - only update connection tracking
             socket.on('disconnect', async () => {
                 logger.info(`Socket disconnected: ${socket.id}`);
                 
-                // 🚀 CLEAN: Only handle connection cleanup
+                // Only handle connection cleanup
                 if (socket.userRole === 'RIDER' && socket.riderId) {
                     try {
                         // Set rider as offline when they disconnect
@@ -258,7 +258,7 @@ export class SocketService {
         });
     }
 
-    // 🚀 CLEAN: Socket utility methods only
+    // Socket utility methods only
     emitToVendor(vendorId: string, event: string, data: any): void {
         this.io.to(`vendor:${vendorId}`).emit(event, data);
     }
@@ -321,13 +321,13 @@ export class SocketService {
     }
 }
 
-// 🚀 CLEAN: Simple initialization function
+// Simple initialization function
 export const initializeSocket = (server: HTTPServer): SocketService => {
     const socketManager = new SocketService(server);
     return socketManager;
 };
 
-// 🚀 CLEAN: Simple getter function
+// Simple getter function
 let socketManager: SocketService | null = null;
 
 export const getSocketManager = (): SocketService => {

@@ -290,7 +290,7 @@ pnpm docker:all
 
 ## 👨‍💻 Author
 
-**Bright** — Senior Full-Stack Developer & Technical Architect
+**Mujeeb Adejobi (Bright)** — Senior Full-Stack Developer & Technical Architect
 
 **Expertise**: React, React Native, Node.js, PostgreSQL, TypeScript, System Architecture, Enterprise Development
 

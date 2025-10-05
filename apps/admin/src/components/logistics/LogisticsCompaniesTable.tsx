@@ -381,8 +381,6 @@ export default function LogisticsCompaniesTable({
                     }}
                     company={companies.find(c => c.id === selectedCompanyId) || null}
                     onSuccess={() => {
-                        // No direct refetch here, as this is a modal.
-                        // The table will re-render with the updated data on next render.
                         setShowEditModal(false);
                     }}
                 />

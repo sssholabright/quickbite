@@ -202,7 +202,7 @@ export class LocationService {
     }
 
     /**
-     * Get rider's location history - FIXED: Use proper list operations
+     * Get rider's location history - Use proper list operations
      * Real-world: For showing route trail on customer's map
      */
     static async getRiderLocationHistory(riderId: string, limit: number = 20): Promise<any[]> {
