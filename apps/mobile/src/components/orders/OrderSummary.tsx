@@ -1,4 +1,4 @@
-import { Text, View } from "react-native";
+import { Image, Text, View } from "react-native";
 import { useTheme } from "../../theme/theme";
 import { Icon } from "../../ui/Icon";
 import { OrderSummaryProps } from "../../types/order";
@@ -37,15 +37,19 @@ export default function OrderSummary({ items, vendor, total}: OrderSummaryProps)
                 borderBottomColor: theme.colors.border,
             }}>
                 <View style={{
-                    width: 40,
-                    height: 40,
+                    width: 50,
+                    height: 50,
                     borderRadius: 8,
                     backgroundColor: theme.colors.background,
                     alignItems: 'center',
                     justifyContent: 'center',
                     marginRight: 12,
                 }}>
-                    <Icon name="restaurant" size={20} color={theme.colors.primary} />
+                    {vendor.logo ? (
+                        <Image source={{ uri: vendor.logo }} style={{ width: 40, height: 40, borderRadius: 8 }} />
+                    ) : (
+                        <Icon name="restaurant" size={20} color={theme.colors.primary} />
+                    )}
                 </View>
                 <View style={{ flex: 1 }}>
                     <Text style={{

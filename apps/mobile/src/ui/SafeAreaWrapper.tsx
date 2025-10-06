@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import { SafeAreaView, StatusBar, Platform } from "react-native";
+import { SafeAreaView, StatusBar, Platform, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "../theme/theme";
 
@@ -24,6 +24,7 @@ export function SafeAreaWrapper({
     const insets = useSafeAreaInsets();
     
     const bgColor = backgroundColor || theme.colors.background;
+    // If statusBarBackgroundColor is provided, use it; otherwise use bgColor
     const statusBarBg = statusBarBackgroundColor || bgColor;
     
     // Auto-determine status bar style based on theme
@@ -44,19 +45,22 @@ export function SafeAreaWrapper({
                 barStyle={getStatusBarStyle()}
                 backgroundColor={statusBarBg}
                 translucent={false}
+                animated={true}
             />
-            <SafeAreaView
-                style={{
-                    flex: 1,
-                    backgroundColor: bgColor,
-                    paddingTop: effectiveEdges.includes("top") ? insets.top : 0,
-                    paddingBottom: effectiveEdges.includes("bottom") ? insets.bottom : 0,
-                    paddingLeft: effectiveEdges.includes("left") ? insets.left : 0,
-                    paddingRight: effectiveEdges.includes("right") ? insets.right : 0,
-                }}
-            >
-                {children}
-            </SafeAreaView>
+            <View style={{ flex: 1, backgroundColor: statusBarBg }}>
+                <SafeAreaView
+                    style={{
+                        flex: 1,
+                        backgroundColor: bgColor,
+                        paddingTop: effectiveEdges.includes("top") ? insets.top : 0,
+                        paddingBottom: effectiveEdges.includes("bottom") ? insets.bottom : 0,
+                        paddingLeft: effectiveEdges.includes("left") ? insets.left : 0,
+                        paddingRight: effectiveEdges.includes("right") ? insets.right : 0,
+                    }}
+                >
+                    {children}
+                </SafeAreaView>
+            </View>
         </>
     )
 }

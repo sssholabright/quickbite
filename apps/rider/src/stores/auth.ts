@@ -78,9 +78,6 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
         try {
             set({ isLoading: true });
             
-            // Call logout API
-            // await AuthService.logout();
-            
             // Clear stored tokens
             await SecureStore.deleteItemAsync('access_token');
             await SecureStore.deleteItemAsync('refresh_token');

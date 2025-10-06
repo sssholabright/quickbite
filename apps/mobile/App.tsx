@@ -1,9 +1,7 @@
-import "react-native-gesture-handler";
 import React, { useEffect } from 'react';
 import RootNavigator from "./src/navigation/RootNavigator";
 import { QueryProvider } from "./src/providers/QueryProvider";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuthStore } from './src/stores/auth';
 import { useSocket } from './src/hooks/useSocket';
@@ -13,7 +11,8 @@ import { useLocationStore } from './src/stores/location';
 const queryClient = new QueryClient();
 
 function AppContent() {
-  const { hydrate } = useAuthStore();
+  // 🚀 FIXED: Remove manual hydration - let Zustand handle it
+  // const { hydrate } = useAuthStore();
   const { initializeNotifications } = useCustomerStore();
   const { checkLocationStatus, requestLocationPermission } = useLocationStore();
   
@@ -21,13 +20,13 @@ function AppContent() {
   useSocket();
 
   useEffect(() => {
-    // Hydrate auth store and initialize notifications
-    hydrate();
+    // 🚀 FIXED: Remove manual hydration - let Zustand handle it
+    // hydrate();
     initializeNotifications();
     
     // 🚀 ENHANCED: Auto-request location permission on app start
     initializeLocation();
-  }, [hydrate, initializeNotifications]);
+  }, [initializeNotifications]); // Remove hydrate from dependencies
 
   // 🚀 ENHANCED: Auto-request location permission
   const initializeLocation = async () => {
@@ -54,7 +53,6 @@ function AppContent() {
 
   return (
     <>
-      <StatusBar style="auto" />
       <RootNavigator />
     </>
   );

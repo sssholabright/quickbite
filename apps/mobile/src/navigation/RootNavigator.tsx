@@ -4,7 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { linking } from './Linking';
 import { useAuthStore } from '../stores/auth';
-import { useLocationStore, useIsLocationReady } from '../stores/location';
+import { useLocationStore } from '../stores/location';
 import LoginScreen from '../screens/auth/LoginScreen';
 import HomeScreen from '../screens/home/HomeScreen';
 import OrdersScreen from '../screens/order/OrdersScreen';
@@ -31,11 +31,11 @@ import EditProfileScreen from '../screens/profile/EditProfileScreen';
 import ChangePasswordScreen from '../screens/profile/ChangePassword';
 import SupportScreen from '../screens/profile/SupportScreen';
 import LegalScreen from '../screens/profile/LegalScreen';
-import { useThemeStore } from '../stores/theme';
 import LocationPermissionScreen from '../screens/auth/LocationPermissionScreen';
 import notificationService from '../services/notificationService';
 import { SocketProvider } from '../providers/SocketProvider';
 import UnauthorizedScreen from '../screens/auth/UnauthorizedScreen';
+import { useRealtimeStore } from '../stores/realtime';
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
@@ -70,7 +70,63 @@ function AuthStackNavigator() {
 
 function AppTabs() {
 	const theme = useTheme();
+	const { user } = useAuthStore();
 	const insets = useSafeAreaInsets();
+	const { connectionStatus } = useRealtimeStore();
+
+	const getUserFirstName = () => {
+		if (user?.name) {
+			return user.name.split(' ')[0];
+		}
+		return 'Guest';
+	};
+
+	const orderHeaderTitle = () => {
+		return (
+			<View style={{ 
+				flexDirection: 'row', 
+				alignItems: 'center', 
+				width: '100%',
+				justifyContent: 'space-between',
+			}}>
+				<View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+					<Text style={{ 
+						fontSize: 16, 
+						fontWeight: '600', 
+						color: '#fff',
+					}}>
+						My Orders
+					</Text>
+				</View>
+
+				{/* 🚀 ENHANCED: Connection status indicator */}
+				<View style={{
+					flexDirection: 'row',
+					alignItems: 'center',
+					paddingHorizontal: 8,
+					paddingVertical: 4,
+					borderRadius: 4,
+					backgroundColor: '#ffffff',
+					marginLeft: 16,
+				}}>
+					<View style={{
+						width: 6,
+						height: 6,
+						borderRadius: 3,
+						backgroundColor: connectionStatus === 'connected' ? '#34C759' : '#FF3B30',
+						marginRight: 4,
+					}} />
+					<Text style={{
+						fontSize: 10,
+						color: connectionStatus === 'connected' ? '#34C759' : '#FF3B30',
+						fontWeight: '600',
+					}}>
+						{connectionStatus === 'connected' ? 'LIVE' : 'OFFLINE'}
+					</Text>
+				</View>
+			</View>
+		);
+	};
 
 	return (
 		<>
@@ -78,24 +134,21 @@ function AppTabs() {
 			<Tab.Navigator
 				id={undefined}
 				screenOptions={({ route }) => ({
-					headerShown: route.name === "Profile",
-					headerStyle: route.name === "Profile" ? { 
-						backgroundColor: theme.colors.surface,
-						height: 85,
+					headerShown: true,
+					headerTitle: route.name === "Home" ? `Welcome ${getUserFirstName()}, what will you like to order today?` : route.name === "Orders" ? orderHeaderTitle : undefined,
+					headerStyle: { 
+						backgroundColor: theme.colors.primary,
+						height: 80,
 						borderBottomWidth: 0,
 						elevation: 0,
 						shadowOpacity: 0,
-					} : {
-						height: 0,
-						elevation: 0,
-						shadowOpacity: 0,
-					},
+					}, 
 					headerTintColor: theme.colors.text,
 					headerTitleStyle: { 
-						fontWeight: "700",
-						fontSize: 18,
+						fontWeight: "500",
+						fontSize: route.name === "Home" ? 14 : 16,
+						color: '#fff',
 					},
-					headerTitleAlign: "center",
 					headerShadowVisible: false,
 					tabBarActiveTintColor: theme.colors.primary,
 					tabBarInactiveTintColor: theme.colors.muted,
@@ -146,7 +199,8 @@ function LoadingScreen() {
 }
 
 export default function RootNavigator() {
-	const { isAuthenticated, hydrated, user, hydrate } = useAuthStore();
+	const { isAuthenticated, user } = useAuthStore();
+	const hydrated = useAuthStore((state) => state.hydrated); // Use the new hook
 	const { isLocationEnabled, isLocationPermissionGranted, currentLocation, checkLocationStatus } = useLocationStore();
 	const theme = useTheme();
 
@@ -160,9 +214,10 @@ export default function RootNavigator() {
 	// Check if user has unauthorized role
 	const isUnauthorizedRole = user && user.role !== 'CUSTOMER';
 
-	useEffect(() => { 
-		void hydrate();
-	}, [hydrate]);
+	// 🚀 FIXED: Remove manual hydration - let Zustand handle it
+	// useEffect(() => { 
+	//     void hydrate();
+	// }, [hydrate]);
 
 	// 🚀 ENHANCED: Background location check with timeout
 	useEffect(() => {
@@ -239,7 +294,7 @@ export default function RootNavigator() {
 		}
 	}, []);
 
-	// Wait for auth to be hydrated
+	// Show loading screen until hydrated
 	if (!hydrated) {
 		return <LoadingScreen />;
 	}

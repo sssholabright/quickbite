@@ -160,16 +160,16 @@ export default function OrdersScreen() {
                 orderId: item.orderNumber,
                 vendor: {
                     id: item.vendor.id,
-                    name: item.vendor.businessName,
+                    name: item.vendor.name,
+                    businessName: item.vendor.businessName,
                     logo: undefined,
-                    location: item.vendor.address || 'Address not available'
+                    address: item.vendor.address || 'Address not available'
                 },
                 // 🚀 NEW: Include rider info if available
                 rider: item.rider ? {
                     id: item.rider.id,
                     name: item.rider.user?.name || 'Rider',
                     phone: item.rider.user?.phone || '',
-                    vehicleType: item.rider.vehicleType || 'bike'
                 } : undefined,
                 items: item.items.map((orderItem: any) => ({
                     id: orderItem.id,
@@ -192,20 +192,21 @@ export default function OrdersScreen() {
                 })),
                 status: getStatusMapping(item.status),
                 //  NEW: Enhanced status display
-                statusText: getStatusDisplayText(item),
+                statusDisplayText: getStatusDisplayText(item),
                 statusColor: getStatusColor(item.status),
                 total: item.pricing.total,
                 subtotal: item.pricing.subtotal,
                 fees: item.pricing.deliveryFee + item.pricing.serviceFee,
                 paymentMethod: 'cash' as const,
                 paymentStatus: 'paid' as const,
-                notes: item.specialInstructions,
-                pickupTime: 'asap',
-                placedAt: new Date(item.createdAt),
-                estimatedReadyAt: item.estimatedDeliveryTime ? new Date(item.estimatedDeliveryTime) : undefined,
+                specialInstructions: item.specialInstructions,
+                createdAt: new Date(item.createdAt),
+                updatedAt: new Date(item.updatedAt),
+                estimatedDeliveryTime: item.estimatedDeliveryTime ? new Date(item.estimatedDeliveryTime) : undefined,
                 // 🚀 NEW: Real-time tracking info
-                isLiveTracking: ['ASSIGNED', 'PICKED_UP', 'OUT_FOR_DELIVERY'].includes(item.status),
-                estimatedDeliveryTime: item.estimatedDeliveryTime ? new Date(item.estimatedDeliveryTime) : undefined
+                isRealtime: ['ASSIGNED', 'PICKED_UP', 'OUT_FOR_DELIVERY'].includes(item.status),
+                deliveryFee: item.pricing.deliveryFee,
+                serviceFee: item.pricing.serviceFee,
             }}
             onPress={() => handleOrderPress(item.id)}
         />
@@ -311,63 +312,14 @@ export default function OrdersScreen() {
         <SafeAreaWrapper 
             edges={["top"]} // Only apply top padding
             backgroundColor={theme.colors.background}
+            statusBarStyle='light'
         >
-            <View style={{ flex: 1 }}>
-                {/* Header with connection status */}
-                <View style={{ 
-                    flexDirection: 'row', 
-                    alignItems: 'center', 
-                    paddingHorizontal: 16, 
-                    paddingVertical: 12,
-                    borderBottomWidth: 1,
-                    borderBottomColor: theme.colors.border
-                }}>
-                    <Pressable onPress={() => navigation.goBack()}>
-                        <Icon name="arrow-left" size={24} color={theme.colors.text} />
-                    </Pressable>
-                    <Text style={{ 
-                        fontSize: 16, 
-                        fontWeight: '700', 
-                        color: theme.colors.text,
-                        marginLeft: 12,
-                        flex: 1,
-                    }}>
-                        My Orders
-                    </Text>
-                    
-                    {/* 🚀 ENHANCED: Connection status indicator */}
-                    <View style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        paddingHorizontal: 8,
-                        paddingVertical: 4,
-                        borderRadius: 12,
-                        backgroundColor: connectionStatus === 'connected' 
-                            ? '#34C759' + '15' 
-                            : theme.colors.danger + '15',
-                    }}>
-                        <View style={{
-                            width: 6,
-                            height: 6,
-                            borderRadius: 3,
-                            backgroundColor: connectionStatus === 'connected' ? '#34C759' : '#FF3B30',
-                            marginRight: 4,
-                        }} />
-                        <Text style={{
-                            fontSize: 10,
-                            color: connectionStatus === 'connected' ? '#34C759' : '#FF3B30',
-                            fontWeight: '600',
-                        }}>
-                            {connectionStatus === 'connected' ? 'LIVE' : 'OFFLINE'}
-                        </Text>
-                    </View>
-                </View>
-
+            <View style={{ flex: 1, marginTop: -16 }}>
                 {/*  ENHANCED: Filter Tabs with better labels */}
                 <View style={{ 
                     flexDirection: 'row', 
                     paddingHorizontal: 16, 
-                    paddingVertical: 12,
+                    paddingBottom: 12,
                     borderBottomWidth: 1,
                     borderBottomColor: theme.colors.border
                 }}>
@@ -408,7 +360,7 @@ export default function OrdersScreen() {
                         data={orders}
                         renderItem={renderOrderItem}
                         keyExtractor={(item) => item.id}
-                        contentContainerStyle={{ flexGrow: 1, marginTop: 16 }}
+                        contentContainerStyle={{ flexGrow: 1, marginTop: 16, paddingBottom: 50 }}
                         refreshControl={
                             <RefreshControl
                                 refreshing={isRefreshing}

@@ -3,7 +3,7 @@ import { Icon } from "./Icon";
 import { useTheme } from "../theme/theme";
 import { SearchBarProps } from "../types/vendor";
 
-export function SearchBar({ value, onChangeText, onFocus, placeholder = "Search vendors or meals..." }: SearchBarProps) {
+export function SearchBar({ value, onChangeText, onFocus, placeholder = "Search vendors or meals...", style = {} }: SearchBarProps) {
     const theme = useTheme();
   
     return (
@@ -17,7 +17,8 @@ export function SearchBar({ value, onChangeText, onFocus, placeholder = "Search 
             marginHorizontal: 16,
             marginVertical: 8,
             borderWidth: 1,
-            borderColor: theme.colors.border
+            borderColor: theme.colors.border,
+            ...(style as object)
         }}>
             <Icon name="search" size={20} color={theme.colors.muted} />
             <TextInput

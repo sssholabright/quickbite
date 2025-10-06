@@ -37,8 +37,9 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
             // Clear user state immediately for better UX
             set({ user: null })
             
-            // Call logout service
-            await authService.logout()
+            // Clear tokens from localStorage
+            localStorage.removeItem('accessToken')
+            localStorage.removeItem('refreshToken')
             
             // Redirect to login page or specified route
             window.location.href = redirectTo
@@ -61,7 +62,8 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
                     set({ user: userProfile })
                 } catch (error) {
                     console.error('Failed to get user profile:', error)
-                    await authService.logout()
+                    localStorage.removeItem('accessToken')
+                    localStorage.removeItem('refreshToken')
                     set({ user: null })
                 }
             } else {

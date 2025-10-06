@@ -784,10 +784,10 @@ export class OrderService {
     }
 
     /**
-     * 🚀 NEW METHOD: Get statistics of orders by status
+     * 🚀 FIXED METHOD: Get statistics of orders by status with role-based filtering
      * Real-world: Dashboard view of order statuses for monitoring
      */
-     static async getOrderStatusStats(): Promise<{
+    static async getOrderStatusStats(userId: string, userRole: string): Promise<{
         pending: number;
         preparing: number;
         ready: number;
@@ -795,26 +795,57 @@ export class OrderService {
         cancelled: number;
     }> {
         try {
-            // Get counts by status
-            const statusCounts = await prisma.order.groupBy({
-                by: ['status'],
-                _count: {
+            // 🚀 FIXED: Build role-based where clause directly
+            const where: any = {};
+            
+            // Role-based filtering
+            switch (userRole) {
+                case 'CUSTOMER':
+                    where.customer = {
+                        user: {
+                            id: userId
+                        }
+                    };
+                    break;
+                case 'VENDOR':
+                    where.vendor = {
+                        user: {
+                            id: userId
+                        }
+                    };
+                    break;
+                case 'RIDER':
+                    where.rider = {
+                        user: {
+                            id: userId
+                        }
+                    };
+                    break;
+                case 'ADMIN':
+                    // Admins can see all orders
+                    break;
+            }
+            
+            // 🚀 FIXED: Use a different approach to avoid ambiguous column reference
+            const orders = await prisma.order.findMany({
+                where,
+                select: {
                     status: true
                 }
             });
 
-            // Convert to object
-            const byStatus = statusCounts.reduce((acc: any, item: any) => {
-                acc[item.status] = item._count.status;
+            // Count orders by status manually
+            const statusCounts = orders.reduce((acc: Record<string, number>, order) => {
+                acc[order.status] = (acc[order.status] || 0) + 1;
                 return acc;
-            }, {} as Record<string, number>);
+            }, {});
 
             return {
-                pending: byStatus['PENDING'] || 0,
-                preparing: (byStatus['CONFIRMED'] || 0) + (byStatus['PREPARING'] || 0),
-                ready: byStatus['READY_FOR_PICKUP'] || 0,
-                delivered: byStatus['DELIVERED'] || 0,
-                cancelled: byStatus['CANCELLED'] || 0
+                pending: statusCounts['PENDING'] || 0,
+                preparing: (statusCounts['CONFIRMED'] || 0) + (statusCounts['PREPARING'] || 0),
+                ready: statusCounts['READY_FOR_PICKUP'] || 0,
+                delivered: statusCounts['DELIVERED'] || 0,
+                cancelled: statusCounts['CANCELLED'] || 0
             };
         } catch (error) {
             console.error("Error getting order status stats: ", error);
@@ -876,6 +907,7 @@ export class OrderService {
                 businessName: order.vendor.businessName,
                 address: order.vendor.businessAddress,
                 phone: order.vendor.user.phone,
+                logo: order.vendor.logo,
                 coordinates: {
                     lat: order.vendor.latitude,
                     lng: order.vendor.longitude

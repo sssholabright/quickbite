@@ -1,3 +1,5 @@
+import { StyleProp, ViewStyle } from "react-native";
+
 export interface Vendor {
     id: string;
     name: string;
@@ -9,6 +11,9 @@ export interface Vendor {
     category: string;
     isOpen: boolean;
     featured: boolean;
+    openingTime?: string | null;
+    closingTime?: string | null;
+    operatingDays?: string[];
     categories?: Array<{
         id: string;
         name: string;
@@ -46,6 +51,7 @@ export interface SearchBarProps {
     onChangeText: (text: string) => void;
     onFocus?: () => void;
     placeholder?: string;
+    style?: object; // or ViewStyle from react-native
 }
 
 export interface VendorCardProps {
@@ -83,6 +89,7 @@ export interface MealGridCardProps {
     onAddToCart: () => void;
     onRemoveFromCart: () => void;
     quantity: number;
+    isOpen: boolean;
 }
 
 export interface MealListCardProps {
@@ -90,6 +97,7 @@ export interface MealListCardProps {
     onAddToCart: () => void;
     onRemoveFromCart: () => void;
     quantity: number;
+    isOpen: boolean;
 }
 
 export interface CartBottomSheetProps {
@@ -137,6 +145,9 @@ export interface PublicVendor {
     coverImage?: string;
     rating: number;
     isOpen: boolean;
+    openingTime?: string | null;
+    closingTime?: string | null;
+    operatingDays?: string[];
     latitude?: number;
     longitude?: number;
     categories?: Array<{

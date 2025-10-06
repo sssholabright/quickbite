@@ -68,20 +68,6 @@ class AuthService {
         }
     }
 
-     // Logout user
-     async logout(): Promise<void> {
-        try {
-            await api.post<ApiResponse<void>>('/auth/logout')
-        } catch (error) {
-            // Even if logout fails on server, clear local tokens
-            console.error('Logout error:', error)
-        } finally {
-            // Clear tokens from localStorage
-            localStorage.removeItem('accessToken')
-            localStorage.removeItem('refreshToken')
-        }
-    }
-
     // Change password
     async changePassword(data: { currentPassword: string; newPassword: string; confirmPassword: string }): Promise<void> {
         try {

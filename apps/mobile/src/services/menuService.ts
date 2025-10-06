@@ -10,6 +10,9 @@ export interface PublicVendor {
     rating: number
     isOpen: boolean
     isActive: boolean
+    openingTime?: string | null
+    closingTime?: string | null
+    operatingDays?: string[]
     categories?: Array<{
         id: string;
         name: string;

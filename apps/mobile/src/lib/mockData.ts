@@ -56,7 +56,8 @@ export const mockMeals: Meal[] = [
         image: "https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=300",
         vendorId: "1",
         category: "lunch",
-        popular: true
+        popular: true,
+        preparationTime: 25
     },
     {
         id: "2",
@@ -66,6 +67,7 @@ export const mockMeals: Meal[] = [
         image: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=300",
         vendorId: "2",
         category: "lunch",
-        popular: true
+        popular: true,
+        preparationTime: 25
     }
 ];

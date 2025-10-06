@@ -127,6 +127,7 @@ export interface ApiOrderResponse {
         name: string
         phone: string
         vehicleType: string
+        rating: number
     }
     items: Array<{
         id: string

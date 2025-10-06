@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { FlatList, Image, Pressable, ScrollView, Text, View } from 'react-native'
 import { useTheme } from '../../theme/theme'
-import { RouteProp, useRoute } from '@react-navigation/native'
+import { RouteProp, useRoute, useNavigation } from '@react-navigation/native'
 import { Icon } from '../../ui/Icon'
 import { SearchBar } from '../../ui/SearchBar'
 import { SafeAreaWrapper } from '../../ui/SafeAreaWrapper'
@@ -12,6 +12,7 @@ import { useVendors, useVendorCategories, useVendorMenuItems } from '../../hooks
 import ItemCustomizeModal from '../../ui/ItemCustomizeModal'
 import { useCartStore } from '../../stores/cart'
 import CartScreen from '../cart/CartScreen'
+import { getVendorTimeInfo } from '../../utils/timeUtils'
 
 type MenuScreenRouteProp = RouteProp<RootStackParamList, 'Menu'>;
 
@@ -33,6 +34,7 @@ export default function MenuScreen() {
 
     const theme = useTheme()
     const route = useRoute<MenuScreenRouteProp>();
+    const navigation = useNavigation();
     const vendorId = route.params?.vendorId as string;
 
     // Vendors (for header)
@@ -51,6 +53,19 @@ export default function MenuScreen() {
     const formatNaira = (amount: number): string => {
         return `₦${amount.toLocaleString('en-NG')}`
     }
+
+    // Get vendor time information
+    const getVendorTimeDisplay = () => {
+        if (!vendor) return null;
+        
+        const timeInfo = getVendorTimeInfo({
+            openingTime: vendor.openingTime,
+            closingTime: vendor.closingTime,
+            operatingDays: vendor.operatingDays
+        });
+        
+        return timeInfo;
+    };
 
      // helper to open modal
     const openCustomize = (item: any) => {
@@ -161,6 +176,7 @@ export default function MenuScreen() {
             }}
             onRemoveFromCart={() => removeFromCart(item.id)}
             quantity={cartItems[item.id]?.quantity || 0}
+            isOpen={vendor?.isOpen || false}
         />
     )
     const renderMealList = ({ item }: { item: typeof items[0] }) => (
@@ -178,11 +194,14 @@ export default function MenuScreen() {
             }}
             onRemoveFromCart={() => removeFromCart(item.id)}
             quantity={cartItems[item.id]?.quantity || 0}
+            isOpen={vendor?.isOpen || false}
         />
     )
 
+    const vendorTimeInfo = getVendorTimeDisplay();
+
     return (
-        <SafeAreaWrapper>
+        <SafeAreaWrapper backgroundColor={theme.mode === "dark" ? theme.colors.background : theme.colors.surface}>
             <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
                 {/* 🔝 TOP: Vendor Header */}
                 <View style={{
@@ -192,6 +211,38 @@ export default function MenuScreen() {
                     borderBottomWidth: 1,
                     borderBottomColor: theme.colors.border
                 }}>
+                    {/* Back Button */}
+                    <View style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        paddingHorizontal: 16,
+                    }}>
+                        <Pressable
+                            onPress={() => navigation.goBack()}
+                            style={{
+                                width: 30,
+                                height: 30,
+                                borderRadius: 20,
+                                backgroundColor: theme.colors.background,
+                                alignItems: "center",
+                                justifyContent: "center",
+                                marginRight: 12,
+                                borderWidth: 1,
+                                borderColor: theme.colors.border
+                            }}
+                        >
+                            <Icon name="arrow-back" size={16} color={theme.colors.text} />
+                        </Pressable>
+                        {/* <Text style={{
+                            fontSize: 18,
+                            fontWeight: "700",
+                            color: theme.colors.text,
+                            flex: 1
+                        }}>
+                            {vendor?.businessName || 'Menu'}
+                        </Text> */}
+                    </View>
+
                     <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
                         <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 12 }}>
                             <Image
@@ -217,7 +268,7 @@ export default function MenuScreen() {
                                     </Text>
                                 )}
                                 <View style={{ flexDirection: "row", alignItems: "center" }}>
-                                    {vendor?.rating && (
+                                    {vendor?.rating && vendor.rating > 0 && (
                                         <>
                                             <Icon name="star" size={14} color="#fbbf24" />
                                             <Text style={{
@@ -253,6 +304,35 @@ export default function MenuScreen() {
                                         </Text>
                                     </View>
                                 </View>
+
+                                {/* Always show time information */}
+                                {vendorTimeInfo && (
+                                    <View style={{
+                                        flexDirection: "row",
+                                        alignItems: "center",
+                                        marginTop: 8,
+                                        paddingHorizontal: 8,
+                                        paddingVertical: 4,
+                                        backgroundColor: theme.colors.background,
+                                        borderRadius: 6,
+                                        borderWidth: 1,
+                                        borderColor: theme.colors.border
+                                    }}>
+                                        <Icon 
+                                            name="time" 
+                                            size={12} 
+                                            color={vendor?.isOpen ? "#FF3B30" : theme.colors.primary} 
+                                        />
+                                        <Text style={{
+                                            marginLeft: 4,
+                                            fontSize: 10,
+                                            color: vendor?.isOpen ? "#FF3B30" : theme.colors.primary,
+                                            fontWeight: "500"
+                                        }}>
+                                            {vendorTimeInfo.timeInfo}
+                                        </Text>
+                                    </View>
+                                )}
                             </View>
                         </View>
 
@@ -261,6 +341,11 @@ export default function MenuScreen() {
                             value={searchQuery}
                             onChangeText={setSearchQuery}
                             placeholder="Search in menu..."
+                            style={{
+                                backgroundColor: theme.colors.background,
+                                width: '100%',
+                                marginLeft: 0,
+                            }}
                         />
                     </View>
 
@@ -306,7 +391,7 @@ export default function MenuScreen() {
                                     flexDirection: "row",
                                     alignItems: "center",
                                     borderWidth: 1,
-                                    borderColor: selectedCategory === category.id ? theme.colors.primary : theme.colors.border
+                                    borderColor: selectedCategory === category.id ? theme.colors.border : theme.colors.border
                                 }}
                             >
                                 <Text style={{

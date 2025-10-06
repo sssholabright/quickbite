@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Order, OrderFilters as OrderFiltersType } from '../../types/order'
+import { OrderFilters as OrderFiltersType } from '../../types/order'
 import VendorLayout from '../../components/layout/VendorLayout'
 import OrderCard from '../../components/orders/OrderCard'
-import { FaSync, FaFilter, FaClipboardList, FaWifi, FaMotorcycle, FaExclamationTriangle, FaChevronDown, FaChevronUp, FaSearch, FaSort } from 'react-icons/fa'
+import { FaSync, FaFilter, FaClipboardList, FaExclamationTriangle, FaChevronDown, FaChevronUp, FaSearch, FaSort } from 'react-icons/fa'
 import OrderStats from '../../components/orders/OrderStats'
 import OrderFilters from '../../components/orders/OrderFilters'
 import { useOrderStats, useUpdateOrderStatus, useCancelOrder } from '../../hooks/useOrders'
@@ -15,11 +15,10 @@ import { ORDER_PRIORITY } from '../../types/order'
 
 export default function OrdersPage() {
     const [showFilters, setShowFilters] = useState(false)
-    const [autoRefresh, setAutoRefresh] = useState(true)
     const [searchQuery, setSearchQuery] = useState('')
     const [showMobileFilters, setShowMobileFilters] = useState(false)
     
-    // 🚀 NEW: Default filters with priority sorting
+    // Default filters with priority sorting
     const [filters, setFilters] = useState<OrderFiltersType>({
         sortBy: 'priority', // Default to priority sorting
         sortOrder: 'asc'    // Ascending for priority (Pending first)
@@ -47,7 +46,7 @@ export default function OrdersPage() {
 
     const orders = ordersData?.orders || []
 
-    // 🚀 NEW: Apply client-side priority sorting as fallback
+    // Apply client-side priority sorting as fallback
     const sortedOrders = React.useMemo(() => {
         if (filters.sortBy === 'priority') {
             return [...orders].sort((a, b) => {
@@ -64,6 +63,10 @@ export default function OrdersPage() {
         }
         return orders
     }, [orders, filters.sortBy])
+
+    useEffect(() => {
+        console.log('refetching orders and stats', orders)
+    }, [orders])
 
     // Auto-refresh functionality
     // useEffect(() => {
@@ -108,7 +111,7 @@ export default function OrdersPage() {
                     orderId,
                     statusUpdate: { status: newStatus }
                 })
-                // 🚀 FIXED: Make success message less intrusive for routine status updates
+                // Make success message less intrusive for routine status updates
                 const routineStatuses = ['CONFIRMED', 'PREPARING', 'READY_FOR_PICKUP'];
                 if (routineStatuses.includes(newStatus)) {
                     // Use a toast notification instead of SweetAlert for routine updates
@@ -167,7 +170,7 @@ export default function OrdersPage() {
         }
     }
 
-    // 🚀 NEW: Handle marking order as ready for pickup
+    // Handle marking order as ready for pickup
     const handleMarkReady = async (orderId: string) => {
         const result = await showConfirm(
             'Mark Order Ready',

@@ -66,7 +66,7 @@ export default function OrderCard({ order, onPress }: OrderCardProps) {
 
     const hasAddOns = order.items.some(item => item.addOns && item.addOns.length > 0);
 
-    const isLiveTracking = order.isLiveTracking || false;
+    const isLiveTracking = order.isRealtime || false;
     const hasRider = order.rider && order.rider.name;
 
     return (
@@ -114,7 +114,7 @@ export default function OrderCard({ order, onPress }: OrderCardProps) {
                         fontSize: 10,
                         color: theme.colors.muted,
                     }}>
-                        {order.orderId} • {formatTime(order.placedAt)}
+                        {order.orderId} • {formatTime(order.createdAt)}
                     </Text>
                 </View>
 
@@ -166,7 +166,7 @@ export default function OrderCard({ order, onPress }: OrderCardProps) {
                             fontSize: 10,
                             color: theme.colors.muted,
                         }}>
-                            {order.rider?.vehicleType} • {order.rider?.phone}
+                            {order.rider?.phone}
                         </Text>
                     </View>
                     {isLiveTracking && (
@@ -197,7 +197,7 @@ export default function OrderCard({ order, onPress }: OrderCardProps) {
                 </View>
             )}
 
-            {order.statusText && (
+            {order.status && (
                 <View style={{
                     backgroundColor: theme.colors.background,
                     borderRadius: 8,
@@ -210,7 +210,7 @@ export default function OrderCard({ order, onPress }: OrderCardProps) {
                         width: 8,
                         height: 8,
                         borderRadius: 4,
-                        backgroundColor: order.statusColor || getStatusColor(order.status),
+                        backgroundColor: getStatusColor(order.status),
                         marginRight: 8,
                     }} />
                     <Text style={{
@@ -218,7 +218,7 @@ export default function OrderCard({ order, onPress }: OrderCardProps) {
                         color: theme.colors.text,
                         flex: 1,
                     }}>
-                        {order.statusText}
+                        {order.status}
                     </Text>
                     {order.estimatedDeliveryTime && isLiveTracking && (
                         <Text style={{
@@ -249,7 +249,7 @@ export default function OrderCard({ order, onPress }: OrderCardProps) {
                         fontSize: 10,
                         color: theme.colors.muted,
                     }}>
-                        {order.vendor.location}
+                        {order.vendor.address}
                     </Text>
                     {hasAddOns && (
                         <Text style={{

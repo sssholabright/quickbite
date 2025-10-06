@@ -35,6 +35,7 @@ export interface OrderResponse {
         name: string;
         businessName: string;
         address: string;
+        logo?: string;
         phone: string;
         coordinates: {
             lat: number;

@@ -306,7 +306,10 @@ export class OrderController {
      */
     static async getOrderStats(req: Request, res: Response, next: NextFunction) {
         try {
-            const stats = await OrderService.getOrderStatusStats();
+            const userId = (req.user as any).userId as string;
+            const userRole = (req.user as any).role as string;
+            
+            const stats = await OrderService.getOrderStatusStats(userId, userRole); // 🚀 ADD: Pass user context
             
             res.status(200).json({
                 success: true,

@@ -75,26 +75,31 @@ export default function VendorDashboard() {
             <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
                 <div className="space-y-8">
                     {/* Page Header */}
-                    <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-4">
-                                <div className="w-16 h-16 bg-gradient-to-br from-primary-500 to-primary-600 rounded-2xl flex items-center justify-center shadow-lg">
-                                    <FaChartLine className="w-8 h-8 text-white" />
+                    <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-4 sm:p-6 md:p-8">
+                        <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                                <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-primary-500 to-primary-600 rounded-2xl flex items-center justify-center shadow-lg mx-auto sm:mx-0">
+                                    <FaChartLine className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
                                 </div>
-                                <div>
-                                    <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
+                                <div className="text-center sm:text-left">
+                                    <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
                                         Dashboard Overview
                                     </h1>
-                                    <p className="mt-2 text-gray-600 text-lg">Welcome back! Here's what's happening with your restaurant today.</p>
+                                    <p className="mt-2 text-gray-600 text-base sm:text-lg">
+                                        Welcome back! Here's what's happening with your restaurant today.
+                                    </p>
                                 </div>
                             </div>
-                            
                             {/* Connection Status */}
-                            <div className="flex items-center space-x-3 bg-gray-50 rounded-2xl px-6 py-3">
-                                <div className={`w-3 h-3 rounded-full ${
-                                    connectionStatus === 'connected' ? 'bg-green-500 animate-pulse' : 'bg-red-500'
-                                }`} />
-                                <span className="text-sm font-medium text-gray-700">
+                            <div className="flex items-center justify-center space-x-2 sm:space-x-3 bg-gray-50 rounded-2xl px-4 py-2 sm:px-6 sm:py-3 mt-4 sm:mt-0">
+                                <div
+                                    className={`w-2 h-2 sm:w-3 sm:h-3 rounded-full ${
+                                        connectionStatus === 'connected'
+                                            ? 'bg-green-500 animate-pulse'
+                                            : 'bg-red-500'
+                                    }`}
+                                />
+                                <span className="text-xs sm:text-sm font-medium text-gray-700">
                                     {connectionStatus === 'connected' ? 'Live Updates' : 'Offline'}
                                 </span>
                             </div>
@@ -102,7 +107,7 @@ export default function VendorDashboard() {
                     </div>
 
                     {/* Stats Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-6">
                         {/* Pending Orders */}
                         <div className="group bg-white rounded-3xl shadow-sm border border-gray-100 p-8 hover:shadow-xl hover:scale-[1.02] transition-all duration-300">
                             <div className="flex items-center justify-between">

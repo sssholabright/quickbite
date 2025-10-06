@@ -79,18 +79,20 @@ apiClient.interceptors.response.use(
                 return apiClient(originalRequest);
 
             } catch (refreshError) {
-                console.error('Token refresh failed:', refreshError);
+                console.error('❌ Token refresh failed:', refreshError);
                 // Clear refresh promise on failure
                 refreshTokenPromise = null;
                 
-                // Clear tokens from secure storage
-                await SecureStore.deleteItemAsync('access_token');
-                await SecureStore.deleteItemAsync('refresh_token');
-                
-                // Import and use auth store to logout
-                const { useAuthStore } = await import('../stores/auth');
-                const { logout } = useAuthStore.getState();
-                await logout();
+                // 🚀 ENHANCED: Always logout when refresh fails
+                try {
+                    // Import and use auth store to logout
+                    const { useAuthStore } = await import('../stores/auth');
+                    const { logout } = useAuthStore.getState();
+                    await logout();
+                    console.log('✅ Auto-logout completed after token refresh failure');
+                } catch (logoutError) {
+                    console.error('❌ Error during auto-logout:', logoutError);
+                }
                 
                 // Reject the original request
                 return Promise.reject(refreshError);

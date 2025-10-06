@@ -1,9 +1,8 @@
-import { Button, FlatList, Pressable, ScrollView, Text, View, RefreshControl } from 'react-native'
+import { FlatList, Pressable, ScrollView, Text, View, RefreshControl } from 'react-native'
 import { useTheme } from '../../theme/theme'
 import { SearchBar } from '../../ui/SearchBar'
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CategoryChip } from '../../ui/CategoryChip';
-import { categories, mockMeals } from '../../lib/mockData';
 import { PromoBanner } from '../../ui/PromoBanner';
 import { MealCard } from '../../ui/MealCard';
 import { VendorCard } from '../../ui/VendorCard';
@@ -36,36 +35,40 @@ export default function HomeScreen() {
 
 	// Add this hook to fetch featured menu items
 	const { data: featuredMenuItems = [], isLoading: featuredLoading } = useQuery({
-    queryKey: ['featured-menu-items'],
-    queryFn: async () => {
-        // Get all vendors first
-        const vendorsResponse = await menuService.getVendors({ hasAvailableItems: true });
-        const vendors = vendorsResponse;
-        
-        // Get menu items from all vendors
-        const allMenuItems = [];
-        for (const vendor of vendors.slice(0, 3)) { // Limit to first 3 vendors for performance
-            try {
-                const itemsResponse = await menuService.getVendorItems(vendor.id, {});
-                const items = itemsResponse;
-                allMenuItems.push(...items.map(item => ({
-                    ...item,
-                    vendorId: vendor.id,
-                    vendorName: vendor.businessName,
-                    vendorImage: vendor.logo || vendor.coverImage
-                })));
-            } catch (error) {
-                console.error(`Error fetching items for vendor ${vendor.id}:`, error);
-            }
-        }
-        
-        // Sort by rating/price and return top 5
-        return allMenuItems
-            .sort((a, b) => b.price - a.price) // Sort by price descending
-            .slice(0, 5);
-    },
-    staleTime: 5 * 60 * 1000, // 5 minutes
-});
+		queryKey: ['featured-menu-items'],
+		queryFn: async () => {
+			// Get all vendors first
+			const vendorsResponse = await menuService.getVendors({ hasAvailableItems: true });
+			const vendors = vendorsResponse;
+			
+			// Get menu items from all vendors
+			const allMenuItems = [];
+			for (const vendor of vendors.slice(0, 3)) { // Limit to first 3 vendors for performance
+				try {
+					const itemsResponse = await menuService.getVendorItems(vendor.id, {});
+					const items = itemsResponse;
+					allMenuItems.push(...items.map(item => ({
+						...item,
+						vendorId: vendor.id,
+						vendorName: vendor.businessName,
+						vendorImage: vendor.logo || vendor.coverImage
+					})));
+				} catch (error) {
+					console.error(`Error fetching items for vendor ${vendor.id}:`, error);
+				}
+			}
+			
+			// Sort by rating/price and return top 5
+			return allMenuItems
+				.sort((a, b) => b.price - a.price) // Sort by price descending
+				.slice(0, 5);
+		},
+		staleTime: 5 * 60 * 1000, // 5 minutes
+	});
+
+	useEffect(() => {
+		console.log('Vendors', JSON.stringify(vendors, null, 2));
+	}, [vendors]);
 
 	// Map API vendors to UI shape expected by VendorCard
 	const uiVendors = useMemo(() => {
@@ -80,31 +83,29 @@ export default function HomeScreen() {
 			category: 'all',
 			isOpen: !!v.isOpen,
 			featured: false,
-			categories: v.categories || [] // Add categories from API
+			categories: v.categories || [],
+			openingTime: v.openingTime,
+			closingTime: v.closingTime,
+			operatingDays: v.operatingDays || []
 		}));
 	}, [vendors]);
 
 	// Update the featuredMeals mapping
 	const uiFeaturedMeals = useMemo(() => {
-    return featuredMenuItems.map(item => ({
-        id: item.id,
-        name: item.name,
-        description: item.description || '',
-        price: item.price,
-        image: item.image || 'https://via.placeholder.com/300',
-        vendorId: item.vendorId,
-        vendorName: item.vendorName,
-        vendorImage: item.vendorImage,
-        category: item.category?.name || 'lunch',
-        popular: true,
-        preparationTime: item.preparationTime
-    }));
-}, [featuredMenuItems]);
-
-	// Remove the old mock featuredMeals
-	// const featuredMeals = useMemo(() => {
-	//     return mockMeals.filter(meal => meal.popular);
-	// }, []);
+		return featuredMenuItems.map(item => ({
+			id: item.id,
+			name: item.name,
+			description: item.description || '',
+			price: item.price,
+			image: item.image || 'https://via.placeholder.com/300',
+			vendorId: item.vendorId,
+			vendorName: item.vendorName,
+			vendorImage: item.vendorImage,
+			category: item.category?.name || 'lunch',
+			popular: true,
+			preparationTime: item.preparationTime
+		}));
+	}, [featuredMenuItems]);
 
 	const filteredVendors = useMemo(() => {
 		return uiVendors.filter(vendor => {
@@ -179,15 +180,21 @@ export default function HomeScreen() {
 	return (
 		<SafeAreaWrapper 
 			edges={["top"]} // Only apply top padding, let tab navigator handle bottom
-			backgroundColor={theme.colors.background}
+			statusBarStyle="light"
 		>
 			<View style={{ flex: 1 }}>
 				{/* Search Bar */}
-				<SearchBar
-					value={searchQuery}
-					onChangeText={setSearchQuery}
-					placeholder="Search vendors or meals..."
-				/>
+				<View style={{ backgroundColor: theme.colors.primary, marginTop: -40, paddingBottom: 10 }}>
+					<SearchBar
+						value={searchQuery}
+						onChangeText={setSearchQuery}
+						placeholder="Search vendors or meals..."
+						style={{
+							backgroundColor: 'white',
+							borderWidth: 0
+						}}
+					/>
+				</View>
 
 				<ScrollView
 					showsVerticalScrollIndicator={false}
@@ -202,7 +209,7 @@ export default function HomeScreen() {
 					}
 				>
 					{/* Categories */}
-					<View style={{ marginBottom: 20 }}>
+					<View style={{ marginBottom: 20, paddingTop: 10 }}>
 						<ScrollView
 							horizontal
 							showsHorizontalScrollIndicator={false}
@@ -303,7 +310,10 @@ export default function HomeScreen() {
 							renderItem={renderVendor}
 							keyExtractor={(item) => item.id}
 							scrollEnabled={false}
-							contentContainerStyle={{ paddingBottom: 20 }}
+							numColumns={2}
+							contentContainerStyle={{ paddingBottom: 20, paddingHorizontal: 16 }}
+							columnWrapperStyle={{ justifyContent: 'space-between', paddingHorizontal: 0 }}
+							ItemSeparatorComponent={() => <View style={{ height: 16 }} />}
 						/>
 					</View>
 				</ScrollView>

@@ -15,6 +15,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import AlertModal from '../../ui/AlertModal';
 import { useEnhancedOrder } from '../../hooks/useEnhancedOrder';
 import { useRealtimeStore } from '../../stores/realtime';
+import { SafeAreaWrapper } from '../../ui/SafeAreaWrapper'; 
 
 type OrderDetailRouteProp = RouteProp<RootStackParamList, 'OrderDetail'>;
 
@@ -102,22 +103,26 @@ export default function OrderDetailScreen() {
         }
     };
 
+    useEffect(() => {
+        console.log('backendOrderData', JSON.stringify(backendOrderData, null, 2));
+    }, [backendOrderData]);
+
     // Transform backend data to match UI expectations
     const orderData: Order | null = backendOrderData ? {
         id: backendOrderData.id,
         orderId: backendOrderData.orderNumber,
         vendor: {
             id: backendOrderData.vendor.id,
-            name: backendOrderData.vendor.businessName,
-            logo: undefined,
-            location: backendOrderData.vendor.address || 'Address not available'
+            name: backendOrderData.vendor.name,
+            businessName: backendOrderData.vendor.businessName,
+            logo: backendOrderData.vendor.logo || undefined,
+            address: backendOrderData.vendor.address || 'Address not available'
         },
         // 🚀 NEW: Include rider information
         rider: backendOrderData.rider ? {
             id: backendOrderData.rider.id,
             name: backendOrderData.rider.name || 'Rider',
             phone: backendOrderData.rider.phone || '',
-            vehicleType: backendOrderData.rider.vehicleType || 'Bicycle'
         } : undefined,
         items: backendOrderData.items.map((orderItem: any) => ({
             id: orderItem.id,
@@ -138,21 +143,22 @@ export default function OrderDetailScreen() {
                 price: addOn.price
             })) || []
         })),
-        status: getStatusMapping(backendOrderData.status),
-        // 🚀 NEW: Enhanced status display
-        statusText: getStatusDisplayText(backendOrderData),
+        status: getStatusMapping(backendOrderData.status), // Keep only this status property
+        // 🚀 NEW: Enhanced status display - move to separate properties
+        statusDisplayText: getStatusDisplayText(backendOrderData),
         statusColor: getStatusColor(backendOrderData.status),
-        isLiveTracking: ['ASSIGNED', 'PICKED_UP', 'OUT_FOR_DELIVERY'].includes(backendOrderData.status),
+        isRealtime: ['ASSIGNED', 'PICKED_UP', 'OUT_FOR_DELIVERY'].includes(backendOrderData.status),
         total: backendOrderData.pricing.total,
         subtotal: backendOrderData.pricing.subtotal,
         fees: backendOrderData.pricing.deliveryFee + backendOrderData.pricing.serviceFee,
+        deliveryFee: backendOrderData.pricing.deliveryFee,
+        serviceFee: backendOrderData.pricing.serviceFee,
         paymentMethod: 'cash' as const,
         paymentStatus: 'paid' as const,
-        notes: backendOrderData.specialInstructions,
-        pickupTime: 'asap',
-        placedAt: new Date(backendOrderData.createdAt),
-        estimatedReadyAt: backendOrderData.estimatedDeliveryTime ? new Date(backendOrderData.estimatedDeliveryTime) : undefined,
-        estimatedDeliveryTime: backendOrderData.estimatedDeliveryTime ? new Date(backendOrderData.estimatedDeliveryTime) : undefined
+        specialInstructions: backendOrderData.specialInstructions,
+        createdAt: new Date(backendOrderData.createdAt),
+        updatedAt: new Date(backendOrderData.updatedAt),
+        estimatedDeliveryTime: backendOrderData.estimatedDeliveryTime ? new Date(backendOrderData.estimatedDeliveryTime) : undefined,
     } : null;
 
   
@@ -254,9 +260,15 @@ export default function OrderDetailScreen() {
     };
 
     // Add this helper function after the existing helper functions
-    const getRelativeTime = (timestamp: string) => {
+    const getRelativeTime = (timestamp: string | Date | undefined) => {
+        if (!timestamp) return 'Unknown';
+        
         const now = new Date();
         const time = new Date(timestamp);
+        
+        // Check if the date is valid
+        if (isNaN(time.getTime())) return 'Invalid date';
+        
         const diff = now.getTime() - time.getTime();
         const minutes = Math.floor(diff / (1000 * 60));
         
@@ -504,8 +516,8 @@ export default function OrderDetailScreen() {
                             fontWeight: '600',
                             color: theme.colors.primary,
                         }}>
-                            {backendOrderData.estimatedDeliveryTime ? 
-                                `${Math.ceil((new Date(backendOrderData.estimatedDeliveryTime).getTime() - Date.now()) / (1000 * 60))} minutes` :
+                            {orderData.estimatedDeliveryTime ? 
+                                `${Math.ceil((new Date(orderData.estimatedDeliveryTime).getTime() - Date.now()) / (1000 * 60))} minutes` :
                                 '8-12 minutes'
                             }
                         </Text>
@@ -520,7 +532,7 @@ export default function OrderDetailScreen() {
     );
 
     return (
-        <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }} edges={['top','bottom']}>
+        <SafeAreaWrapper statusBarStyle={theme.mode === 'dark' ? 'light' : 'dark'} backgroundColor={theme.colors.background} edges={['top','bottom']}>
             {/* Header with real-time indicator */}
             <View style={{
                 flexDirection: 'row',
@@ -554,9 +566,9 @@ export default function OrderDetailScreen() {
                         backgroundColor: connectionStatus === 'connected' ? '#34C759' : '#FF3B30',
                         marginRight: 4,
                     }} />
-                    {hasRealtimeUpdate && (
+                    {connectionStatus === 'connected' && (
                         <Text style={{
-                            fontSize: 8,
+                            fontSize: 10,
                             color: theme.colors.primary,
                             fontWeight: '600',
                         }}>
@@ -573,24 +585,24 @@ export default function OrderDetailScreen() {
             >
                 {/*  ENHANCED: Current Status Banner with live tracking indicator */}
                 <View style={{
-                    backgroundColor: orderData.isLiveTracking ? '#3b82f6' + '15' : theme.colors.primary + '15',
+                    backgroundColor: orderData.isRealtime ? '#3b82f6' + '15' : theme.colors.primary + '15',
                     borderRadius: 12,
                     padding: 16,
                     marginBottom: 20,
                     borderWidth: 1,
-                    borderColor: orderData.isLiveTracking ? '#3b82f6' + '30' : theme.colors.primary + '30',
+                    borderColor: orderData.isRealtime ? '#3b82f6' + '30' : theme.colors.primary + '30',
                 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                        <Icon name={currentStep?.icon || 'time'} size={24} color={orderData.isLiveTracking ? '#3b82f6' : theme.colors.primary} />
+                        <Icon name={currentStep?.icon || 'time'} size={24} color={orderData.isRealtime ? '#3b82f6' : theme.colors.primary} />
                         <Text style={{
                             fontSize: 16,
                             fontWeight: '600',
-                            color: orderData.isLiveTracking ? '#3b82f6' : theme.colors.primary,
+                            color: orderData.isRealtime ? '#3b82f6' : theme.colors.primary,
                             marginLeft: 12,
                         }}>
                             {currentStep?.label}
                         </Text>
-                        {orderData.isLiveTracking && (
+                        {orderData.isRealtime && (
                             <View style={{
                                 backgroundColor: '#3b82f6',
                                 paddingHorizontal: 6,
@@ -654,10 +666,11 @@ export default function OrderDetailScreen() {
                     items={orderData.items}
                     vendor={{
                         name: orderData.vendor.name,
-                        distance: orderData.vendor.location || 'Address not provided',
-                        eta: orderData.estimatedReadyAt ? 
-                            `Ready by ${orderData.estimatedReadyAt.toLocaleTimeString()}` :
-                            'ASAP'
+                        distance: orderData.vendor.address || 'Address not provided',   
+                        logo: orderData.vendor.logo || undefined,
+                        eta: orderData.estimatedDeliveryTime ? 
+                            `Ready by ${orderData.estimatedDeliveryTime.toLocaleTimeString()}` :
+                            'ASAP',
                     }}
                     total={orderData.items.reduce((acc, item) => acc + item.price * item.quantity + (item.addOns || []).reduce((acc, addOn) => acc + addOn.price * addOn.quantity, 0), 0)}
                 />
@@ -787,6 +800,6 @@ export default function OrderDetailScreen() {
                 onConfirm={hideAlert}
                 confirmText="OK"
             />
-        </SafeAreaView>
+        </SafeAreaWrapper>
     );
 }

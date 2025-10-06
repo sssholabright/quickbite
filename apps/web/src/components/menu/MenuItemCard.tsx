@@ -227,59 +227,62 @@ export default function MenuItemCard({ item, onEdit }: MenuItemCardProps) {
                 )}
 
                 {/* Actions */}
-                <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-                    <div className="flex items-center space-x-2">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between pt-2 border-t border-gray-100 space-y-2 sm:space-y-0">
+                    {/* Mobile: Stack buttons vertically, Desktop: Horizontal */}
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-1 sm:space-y-0 sm:space-x-2">
                         <button
                             onClick={handleEditClick}
                             disabled={isLoadingAction}
-                            className={`flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
+                            className={`flex items-center justify-center px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 ${
                                 isEditLoading 
                                     ? 'text-gray-400 bg-gray-100' 
                                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                             }`}
                         >
                             {isEditLoading ? (
-                                <FaSpinner className="w-4 h-4 mr-1 animate-spin" />
+                                <FaSpinner className="w-3 h-3 sm:w-4 sm:h-4 mr-1 animate-spin" />
                             ) : (
-                                <FaEdit className="w-4 h-4 mr-1" />
+                                <FaEdit className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
                             )}
                             Edit
                         </button>
                         <button
                             onClick={handleDelete}
                             disabled={isLoadingAction || !isDeleteLoading}
-                            className={`flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
+                            className={`flex items-center justify-center px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 ${
                                 isDeleteLoading 
                                     ? 'text-red-400 bg-red-100' 
                                     : 'text-red-600 hover:text-red-900 hover:bg-red-100'
                             }`}
                         >
                             {isDeleteLoading ? (
-                                <FaSpinner className="w-4 h-4 mr-1 animate-spin" />
+                                <FaSpinner className="w-3 h-3 sm:w-4 sm:h-4 mr-1 animate-spin" />
                             ) : (
-                                <FaTrash className="w-4 h-4 mr-1" />
+                                <FaTrash className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
                             )}
                             Delete
                         </button>
                     </div>
                     
+                    {/* Toggle Button - Full width on mobile, inline on desktop */}
                     <button
                         onClick={handleToggleAvailability}
                         disabled={isLoadingAction}
-                        className={`flex items-center px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 ${
-                            item.isAvailable
+                        className={`flex items-center justify-center px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all duration-200 ${
+                            !item.isAvailable
                                 ? 'text-green-600 hover:text-green-900 hover:bg-green-100'
                                 : 'text-red-600 hover:text-red-900 hover:bg-red-100'
                         } ${isToggleLoading ? 'opacity-50' : ''}`}
                     >
-                        {isToggleLoading ? (
-                            <FaSpinner className="w-4 h-4 mr-1 animate-spin" />
+                        {/* {isToggleLoading ? (
+                            <FaSpinner className="w-3 h-3 sm:w-4 sm:h-4 mr-1 animate-spin" />
                         ) : item.isAvailable ? (
-                            <FaToggleOn className="w-4 h-4 mr-1" />
+                            <FaToggleOn className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
                         ) : (
-                            <FaToggleOff className="w-4 h-4 mr-1" />
-                        )}
-                        {item.isAvailable ? 'Available' : 'Unavailable'}
+                            <FaToggleOff className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+                        )} */}
+                        <span className="hidden sm:inline">{item.isAvailable ? 'Mark as Unavailable' : 'Mark as Available'}</span>
+                        <span className="sm:hidden">{item.isAvailable ? 'Mark as Unavailable' : 'Mark as Available'}</span>
                     </button>
                 </div>
             </div>

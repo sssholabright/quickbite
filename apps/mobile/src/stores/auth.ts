@@ -10,20 +10,21 @@ interface AuthStore extends AuthState {
     hydrated: boolean;
     hasSeenOnboarding: boolean;
     login: (credentials: LoginCredentials) => Promise<void>;
-	register: (userData: RegisterData) => Promise<void>;
-	logout: () => Promise<void>;
+    register: (userData: RegisterData) => Promise<void>;
+    logout: () => Promise<void>;
     refreshToken: () => Promise<void>;
     clearError: () => void;
-	hydrate: () => Promise<void>;
-	markOnboardingSeen: () => Promise<void>;
-	forgotPassword: (identifier: string) => Promise<void>;
+    markOnboardingSeen: () => Promise<void>;
+    forgotPassword: (identifier: string) => Promise<void>;
     fetchProfile: () => Promise<void>;
     updateProfile: (profileData: { name?: string; phone?: string; avatar?: string; }) => Promise<void>;
     // Add specific loading states
     isUpdatingProfile: boolean;
     changePassword: (passwordData: { currentPassword: string; newPassword: string; confirmPassword: string; }) => Promise<void>;
     isChangingPassword: boolean;
-};
+    // 🚀 NEW: Auto-logout when tokens are invalid
+    checkAuthStatus: () => Promise<void>;
+}
 
 export const useAuthStore = create<AuthStore>()(
     persist(
@@ -39,7 +40,7 @@ export const useAuthStore = create<AuthStore>()(
             error: null,
             hydrated: false,
             hasSeenOnboarding: false,
-            isUpdatingProfile: false, // Add this
+            isUpdatingProfile: false,
             isChangingPassword: false,
 
             login: async (credentials: LoginCredentials) => {
@@ -47,7 +48,7 @@ export const useAuthStore = create<AuthStore>()(
                     set({ isLoading: true, error: null });
                     const result: AuthResult = await AuthService.login(credentials);
 
-                    console.log("Dats: ", result)
+                    console.log("Login successful: ", result)
 
                     // Store tokens securely
                     await SecureStore.setItemAsync('access_token', result.tokens.accessToken);
@@ -98,13 +99,11 @@ export const useAuthStore = create<AuthStore>()(
                 }
             },
 
-            // Logout action
+            // 🚀 ENHANCED: Logout action with proper cleanup
             logout: async () => {
                 try {
+                    console.log('🚪 Logging out user...');
                     set({ isLoading: true });
-                    
-                    // Call logout API
-                    await AuthService.logout();
                     
                     // Clear stored tokens
                     await SecureStore.deleteItemAsync('access_token');
@@ -120,7 +119,10 @@ export const useAuthStore = create<AuthStore>()(
                         isLoading: false,
                         error: null,
                     });
+                    
+                    console.log('✅ Logout completed successfully');
                 } catch (error: any) {
+                    console.error('❌ Error during logout:', error);
                     // Even if API call fails, clear local state
                     await SecureStore.deleteItemAsync('access_token');
                     await SecureStore.deleteItemAsync('refresh_token');
@@ -138,25 +140,30 @@ export const useAuthStore = create<AuthStore>()(
                 }
             },
 
-            // Refresh token action
+            // 🚀 ENHANCED: Refresh token with auto-logout on failure
             refreshToken: async () => {
                 try {
                     const { tokens } = get();
                     if (!tokens.refreshToken) {
-                        throw new Error('No refresh token available');
+                        console.log('🚪 No refresh token available, logging out...');
+                        await get().logout();
+                        return;
                     }
 
+                    console.log('🔄 Refreshing access token...');
                     const result = await AuthService.refreshToken(tokens.refreshToken);
                     
                     await SecureStore.setItemAsync('access_token', result.accessToken);
                     
                     set({
                         tokens: {
-                        ...tokens,
-                        accessToken: result.accessToken,
+                            ...tokens,
+                            accessToken: result.accessToken,
                         },
                     });
+                    console.log('✅ Token refreshed successfully');
                 } catch (error: any) {
+                    console.log('❌ Token refresh failed, logging out:', error.message);
                     // If refresh fails, logout user
                     await get().logout();
                     throw error;
@@ -175,100 +182,34 @@ export const useAuthStore = create<AuthStore>()(
                     const user = await AuthService.getProfile();
                     set({ user, isLoading: false });
                 } catch (error: any) {
+                    console.error('❌ Failed to fetch profile:', error);
                     set({ error: error.message, isLoading: false });
                     throw error;
                 }
             },
 
-            // Update profile action - FIXED: Use specific loading state
+            // Update profile action
             updateProfile: async (profileData) => {
                 try {
-                    set({ isUpdatingProfile: true, error: null }); // Use specific loading state
+                    set({ isUpdatingProfile: true, error: null });
                     
                     const updatedUser = await AuthService.updateProfile(profileData);
                     
                     set({
                         user: updatedUser,
-                        isUpdatingProfile: false, // Use specific loading state
+                        isUpdatingProfile: false,
                         error: null,
                     });
                 } catch (error: any) {
                     set({
                         error: error.message || 'Failed to update profile',
-                        isUpdatingProfile: false, // Use specific loading state
+                        isUpdatingProfile: false,
                     });
                     throw error;
                 }
             },
 
-            // Hydrate store from secure storage
-            hydrate: async () => {
-                try {
-                    set({ isLoading: true });
-                    
-                    const accessToken = await SecureStore.getItemAsync('access_token');
-                    const refreshToken = await SecureStore.getItemAsync('refresh_token');
-                    const seen = await SecureStore.getItemAsync('onboarding_seen');
-                
-                    if (accessToken && refreshToken) {
-                        // Fetch user profile from API
-                        try {
-                            const user = await AuthService.getProfile();
-                            set({
-                                user,
-                                tokens: {
-                                    accessToken,
-                                    refreshToken,
-                                },
-                                isAuthenticated: true,
-                                isLoading: false,
-                                hydrated: true,
-                                hasSeenOnboarding: !!seen,
-                            });
-                        } catch (error) {
-                            // If profile fetch fails, still set auth state but without user data
-                            set({
-                                user: null,
-                                tokens: {
-                                    accessToken,
-                                    refreshToken,
-                                },
-                                isAuthenticated: true,
-                                isLoading: false,
-                                hydrated: true,
-                                hasSeenOnboarding: !!seen,
-                            });
-                        }
-                    } else {
-                        set({
-                            user: null,
-                            tokens: {
-                                accessToken: null,
-                                refreshToken: null,
-                            },
-                            isAuthenticated: false,
-                            isLoading: false,
-                            hydrated: true,
-                            hasSeenOnboarding: !!seen,
-                        });
-                    }
-                } catch (error) {
-                    console.error('Error hydrating auth store:', error);
-                    set({
-                        user: null,
-                        tokens: {
-                            accessToken: null,
-                            refreshToken: null,
-                        },
-                        isAuthenticated: false,
-                        isLoading: false,
-                        hydrated: true,
-                        hasSeenOnboarding: false,
-                    });
-                }
-            },
-
-           // Mark onboarding as seen
+            // Mark onboarding as seen
             markOnboardingSeen: async () => {
                 try {
                     await SecureStore.setItemAsync('onboarding_seen', '1');
@@ -314,6 +255,40 @@ export const useAuthStore = create<AuthStore>()(
                     throw error;
                 }
             },
+
+            // 🚀 NEW: Check auth status and auto-logout if invalid
+            checkAuthStatus: async () => {
+                try {
+                    const { tokens, isAuthenticated } = get();
+                    
+                    // If no tokens, ensure user is logged out
+                    if (!tokens.accessToken || !tokens.refreshToken) {
+                        if (isAuthenticated) {
+                            console.log('🚪 No tokens found, logging out...');
+                            await get().logout();
+                        }
+                        return;
+                    }
+
+                    // Try to fetch profile to validate tokens
+                    try {
+                        const user = await AuthService.getProfile();
+                        // If successful, update user data
+                        set({ user, isAuthenticated: true });
+                    } catch (error: any) {
+                        // If profile fetch fails, tokens might be invalid
+                        if (error.response?.status === 401) {
+                            console.log('🚪 Invalid tokens detected, logging out...');
+                            await get().logout();
+                        } else {
+                            // Other errors, just update user but keep auth state
+                            console.warn('⚠️ Profile fetch failed, but keeping auth state:', error.message);
+                        }
+                    }
+                } catch (error) {
+                    console.error('❌ Error checking auth status:', error);
+                }
+            },
         }),
         {
             name: 'mobile-auth-storage',
@@ -325,6 +300,22 @@ export const useAuthStore = create<AuthStore>()(
                 isAuthenticated: state.isAuthenticated,
                 hasSeenOnboarding: state.hasSeenOnboarding,
             }),
+            // 🚀 ENHANCED: onRehydrateStorage with auth status check
+            onRehydrateStorage: () => (state) => {
+                if (state) {
+                    state.hydrated = true;
+                    // 🚀 NEW: Check auth status after rehydration
+                    setTimeout(() => {
+                        state.checkAuthStatus();
+                    }, 100);
+                }
+            },
         }
     )
 );
+
+// Hook to check if store is hydrated
+export const useAuthHydration = () => {
+    const hydrated = useAuthStore((state) => state.hydrated);
+    return hydrated;
+};

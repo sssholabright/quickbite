@@ -47,16 +47,6 @@ class AuthService {
         }
     }
 
-    // Logout user
-    static async logout(): Promise<void> {
-        try {
-            await apiClient.post('/auth/logout');
-        } catch (error: any) {
-            // Even if logout fails on server, we should clear local tokens
-            console.error('Logout error:', error);
-        }
-    }
-
     // Get current user profile
     static async getProfile(): Promise<any> {
         try {

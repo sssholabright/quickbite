@@ -123,7 +123,7 @@ export class OrderService {
                 name: apiOrder.rider.name,
                 phone: apiOrder.rider.phone,
                 vehicleType: apiOrder.rider.vehicleType as any,
-                rating: 4.5 // Default rating, should come from API
+                rating: apiOrder.rider.rating // Default rating, should come from API
             } : undefined,
             estimatedDeliveryTime: apiOrder.estimatedDeliveryTime,
             createdAt: apiOrder.createdAt,

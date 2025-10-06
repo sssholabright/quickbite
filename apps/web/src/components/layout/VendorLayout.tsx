@@ -1,4 +1,4 @@
-import { ReactNode, useState } from 'react'
+import { ReactNode, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../stores/authStore'
 import NotificationCenter from '../notifications/NotificationCenter'
@@ -111,9 +111,13 @@ export default function VendorLayout({ children }: VendorLayoutProps) {
                 <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-100">
                     <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-2xl p-4 mb-4">
                         <div className="flex items-center space-x-3">
-                            <div className="w-12 h-12 bg-gradient-to-br from-primary-500 to-primary-600 rounded-2xl flex items-center justify-center shadow-lg">
-                                <FaUser className="w-6 h-6 text-white" />
-                            </div>
+                            {user?.vendor?.logo ? (
+                                <img src={user?.vendor?.logo} alt="User Avatar" className="w-12 h-12 rounded-2xl" />
+                            ) : (
+                                <div className="w-12 h-12 bg-gradient-to-br from-primary-500 to-primary-600 rounded-2xl flex items-center justify-center shadow-lg">
+                                    <FaUser className="w-6 h-6 text-white" />
+                                </div>
+                            )}
                             <div className="flex-1 min-w-0">
                                 <p className="text-sm font-semibold text-gray-900 truncate">{user?.name}</p>
                                 <p className="text-xs text-gray-500">Vendor Account</p>
@@ -151,7 +155,7 @@ export default function VendorLayout({ children }: VendorLayoutProps) {
                         <div className="flex items-center space-x-6 ml-auto">
                             {/* Enhanced Notifications */}
                             <div className="relative">
-                                <NotificationCenter />
+                                {/* <NotificationCenter /> */}
                             </div>
 
                             {/* Vendor info */}
@@ -160,9 +164,13 @@ export default function VendorLayout({ children }: VendorLayoutProps) {
                                     <p className="text-sm font-semibold text-gray-900">{user?.name}</p>
                                     <p className="text-xs text-gray-500">Vendor Portal</p>
                                 </div>
-                                <div className="w-12 h-12 bg-gradient-to-br from-primary-500 to-primary-600 rounded-2xl flex items-center justify-center shadow-lg">
-                                    <FaUser className="w-6 h-6 text-white" />
-                                </div>
+                                {user?.vendor?.logo ? (
+                                    <img src={user?.vendor?.logo} alt="User Avatar" className="w-12 h-12 rounded-2xl" />
+                                ) : (
+                                    <div className="w-12 h-12 bg-gradient-to-br from-primary-500 to-primary-600 rounded-2xl flex items-center justify-center shadow-lg">
+                                        <FaUser className="w-6 h-6 text-white" />
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -177,7 +185,7 @@ export default function VendorLayout({ children }: VendorLayoutProps) {
             </div>
 
             {/* Notification Toast Container */}
-            <NotificationToastContainer />
+            {/* <NotificationToastContainer /> */}
         </div>
     )
 }

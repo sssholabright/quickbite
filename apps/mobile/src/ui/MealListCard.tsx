@@ -3,7 +3,7 @@ import { MealListCardProps } from '../types/vendor'
 import { useTheme } from '../theme/theme'
 import { Icon } from './Icon'
 
-export default function MealListCard({ meal, onAddToCart, onRemoveFromCart, quantity }: MealListCardProps) {
+export default function MealListCard({ meal, onAddToCart, onRemoveFromCart, quantity, isOpen }: MealListCardProps) {
     const theme = useTheme()
 
     const formatNaira = (amount: number): string => {
@@ -267,18 +267,18 @@ export default function MealListCard({ meal, onAddToCart, onRemoveFromCart, quan
                     ) : (
                         <Pressable
                             onPress={onAddToCart}
-                            disabled={!meal.isAvailable}
+                            disabled={!meal.isAvailable || !isOpen}
                             style={{
-                                backgroundColor: meal.isAvailable ? theme.colors.primary : theme.colors.muted,
+                                backgroundColor: meal.isAvailable && isOpen ? theme.colors.primary : theme.colors.danger,
                                 borderRadius: 20,
                                 paddingHorizontal: 12,
                                 paddingVertical: 6,
-                                shadowColor: meal.isAvailable ? theme.colors.primary : theme.colors.muted,
+                                shadowColor: meal.isAvailable && isOpen ? theme.colors.primary : theme.colors.danger,
                                 shadowOffset: { width: 0, height: 2 },
                                 shadowOpacity: 0.3,
                                 shadowRadius: 4,
                                 elevation: 3,
-                                opacity: meal.isAvailable ? 1 : 0.6
+                                opacity: meal.isAvailable && isOpen ? 1 : 0.5
                             }}
                         >
                             <Text style={{
@@ -288,7 +288,7 @@ export default function MealListCard({ meal, onAddToCart, onRemoveFromCart, quan
                                 textTransform: "uppercase",
                                 letterSpacing: 0.5
                             }}>
-                                {meal.isAvailable ? "Add to Cart" : "Out of Stock"}
+                                {!isOpen ? "Closed" : meal.isAvailable ? "Add" : "Out of Stock"}
                             </Text>
                         </Pressable>
                     )}

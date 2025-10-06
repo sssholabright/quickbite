@@ -256,7 +256,7 @@ export default function OrderCard({
                                     </div>
                                 )}
                                 
-                                {order.rider && (
+                                {order.rider && order.rider.rating > 0 && (
                                     <div className="p-3 bg-green-50 rounded-xl border border-green-200">
                                         <p className="text-sm font-bold text-gray-700 mb-1 flex items-center">
                                             <FaMotorcycle className="w-4 h-4 mr-2" />

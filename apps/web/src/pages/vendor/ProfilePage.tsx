@@ -93,7 +93,7 @@ export default function ProfilePage() {
                 <AddressInfo profile={profile} />
 
                 {/* Bank Details */}
-                <BankDetails profile={profile} />
+                {/* <BankDetails profile={profile} /> */}
             </div>
         </VendorLayout>
     )

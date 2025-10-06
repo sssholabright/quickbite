@@ -38,31 +38,52 @@ export interface Order {
     vendor: {
         id: string;
         name: string;
-        logo?: string;
-        location?: string; // Make optional since address can be null
+        businessName: string; // 🚀 ADD: Include business name
+        logo?: string; // 🚀 ENHANCED: Include vendor logo
+        address?: string; // 🚀 ADD: Include vendor address
+        phone?: string; // 🚀 ADD: Include vendor phone
+        coordinates?: { // 🚀 ADD: Include vendor coordinates
+            lat: number;
+            lng: number;
+        };
     };
-    items: OrderItem[];
-    status: OrderStatus;
-    total: number;
-    subtotal: number;
-    fees: number;
-    paymentMethod: 'cash' | 'card';
-    paymentStatus: 'paid' | 'unpaid' | 'refunded';
-    notes?: string;
-    pickupTime: 'asap' | string;
-    placedAt: Date;
-    estimatedReadyAt?: Date;
-    pickupCode?: string;
-    statusText?: string;  // Add this
-    statusColor?: string; // Add this
-    rider?: {
+    customer?: { // 🚀 ADD: Include customer info
         id: string;
         name: string;
         phone: string;
-        vehicleType: string;
     };
-    isLiveTracking?: boolean; // Add this too
-    estimatedDeliveryTime?: Date; // Add this
+    rider?: { // 🚀 ADD: Include rider info
+        id: string;
+        name: string;
+        phone: string;
+    };
+    items: OrderItem[];
+    status: OrderStatus;
+    // 🚀 ADD: New properties for enhanced status display
+    statusDisplayText?: string;
+    statusColor?: string;
+    isRealtime?: boolean;
+    total: number;
+    subtotal: number;
+    fees: number;
+    deliveryFee: number; // 🚀 ADD: Separate delivery fee
+    serviceFee: number; // 🚀 ADD: Separate service fee
+    deliveryAddress?: { // 🚀 ADD: Include delivery address
+        city?: string;
+        label?: string;
+        state?: string;
+        address?: string;
+        coordinates?: {
+            lat: number;
+            lng: number;
+        };
+    };
+    paymentMethod: 'cash' | 'card';
+    paymentStatus: 'paid' | 'unpaid' | 'refunded';
+    estimatedDeliveryTime?: Date;
+    specialInstructions?: string;
+    createdAt: Date;
+    updatedAt: Date;
 }
 
 export interface OrderSummaryProps {
@@ -70,6 +91,7 @@ export interface OrderSummaryProps {
     vendor: {
         name: string;
         distance: string;
+        logo?: string;
         eta: string;
     };
     total: number;
@@ -140,6 +162,7 @@ export interface OrderResponse {
         businessName: string;
         address: string;
         phone: string;
+        logo?: string;
         coordinates: {
             lat: number;
             lng: number;
